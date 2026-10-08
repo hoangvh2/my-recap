@@ -1,0 +1,100 @@
+name: Android
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION_CODE: ${{ github.run_number }}
+  VERSION_NAME: 0.1.${{ github.run_number }}
+
+jobs:
+  build:
+    name: Build, lint, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build
+        run: ./gradlew --no-daemon :core:test :app:lintRelease :app:assembleRelease
+      - name: Upload lint report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-release.html
+          if-no-files-found: ignore
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk MyRecap.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyRecap-apk
+          path: MyRecap.apk
+
+  device-test:
+    name: Emulator test (Android 15)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
+          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest; status=$?; adb pull /data/local/tmp/myrecap-shots screenshots || true; exit $status
+      - name: Upload screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-test-results
+          path: |
+            screenshots/
+            app/build/reports/androidTests/
+          if-no-files-found: ignore
+
+  release:
+    name: Publish APK
+    needs: [build, device-test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/meeting-notes-stt-app-ce4wp7')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MyRecap-apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          name: My Recap ${{ env.VERSION_NAME }}
+          make_latest: true
+          files: MyRecap.apk
+          body: |
+            Cài đặt: mở link này trên điện thoại → tải MyRecap.apk → mở file → cho phép "Cài ứng dụng không rõ nguồn gốc".
+            Bản mới cài đè lên bản cũ, giữ nguyên dữ liệu.
+            Commit: ${{ github.sha }}
