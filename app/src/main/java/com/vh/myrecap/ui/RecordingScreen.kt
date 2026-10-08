@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vh.myrecap.core.TimeFormat
@@ -62,21 +63,35 @@ fun RecordingScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(ui.mode.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                ui.folderTitle.ifBlank { ui.mode.label },
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier
                         .size(16.dp)
                         .clip(CircleShape)
-                        .background(if (ui.paused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error),
+                        .background(
+                            when {
+                                ui.paused -> MaterialTheme.colorScheme.outline
+                                ui.speaking || !ui.autoSplit -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.tertiary
+                            },
+                        ),
                 )
                 Spacer(Modifier.size(10.dp))
                 Text(
                     when {
                         ui.stopping -> "Đang lưu…"
                         ui.paused -> "Tạm dừng"
-                        else -> "Đang ghi"
+                        !ui.autoSplit -> "Đang ghi"
+                        ui.speaking -> "Đang nghe hội thoại"
+                        else -> "Chờ giọng nói…"
                     },
                     style = MaterialTheme.typography.titleLarge,
                 )
@@ -95,6 +110,13 @@ fun RecordingScreen(
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .semantics { contentDescription = "Mức âm thanh micro" },
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "${ui.clips} đoạn đã lưu" +
+                    if (ui.skippedMs >= 1_000) " · bỏ ${TimeFormat.clock(ui.skippedMs)} im lặng" else "",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
 
@@ -134,8 +156,9 @@ fun RecordingScreen(
             }
             Spacer(Modifier.height(16.dp))
             Text(
-                "Có thể tắt màn hình — vẫn ghi âm. Bấm nút nguồn để mở lại màn hình này ngay trên màn hình khoá, " +
-                    "hoặc dùng nút trong thông báo. Rung 1 lần = đã đánh dấu.",
+                "Có thể tắt màn hình — vẫn ghi âm. App tự tách mỗi lượt hỏi-đáp thành 1 đoạn khi có khoảng lặng " +
+                    "và bỏ phần im lặng trước khi gửi đi. Bấm nút nguồn để mở lại màn hình này trên màn hình khoá. " +
+                    "Rung 1 lần = đã đánh dấu.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -147,7 +170,7 @@ fun RecordingScreen(
         AlertDialog(
             onDismissRequest = { confirmStop = false },
             title = { Text("Dừng ghi âm?") },
-            text = { Text("Bản ghi được lưu và tự động chuyển thành văn bản (nếu đã bật).") },
+            text = { Text("Các đoạn được lưu vào folder và tự chuyển thành văn bản. Muốn tóm tắt: mở folder, chọn đoạn, bấm Tóm tắt.") },
             confirmButton = {
                 Button(
                     onClick = {

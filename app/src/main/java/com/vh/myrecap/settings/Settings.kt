@@ -1,16 +1,19 @@
 package com.vh.myrecap.settings
 
 import android.content.Context
+import com.vh.myrecap.core.InterviewerSpeech
 import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
+import com.vh.myrecap.core.SegmenterConfig
 import com.vh.myrecap.core.SessionMode
+import com.vh.myrecap.core.VadSensitivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 data class AppSettings(
     val sttProvider: ProviderKind = ProviderKind.GEMINI,
-    val summaryEnabled: Boolean = true,
+    /** Summaries run only when the user asks, over the clips they pick. */
     val summaryProvider: ProviderKind = ProviderKind.GEMINI,
 
     val geminiKey: String = "",
@@ -29,12 +32,21 @@ data class AppSettings(
     val customPrompt: String = "",
     val defaultMode: SessionMode = SessionMode.INTERVIEW,
 
-    /** Transcribe + summarise automatically when recording stops. */
+    /** Transcribe clips automatically (no summary) once recorded. */
     val autoProcess: Boolean = true,
-    /** Transcribe each finished segment while still recording, so results are ready sooner. */
+    /** Transcribe each finished clip while still recording, so results are ready sooner. */
     val processWhileRecording: Boolean = true,
     val wifiOnly: Boolean = false,
+    /** Upper bound for one clip, so each upload stays small. */
     val segmentMinutes: Int = 10,
+
+    /** Split the recording into one clip per conversational turn, at long pauses. */
+    val autoSplit: Boolean = true,
+    val splitPauseSec: Int = 6,
+    /** Drop long silences inside a clip before upload. */
+    val trimSilence: Boolean = true,
+    val vadSensitivity: VadSensitivity = VadSensitivity.NORMAL,
+    val interviewerSpeech: InterviewerSpeech = InterviewerSpeech.KEEP,
     /** User confirmed they followed the vendor (Tecno/HiOS) background-run guide. */
     val vendorGuideDone: Boolean = false,
 ) {
@@ -43,6 +55,17 @@ data class AppSettings(
         ProviderKind.OPENAI_COMPATIBLE ->
             ProviderConfig(ProviderKind.OPENAI_COMPATIBLE, openAiBaseUrl.trimEnd('/'), openAiKey.trim(), openAiSttModel.trim())
     }
+
+    /** Clip segmentation; with auto-split off, clips are fixed-length chunks as before. */
+    fun segmenterConfig(): SegmenterConfig = SegmenterConfig(
+        splitPauseMs = if (autoSplit) splitPauseSec.coerceIn(2, 60) * 1000 else Int.MAX_VALUE,
+        trimSilence = trimSilence,
+        maxClipMs = segmentMinutes.coerceIn(1, 30) * 60_000,
+        minSpeechMs = if (autoSplit || trimSilence) SegmenterConfig().minSpeechMs else 0,
+    )
+
+    /** VAD only matters when splitting or trimming; otherwise everything is kept. */
+    val usesVad: Boolean get() = autoSplit || trimSilence
 
     fun summaryConfig(): ProviderConfig = when (summaryProvider) {
         ProviderKind.GEMINI -> ProviderConfig(ProviderKind.GEMINI, geminiBaseUrl.trimEnd('/'), geminiKey.trim(), geminiSummaryModel.trim())
@@ -70,7 +93,6 @@ class SettingsRepository(context: Context) {
         val d = AppSettings()
         return AppSettings(
             sttProvider = enumPref("sttProvider", d.sttProvider),
-            summaryEnabled = prefs.getBoolean("summaryEnabled", d.summaryEnabled),
             summaryProvider = enumPref("summaryProvider", d.summaryProvider),
             geminiKey = secrets.decrypt(prefs.getString("geminiKey", "") ?: ""),
             geminiSttModel = prefs.getString("geminiSttModel", null) ?: d.geminiSttModel,
@@ -89,13 +111,17 @@ class SettingsRepository(context: Context) {
             wifiOnly = prefs.getBoolean("wifiOnly", d.wifiOnly),
             segmentMinutes = prefs.getInt("segmentMinutes", d.segmentMinutes),
             vendorGuideDone = prefs.getBoolean("vendorGuideDone", d.vendorGuideDone),
+            autoSplit = prefs.getBoolean("autoSplit", d.autoSplit),
+            splitPauseSec = prefs.getInt("splitPauseSec", d.splitPauseSec),
+            trimSilence = prefs.getBoolean("trimSilence", d.trimSilence),
+            vadSensitivity = enumPref("vadSensitivity", d.vadSensitivity),
+            interviewerSpeech = enumPref("interviewerSpeech", d.interviewerSpeech),
         )
     }
 
     private fun save(s: AppSettings) {
         prefs.edit()
             .putString("sttProvider", s.sttProvider.name)
-            .putBoolean("summaryEnabled", s.summaryEnabled)
             .putString("summaryProvider", s.summaryProvider.name)
             .putString("geminiKey", secrets.encrypt(s.geminiKey))
             .putString("geminiSttModel", s.geminiSttModel)
@@ -114,6 +140,11 @@ class SettingsRepository(context: Context) {
             .putBoolean("wifiOnly", s.wifiOnly)
             .putInt("segmentMinutes", s.segmentMinutes)
             .putBoolean("vendorGuideDone", s.vendorGuideDone)
+            .putBoolean("autoSplit", s.autoSplit)
+            .putInt("splitPauseSec", s.splitPauseSec)
+            .putBoolean("trimSilence", s.trimSilence)
+            .putString("vadSensitivity", s.vadSensitivity.name)
+            .putString("interviewerSpeech", s.interviewerSpeech.name)
             .apply()
     }
 

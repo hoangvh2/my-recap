@@ -15,21 +15,43 @@ class FormatTest {
     }
 
     @Test
-    fun assemblerOrdersSegmentsAndPlacesBookmarks() {
+    fun assemblerOrdersClipsAndPlacesBookmarks() {
         val out = TranscriptAssembler.assemble(
             listOf(
-                SegmentText(600_000, 300_000, "B"),
-                SegmentText(0, 600_000, "A"),
+                ClipText(2, 600_000, 900_000, "Kinh nghiệm Kotlin", "B"),
+                ClipText(1, 0, 600_000, null, "A"),
             ),
             bookmarksMs = listOf(30_000, 600_000, 900_000),
         )
-        val expected = "[00:00 – 10:00]  ⭐ 00:30\nA\n\n[10:00 – 15:00]  ⭐ 10:00, 15:00\nB"
+        val expected = "[Đoạn 1 · 00:00–10:00]  ⭐ 00:30\nA\n\n[Đoạn 2 · 10:00–15:00] Kinh nghiệm Kotlin  ⭐ 10:00, 15:00\nB"
         assertEquals(expected, out)
     }
 
     @Test
     fun assemblerMarksMissingTranscript() {
-        assertTrue("(chưa có transcript)" in TranscriptAssembler.assemble(listOf(SegmentText(0, 1000, null)), emptyList()))
+        assertTrue("(chưa có transcript)" in TranscriptAssembler.assemble(listOf(ClipText(1, 0, 1000, null, null)), emptyList()))
+    }
+
+    @Test
+    fun parsesTitleLine() {
+        assertEquals(
+            ClipTranscript("Lý do nghỉ việc", "Ứng viên: Vì muốn thử thách mới."),
+            Prompts.parseClipTranscript("# **Lý do nghỉ việc**\nỨng viên: Vì muốn thử thách mới.\n"),
+        )
+        assertEquals(ClipTranscript(null, "Xin chào"), Prompts.parseClipTranscript("  Xin chào "))
+        assertEquals(ClipTranscript("Chào hỏi", Prompts.NO_SPEECH), Prompts.parseClipTranscript("# Chào hỏi"))
+    }
+
+    @Test
+    fun interviewerHandlingChangesPrompt() {
+        val keep = Prompts.transcriptionInstruction(SessionMode.INTERVIEW, "", InterviewerSpeech.KEEP)
+        val condense = Prompts.transcriptionInstruction(SessionMode.INTERVIEW, "", InterviewerSpeech.CONDENSE)
+        val drop = Prompts.transcriptionInstruction(SessionMode.INTERVIEW, "", InterviewerSpeech.DROP, OutputLanguage.JA)
+        assertFalse("Leave out" in keep || "at most 20 words" in keep)
+        assertTrue("at most 20 words" in condense)
+        assertTrue("Leave out" in drop && Prompts.INTERVIEWER_ONLY in drop && "Japanese" in drop)
+        // Meetings ignore the interviewer option.
+        assertFalse("Leave out" in Prompts.transcriptionInstruction(SessionMode.MEETING, "", InterviewerSpeech.DROP))
     }
 
     @Test

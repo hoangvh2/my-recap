@@ -32,7 +32,8 @@ sealed interface Screen {
     data object Settings : Screen
 }
 
-class SessionDetail(val session: Session, val transcript: String, val summary: String?)
+/** A folder with the text of each clip (by index) and of each summary (by job id). */
+class FolderDetail(val session: Session, val clipText: Map<Int, String?>, val summaryText: Map<String, String?>)
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as MyRecapApp
@@ -75,21 +76,43 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         RecordingService.start(app, mode, "")
     }
 
+    /** Records more into an existing folder (same interview, after a break). */
+    fun recordMore(folderId: String) {
+        val folder = store.get(folderId) ?: return
+        RecorderState.clearError()
+        RecordingService.start(app, folder.mode, folder.title, folderId)
+    }
+
     fun togglePause() = RecordingService.command(app, RecordingService.ACTION_TOGGLE_PAUSE)
     fun bookmark() = RecordingService.command(app, RecordingService.ACTION_BOOKMARK)
     fun stop() = RecordingService.command(app, RecordingService.ACTION_STOP)
 
-    fun detail(id: String): Flow<SessionDetail?> = store.version
+    fun detail(id: String): Flow<FolderDetail?> = store.version
         .map {
-            store.get(id)?.let { s -> SessionDetail(s, store.fullTranscript(s), store.readSummary(id)) }
+            store.get(id)?.let { s ->
+                FolderDetail(
+                    session = s,
+                    clipText = s.segments.associate { it.index to store.readTranscript(id, it.index) },
+                    summaryText = s.summaries.associate { it.id to store.readSummary(id, it.id) },
+                )
+            }
         }
         .flowOn(Dispatchers.IO)
 
-    fun process(id: String) = io { Processing.retry(app, id, resummarize = false) }
+    fun transcribeAll(id: String) = io { Processing.retryStt(app, id) }
+    fun retranscribe(id: String, index: Int) = io { Processing.retryStt(app, id, index) }
+    fun deleteClip(id: String, index: Int) = io { store.deleteClip(id, index) }
 
-    fun resummarize(id: String, mode: SessionMode) = io {
-        store.update(id) { it.copy(mode = mode) }
-        Processing.retry(app, id, resummarize = true)
+    fun summarize(id: String, clipIndexes: List<Int>, mode: SessionMode) = io {
+        Processing.requestSummary(app, id, clipIndexes, mode)
+    }
+
+    fun retrySummary(id: String, jobId: String) = io { Processing.retrySummary(app, id, jobId) }
+    fun deleteSummary(id: String, jobId: String) = io { store.deleteSummary(id, jobId) }
+
+    /** Text of the chosen clips, for sharing or copying. */
+    suspend fun clipsText(id: String, indexes: Collection<Int>): String = withContext(Dispatchers.IO) {
+        store.get(id)?.let { store.transcript(it, indexes) }.orEmpty()
     }
 
     fun rename(id: String, title: String) = io {

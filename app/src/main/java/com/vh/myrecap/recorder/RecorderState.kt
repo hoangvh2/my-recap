@@ -8,7 +8,14 @@ import kotlinx.coroutines.flow.update
 data class RecorderUi(
     val active: Boolean = false,
     val sessionId: String? = null,
+    val folderTitle: String = "",
     val mode: SessionMode = SessionMode.INTERVIEW,
+    /** Someone is talking (a clip is open). */
+    val speaking: Boolean = false,
+    val clips: Int = 0,
+    /** Time not uploaded thanks to silence filtering in this recording run. */
+    val skippedMs: Long = 0,
+    val autoSplit: Boolean = true,
     val paused: Boolean = false,
     val elapsedMs: Long = 0,
     val level: Float = 0f,

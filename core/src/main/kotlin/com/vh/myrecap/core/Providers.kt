@@ -16,7 +16,12 @@ class GeminiClient(
 
     override fun transcribe(request: SttRequest): String {
         val parts = JSONArray()
-            .put(JSONObject().put("text", Prompts.transcriptionInstruction(request.mode, request.previousTail)))
+            .put(
+                JSONObject().put(
+                    "text",
+                    Prompts.transcriptionInstruction(request.mode, request.previousTail, request.interviewer, request.titleLanguage),
+                ),
+            )
             .put(
                 JSONObject().put(
                     "inline_data",

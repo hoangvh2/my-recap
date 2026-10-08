@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -44,7 +45,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vh.myrecap.core.InterviewerSpeech
 import com.vh.myrecap.core.OutputLanguage
+import com.vh.myrecap.core.VadSensitivity
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
 import com.vh.myrecap.settings.AppSettings
@@ -75,35 +78,77 @@ fun SettingsScreen(vm: AppViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Section("1. Chuyển giọng nói → văn bản (luôn bật)") {
+            Section("1. Chuyển giọng nói → văn bản") {
                 ProviderChoice(s.sttProvider) { k -> update { it.copy(sttProvider = k) } }
                 Hint(
                     if (s.sttProvider == ProviderKind.GEMINI) {
-                        "Gemini: có gói miễn phí, nhận diện người nói, hỗ trợ trộn Việt/Anh/Nhật. Gói miễn phí: Google có thể dùng dữ liệu để cải thiện sản phẩm."
+                        "Gemini: có gói miễn phí, nhận diện người nói, hỗ trợ trộn Việt/Anh/Nhật, tự đặt tiêu đề cho từng đoạn. Gói miễn phí: Google có thể dùng dữ liệu để cải thiện sản phẩm."
                     } else {
-                        "Whisper (Groq ~$0.04/giờ, có gói miễn phí): rất rẻ và nhanh nhưng KHÔNG tách người nói."
+                        "Whisper (Groq ~$0.04/giờ, có gói miễn phí): rất rẻ và nhanh nhưng KHÔNG tách người nói và không tự đặt tiêu đề."
+                    },
+                )
+                SwitchRow("Tự chuyển văn bản sau khi ghi", s.autoProcess) { v -> update { it.copy(autoProcess = v) } }
+                if (s.autoProcess) {
+                    SwitchRow("Chuyển ngay từng đoạn trong lúc ghi", s.processWhileRecording) { v ->
+                        update { it.copy(processWhileRecording = v) }
+                    }
+                }
+                SwitchRow("Chỉ gửi khi có Wi-Fi", s.wifiOnly) { v -> update { it.copy(wifiOnly = v) } }
+            }
+
+            Section("2. Tự nhận biết hội thoại") {
+                SwitchRow("Tự tách đoạn khi có khoảng lặng", s.autoSplit) { v -> update { it.copy(autoSplit = v) } }
+                if (s.autoSplit) {
+                    Text("Khoảng lặng để kết thúc 1 đoạn", fontWeight = FontWeight.SemiBold)
+                    ChoiceRow(listOf(4, 6, 8, 12, 15), s.splitPauseSec, { "$it giây" }) { v -> update { it.copy(splitPauseSec = v) } }
+                    Hint(
+                        "Ví dụ 6 giây: ứng viên trả lời xong, bạn im lặng ≥6 giây để chuẩn bị câu hỏi tiếp → app đóng đoạn " +
+                            "hiện tại và chờ đoạn mới. Ngập ngừng ngắn khi trả lời vẫn nằm chung 1 đoạn.",
+                    )
+                }
+                SwitchRow("Bỏ khoảng lặng dài trước khi gửi (giữ tối đa 0,8 giây)", s.trimSilence) { v ->
+                    update { it.copy(trimSilence = v) }
+                }
+                if (s.usesVad) {
+                    Text("Độ nhạy nhận giọng nói", fontWeight = FontWeight.SemiBold)
+                    VadSensitivity.entries.forEach { v ->
+                        RadioRow(v.label, s.vadSensitivity == v) { update { it.copy(vadSensitivity = v) } }
+                    }
+                    Hint("Tiếng động ngắn (ho, gõ bàn < 1,5 giây) bị bỏ qua. Nếu bị mất lời nói nhỏ, tăng độ nhạy.")
+                }
+                Text("Độ dài tối đa 1 đoạn", fontWeight = FontWeight.SemiBold)
+                ChoiceRow(listOf(5, 10, 15), s.segmentMinutes, { "$it phút" }) { v -> update { it.copy(segmentMinutes = v) } }
+            }
+
+            Section("3. Lời người phỏng vấn (chế độ Phỏng vấn)") {
+                InterviewerSpeech.entries.forEach { v ->
+                    RadioRow(v.label, s.interviewerSpeech == v) { update { it.copy(interviewerSpeech = v) } }
+                }
+                Hint(
+                    if (s.sttProvider == ProviderKind.GEMINI) {
+                        "AI nhận ra ai là người hỏi theo ngữ cảnh. Giúp transcript gọn và giảm phí đầu ra; âm thanh vẫn được gửi đủ " +
+                            "(phí âm thanh không đổi). 'Rút gọn' được khuyên dùng: giữ câu hỏi để tóm tắt vẫn đủ ngữ cảnh."
+                    } else {
+                        "Chỉ áp dụng khi dùng Gemini (Whisper không phân biệt người nói)."
                     },
                 )
             }
 
-            Section("2. AI tóm tắt & viết lại") {
-                SwitchRow("Bật AI tóm tắt", s.summaryEnabled) { v -> update { it.copy(summaryEnabled = v) } }
-                if (s.summaryEnabled) {
-                    ProviderChoice(s.summaryProvider) { k -> update { it.copy(summaryProvider = k) } }
-                    Text("Ngôn ngữ bản tóm tắt", fontWeight = FontWeight.SemiBold)
-                    OutputLanguage.entries.forEach { lang ->
-                        RadioRow(lang.label, s.outputLanguage == lang) { update { it.copy(outputLanguage = lang) } }
-                    }
-                    Field("Yêu cầu tóm tắt tự do (mẫu 'Tự do')", s.customPrompt, singleLine = false) { v ->
-                        update { it.copy(customPrompt = v) }
-                    }
-                    Hint("Ví dụ: \"Viết lại thành email gửi khách hàng, giọng lịch sự\".")
+            Section("4. AI tóm tắt & viết lại (khi bạn bấm)") {
+                Hint("Không tự chạy. Trong folder, chọn các đoạn cần thiết rồi bấm Tóm tắt.")
+                ProviderChoice(s.summaryProvider) { k -> update { it.copy(summaryProvider = k) } }
+                Text("Ngôn ngữ tóm tắt & tiêu đề đoạn", fontWeight = FontWeight.SemiBold)
+                OutputLanguage.entries.forEach { lang ->
+                    RadioRow(lang.label, s.outputLanguage == lang) { update { it.copy(outputLanguage = lang) } }
                 }
+                Field("Yêu cầu tóm tắt tự do (mẫu 'Tự do')", s.customPrompt, singleLine = false) { v ->
+                    update { it.copy(customPrompt = v) }
+                }
+                Hint("Ví dụ: \"Viết lại thành email gửi khách hàng, giọng lịch sự\".")
             }
 
-            val usesGemini = s.sttProvider == ProviderKind.GEMINI || (s.summaryEnabled && s.summaryProvider == ProviderKind.GEMINI)
-            val usesOpenAi = s.sttProvider == ProviderKind.OPENAI_COMPATIBLE ||
-                (s.summaryEnabled && s.summaryProvider == ProviderKind.OPENAI_COMPATIBLE)
+            val usesGemini = s.sttProvider == ProviderKind.GEMINI || s.summaryProvider == ProviderKind.GEMINI
+            val usesOpenAi = s.sttProvider == ProviderKind.OPENAI_COMPATIBLE || s.summaryProvider == ProviderKind.OPENAI_COMPATIBLE
 
             if (usesGemini) {
                 Section("Google Gemini") {
@@ -112,7 +157,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     if (s.sttProvider == ProviderKind.GEMINI) {
                         Field("Model chuyển giọng nói", s.geminiSttModel) { v -> update { it.copy(geminiSttModel = v) } }
                     }
-                    if (s.summaryEnabled && s.summaryProvider == ProviderKind.GEMINI) {
+                    if (s.summaryProvider == ProviderKind.GEMINI) {
                         Field("Model tóm tắt", s.geminiSummaryModel) { v -> update { it.copy(geminiSummaryModel = v) } }
                     }
                     Hint("Mặc định ${ProviderConfig.GEMINI_DEFAULT_MODEL} (rẻ nhất). Muốn chính xác hơn: model 'flash' (không lite).")
@@ -146,29 +191,17 @@ fun SettingsScreen(vm: AppViewModel) {
                             update { it.copy(whisperLanguage = v) }
                         }
                     }
-                    if (s.summaryEnabled && s.summaryProvider == ProviderKind.OPENAI_COMPATIBLE) {
+                    if (s.summaryProvider == ProviderKind.OPENAI_COMPATIBLE) {
                         Field("Model tóm tắt", s.openAiChatModel) { v -> update { it.copy(openAiChatModel = v) } }
                     }
                     TestButton(vm, if (s.sttProvider == ProviderKind.OPENAI_COMPATIBLE) s.sttConfig() else s.summaryConfig())
                 }
             }
 
-            Section("3. Xử lý & chi phí") {
-                SwitchRow("Tự xử lý khi dừng ghi", s.autoProcess) { v -> update { it.copy(autoProcess = v) } }
-                SwitchRow("Chuyển văn bản dần trong lúc ghi (có kết quả sớm hơn)", s.processWhileRecording) { v ->
-                    update { it.copy(processWhileRecording = v) }
-                }
-                SwitchRow("Chỉ xử lý khi có Wi-Fi", s.wifiOnly) { v -> update { it.copy(wifiOnly = v) } }
-                Text("Độ dài mỗi đoạn gửi đi", fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(5, 10, 15).forEach { m ->
-                        val selected = s.segmentMinutes == m
-                        if (selected) FilledTonalButton(onClick = {}) { Text("$m phút") }
-                        else OutlinedButton(onClick = { update { it.copy(segmentMinutes = m) } }) { Text("$m phút") }
-                    }
-                }
-                Hint("Âm thanh ghi ở 32 kbps (~14 MB/giờ). Ước tính chi phí 1 giờ: Gemini Flash-Lite ≈ $0.04 (gói trả phí), Groq Whisper ≈ $0.04.")
-            }
+            Hint(
+                "Âm thanh ghi ở 32 kbps (~14 MB/giờ). Chi phí chuyển văn bản ~\$0.04/giờ âm thanh (Gemini Flash-Lite gói trả phí " +
+                    "hoặc Groq Whisper); phần im lặng đã lược bỏ không bị tính.",
+            )
             Spacer(Modifier.padding(8.dp))
         }
     }
@@ -181,6 +214,19 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             HorizontalDivider()
             content()
+        }
+    }
+}
+
+@Composable
+private fun <T> ChoiceRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEach { o ->
+            if (o == selected) {
+                FilledTonalButton(onClick = {}, contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(label(o)) }
+            } else {
+                OutlinedButton(onClick = { onSelect(o) }, contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(label(o)) }
+            }
         }
     }
 }

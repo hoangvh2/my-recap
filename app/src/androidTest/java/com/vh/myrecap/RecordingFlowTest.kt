@@ -12,7 +12,12 @@ import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.data.RecState
+import com.vh.myrecap.data.Segment
+import com.vh.myrecap.data.SessionStore
+import com.vh.myrecap.data.SummaryJob
+import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
 import com.vh.myrecap.recorder.RecordingService
 import com.vh.myrecap.ui.MainActivity
@@ -57,6 +62,9 @@ class RecordingFlowTest {
 
     @Test
     fun recordBookmarkLockAndStop() {
+        // The emulator microphone delivers silence, which voice detection (tested in ClipRecorderTest)
+        // would rightly drop. Record everything here to exercise the service, screens and storage.
+        MyRecapApp.from(context).settings.update { it.copy(autoSplit = false, trimSilence = false) }
         val launch = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launch).use {
             device.wait(Until.hasObject(By.text("GHI ÂM")), 10_000)
@@ -129,6 +137,68 @@ class RecordingFlowTest {
             device.wait(Until.hasObject(By.text("GHI ÂM")), 5_000)
             shot("06-home-after")
         }
+    }
+
+    /** Seeds a folder like a real interview and walks the folder UI: clips, selection, summary. */
+    @Test
+    fun folderScreenSelectsClipsAndShowsSummaries() {
+        val store = MyRecapApp.from(context).store
+        val folder = store.create(SessionMode.INTERVIEW, "PV Backend – Nguyễn Văn A")
+        val titles = listOf("Giới thiệu bản thân", "Kinh nghiệm Kotlin coroutines", "Lý do nghỉ việc")
+        val now = System.currentTimeMillis()
+        store.update(folder.id) { f ->
+            f.copy(
+                state = RecState.STOPPED,
+                durationMs = 600_000,
+                segments = titles.mapIndexed { i, t ->
+                    Segment(
+                        i, SessionStore.segmentFileName(i), i * 200_000L, 95_000, TaskStatus.DONE,
+                        title = t, endMs = i * 200_000L + 120_000, recordedAt = now - (3 - i) * 200_000L,
+                    )
+                },
+                bookmarksMs = listOf(30_000),
+                summaries = listOf(
+                    SummaryJob("demo", now, SessionMode.INTERVIEW, listOf(0, 1, 2), TaskStatus.DONE),
+                ),
+            )
+        }
+        titles.forEachIndexed { i, _ ->
+            store.writeTranscript(
+                folder.id, i,
+                "Người phỏng vấn: Câu hỏi số ${i + 1}?\nỨng viên: Em đã làm việc 3 năm với Kotlin, chủ yếu là backend và Android, " +
+                    "dùng coroutines cho các tác vụ mạng và cơ sở dữ liệu.",
+            )
+        }
+        store.writeSummary(
+            folder.id, "demo",
+            "## Tổng quan\nỨng viên có **3 năm** kinh nghiệm Kotlin.\n## Điểm mạnh\n- Hiểu coroutines\n- Giao tiếp rõ ràng",
+        )
+
+        val launch = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(MainActivity.EXTRA_SESSION_ID, folder.id)
+        ActivityScenario.launch<MainActivity>(launch).use {
+            assertTrue(device.wait(Until.hasObject(By.text("Kinh nghiệm Kotlin coroutines")), 10_000))
+            shot("07-folder")
+
+            device.findObject(By.textStartsWith("Chọn tất cả")).click()
+            assertTrue("selecting all enables summary", device.wait(Until.hasObject(By.text("Tóm tắt (3)")), 5_000))
+            shot("08-selected")
+            device.findObject(By.text("Tóm tắt (3)")).click()
+            assertTrue(device.wait(Until.hasObject(By.text("Tóm tắt 3 đoạn")), 5_000))
+            shot("09-summarize-dialog")
+            device.findObject(By.text("Huỷ")).click()
+
+            device.findObject(By.text("Tóm tắt (1)")).click()
+            assertTrue(device.wait(Until.hasObject(By.text("Tổng quan")), 5_000))
+            shot("10-summaries")
+
+            device.findObject(By.desc("Đổi tên folder")).click()
+            assertTrue(device.wait(Until.hasObject(By.text("Đổi tên folder")), 5_000))
+            shot("11-rename")
+            device.findObject(By.text("Huỷ")).click()
+        }
+        store.delete(folder.id)
     }
 
     private companion object {

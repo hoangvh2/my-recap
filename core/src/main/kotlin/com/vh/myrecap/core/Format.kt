@@ -16,20 +16,21 @@ object TimeFormat {
 
 object TranscriptAssembler {
     /**
-     * Joins segment transcripts in timeline order. Each block starts with its time range and the
-     * bookmarks that fall inside it, so a reader (and the summary model) can locate marked moments.
+     * Joins clip transcripts in timeline order. Each block starts with its number, time range,
+     * title and the bookmarks inside it, so readers (and the summary model) can locate moments.
      */
-    fun assemble(segments: List<SegmentText>, bookmarksMs: List<Long>): String {
-        val sorted = segments.sortedBy { it.startMs }
-        return sorted.mapIndexed { i, seg ->
-            val end = seg.startMs + seg.durationMs
+    fun assemble(clips: List<ClipText>, bookmarksMs: List<Long>): String {
+        val sorted = clips.sortedBy { it.startMs }
+        return sorted.mapIndexed { i, clip ->
             val isLast = i == sorted.lastIndex
-            val marks = bookmarksMs.filter { it >= seg.startMs && (it < end || (isLast && it <= end)) }
+            val marks = bookmarksMs.filter { it >= clip.startMs && (it < clip.endMs || (isLast && it <= clip.endMs)) }
             val header = buildString {
-                append("[").append(TimeFormat.clock(seg.startMs)).append(" – ").append(TimeFormat.clock(end)).append("]")
+                append("[Đoạn ").append(clip.number).append(" · ")
+                append(TimeFormat.clock(clip.startMs)).append("–").append(TimeFormat.clock(clip.endMs)).append("]")
+                if (!clip.title.isNullOrBlank()) append(" ").append(clip.title)
                 if (marks.isNotEmpty()) append("  ⭐ ").append(marks.joinToString(", ") { TimeFormat.clock(it) })
             }
-            val body = seg.text?.trim().orEmpty().ifEmpty { "(chưa có transcript)" }
+            val body = clip.text?.trim().orEmpty().ifEmpty { "(chưa có transcript)" }
             "$header\n$body"
         }.joinToString("\n\n")
     }

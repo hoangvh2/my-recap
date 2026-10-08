@@ -43,12 +43,25 @@ data class ProviderConfig(
 /** One audio chunk to transcribe. */
 class AudioClip(val bytes: ByteArray, val mimeType: String, val fileName: String)
 
+/** What to do with the interviewer's (the app owner's) speech in interview transcripts. */
+enum class InterviewerSpeech(val label: String) {
+    KEEP("Giữ nguyên"),
+    CONDENSE("Rút gọn thành câu hỏi ngắn"),
+    DROP("Bỏ hẳn, chỉ giữ lời ứng viên"),
+}
+
 class SttRequest(
     val clip: AudioClip,
     val mode: SessionMode,
     /** Tail of the previous chunk's transcript so speaker labels and wording stay consistent. */
     val previousTail: String = "",
+    val interviewer: InterviewerSpeech = InterviewerSpeech.KEEP,
+    /** Language for the short clip title the model writes on the first line. */
+    val titleLanguage: OutputLanguage = OutputLanguage.VI,
 )
+
+/** Model output for one clip: a short topic title (when the provider writes one) and the text. */
+data class ClipTranscript(val title: String?, val text: String)
 
 interface SpeechToText {
     fun transcribe(request: SttRequest): String
@@ -58,5 +71,11 @@ interface TextGenerator {
     fun generate(system: String, user: String): String
 }
 
-/** Text of one recorded segment, positioned on the recording timeline (pauses excluded). */
-data class SegmentText(val startMs: Long, val durationMs: Long, val text: String?)
+/** Text of one recorded clip, positioned on the recording timeline (pauses excluded). */
+data class ClipText(
+    val number: Int,
+    val startMs: Long,
+    val endMs: Long,
+    val title: String?,
+    val text: String?,
+)

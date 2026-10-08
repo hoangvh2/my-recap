@@ -56,7 +56,7 @@ class MyRecapApp : Application() {
         for (session in store.list().filter { it.isRecording }) {
             val dir = store.dir(session.id)
             val known = session.segments.map { it.fileName }.toSet()
-            var start = session.segments.maxOfOrNull { it.startMs + it.durationMs } ?: 0L
+            var start = maxOf(session.durationMs, session.segments.maxOfOrNull { it.endMs } ?: 0L)
             var nextIndex = (session.segments.maxOfOrNull { it.index } ?: -1) + 1
             val orphans = dir.listFiles { f -> f.name.endsWith(".aac") && f.name !in known }
                 .orEmpty().sortedBy { it.name }
@@ -75,12 +75,12 @@ class MyRecapApp : Application() {
                 it.copy(
                     state = RecState.INTERRUPTED,
                     segments = it.segments + recovered,
-                    durationMs = start,
+                    durationMs = maxOf(it.durationMs, start),
                     error = "Ghi âm bị hệ thống dừng đột ngột. Đã giữ lại ${TimeFormat.clock(start)} âm thanh.",
                 )
             }
-            if (updated != null && updated.segments.isNotEmpty() && settings.current.autoProcess) {
-                Processing.enqueue(this, updated.id, summarize = true)
+            if (updated != null && updated.sttBusy && settings.current.autoProcess) {
+                Processing.enqueue(this, updated.id)
             }
         }
     }

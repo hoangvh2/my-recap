@@ -66,6 +66,7 @@ import com.vh.myrecap.core.TimeFormat
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.settings.AppSettings
+import com.vh.myrecap.work.ProcessWorker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,21 +81,7 @@ fun HomeScreen(vm: AppViewModel) {
     val resumeTick by vm.resumeTick.collectAsStateWithLifecycle()
     var mode by rememberSaveable { mutableStateOf(settings.defaultMode) }
     var micDenied by remember { mutableStateOf(false) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        val micOk = result[Manifest.permission.RECORD_AUDIO] ?: hasPermission(context, Manifest.permission.RECORD_AUDIO)
-        if (micOk) vm.startRecording(mode) else micDenied = true
-    }
-
-    fun record() {
-        val needed = buildList {
-            if (!hasPermission(context, Manifest.permission.RECORD_AUDIO)) add(Manifest.permission.RECORD_AUDIO)
-            if (Build.VERSION.SDK_INT >= 33 && !hasPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        if (needed.isEmpty()) vm.startRecording(mode) else permissionLauncher.launch(needed.toTypedArray())
-    }
+    val record = rememberRecordAction(onDenied = { micDenied = true }) { vm.startRecording(mode) }
 
     Scaffold(
         topBar = {
@@ -144,7 +131,7 @@ fun HomeScreen(vm: AppViewModel) {
                             .size(180.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFD32F2F))
-                            .clickable(role = Role.Button, onClickLabel = "Bắt đầu ghi âm", onClick = ::record),
+                            .clickable(role = Role.Button, onClickLabel = "Bắt đầu ghi âm", onClick = record),
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -154,7 +141,7 @@ fun HomeScreen(vm: AppViewModel) {
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "1 chạm để bắt đầu · có thể tắt màn hình",
+                        "1 chạm để bắt đầu · tự tách từng đoạn hội thoại",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -163,12 +150,12 @@ fun HomeScreen(vm: AppViewModel) {
             // Below the record button on purpose: recording must always be one tap away.
             item(key = "setup-$resumeTick") { SetupChecklist(context, settings, vm) }
             item {
-                Text("Bản ghi", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                Text("Folder", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             }
             if (sessions.isEmpty()) {
                 item {
                     Text(
-                        "Chưa có bản ghi nào.",
+                        "Chưa có folder nào. Mỗi lần bấm GHI ÂM tạo 1 folder; trong folder bấm \"Ghi tiếp\" để ghi thêm.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,
@@ -190,7 +177,7 @@ private fun SessionCard(session: Session, settings: AppSettings, onClick: () -> 
         Column(Modifier.padding(16.dp)) {
             Text(session.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
             Text(
-                "${formatDate(session.createdAt)} · ${TimeFormat.clock(session.durationMs)}" +
+                "${formatDate(session.createdAt)} · ${session.segments.size} đoạn · ${TimeFormat.clock(session.audioMs)}" +
                     if (session.bookmarksMs.isNotEmpty()) " · ⭐ ${session.bookmarksMs.size}" else "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -205,25 +192,48 @@ private fun SessionCard(session: Session, settings: AppSettings, onClick: () -> 
     }
 }
 
-/** One-line processing status for lists and the detail header. Second value = is an error. */
+/** One-line processing status for lists and the folder header. Second value = is an error. */
 fun statusText(s: Session, settings: AppSettings): Pair<String, Boolean> {
     val total = s.segments.size
-    val running = s.segments.any { it.stt == TaskStatus.RUNNING } || s.summary == TaskStatus.RUNNING
+    val sttRunning = s.segments.any { it.stt == TaskStatus.RUNNING }
+    val error = s.error
     return when {
         s.isRecording -> "● Đang ghi" to false
-        s.error != null && s.error.startsWith("Đang thử lại") -> "⏳ ${s.error}" to false
-        s.error != null && !running && s.segments.none { it.stt == TaskStatus.PENDING } &&
-            s.summary != TaskStatus.PENDING -> "⚠️ ${s.error}" to true
-        s.segments.any { it.stt == TaskStatus.ERROR } || s.summary == TaskStatus.ERROR -> "⚠️ ${s.error ?: "Lỗi xử lý"}" to true
-        total == 0 -> "Không có âm thanh" to true
-        s.segments.any { it.stt != TaskStatus.DONE } && !settings.sttConfig().isComplete ->
-            "⚠️ Chưa có API key chuyển giọng nói — vào Cài đặt để nhập" to true
-        s.segments.any { it.stt != TaskStatus.DONE } ->
-            if (!running && !settings.autoProcess && s.transcribedCount == 0) "Chưa xử lý — mở để xử lý" to false
-            else "⏳ Đang chuyển thành văn bản ${s.transcribedCount}/$total" to false
-        s.summary == TaskStatus.PENDING || s.summary == TaskStatus.RUNNING -> "⏳ Đang tóm tắt…" to false
-        s.summary == TaskStatus.DONE -> "✅ Đã tóm tắt" to false
-        else -> "✅ Đã có transcript" to false
+        error != null && error.startsWith(ProcessWorker.RETRY_PREFIX) -> "⏳ $error" to false
+        s.segments.any { it.stt == TaskStatus.ERROR } -> "⚠️ ${error ?: "Có đoạn lỗi khi chuyển văn bản"}" to true
+        total == 0 -> "Chưa có đoạn hội thoại nào" to false
+        s.sttBusy && !settings.sttConfig().isComplete -> "⚠️ Chưa có API key chuyển giọng nói — vào Cài đặt để nhập" to true
+        s.sttBusy && !sttRunning && !settings.autoProcess && s.transcribedCount == 0 ->
+            "Chưa chuyển văn bản — mở folder để xử lý" to false
+        s.sttBusy -> "⏳ Đang chuyển văn bản ${s.transcribedCount}/$total" to false
+        s.summaryBusy -> "⏳ Đang tóm tắt…" to false
+        s.summaries.any { it.status == TaskStatus.ERROR } -> "⚠️ Tóm tắt lỗi — mở folder để thử lại" to true
+        else -> {
+            val done = s.summaries.count { it.status == TaskStatus.DONE }
+            "✅ $total đoạn có transcript" + (if (done > 0) " · $done tóm tắt" else "") to false
+        }
+    }
+}
+
+/**
+ * Returns a click handler that asks for the microphone (and notification) permission when needed,
+ * then runs [start]. Recording must start from the visible UI (Android 14+ rule).
+ */
+@Composable
+fun rememberRecordAction(onDenied: () -> Unit, start: () -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        val micOk = result[Manifest.permission.RECORD_AUDIO] ?: hasPermission(context, Manifest.permission.RECORD_AUDIO)
+        if (micOk) start() else onDenied()
+    }
+    return {
+        val needed = buildList {
+            if (!hasPermission(context, Manifest.permission.RECORD_AUDIO)) add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= 33 && !hasPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (needed.isEmpty()) start() else launcher.launch(needed.toTypedArray())
     }
 }
 

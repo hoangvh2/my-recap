@@ -23,10 +23,12 @@ import com.vh.myrecap.core.AudioClip
 import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.ProviderKind
 import com.vh.myrecap.core.Providers
+import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.SttRequest
-import com.vh.myrecap.data.RecState
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.Session
+import com.vh.myrecap.data.SessionStore
+import com.vh.myrecap.data.SummaryJob
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.AudioFiles
 import com.vh.myrecap.ui.MainActivity
@@ -37,42 +39,56 @@ import java.util.concurrent.TimeUnit
 
 object Processing {
     /**
-     * Queues background processing for a session. Work for one session runs sequentially (unique
-     * chain), so segments are transcribed in order and each one gets the previous one's context.
+     * Queues background work for a folder: speech-to-text for clips without text, then any
+     * summaries the user requested. Work for one folder runs sequentially (unique chain), so
+     * clips are transcribed in order and each gets the previous one's context.
      */
-    fun enqueue(context: Context, sessionId: String, summarize: Boolean) {
-        val app = MyRecapApp.from(context)
-        val settings = app.settings.current
-        if (summarize && settings.summaryEnabled) {
-            app.store.update(sessionId) {
-                if (it.summary == TaskStatus.DONE) it else it.copy(summary = TaskStatus.PENDING)
-            }
-        }
+    fun enqueue(context: Context, sessionId: String) {
+        val settings = MyRecapApp.from(context).settings.current
         val request = OneTimeWorkRequestBuilder<ProcessWorker>()
-            .setInputData(workDataOf(ProcessWorker.KEY_ID to sessionId, ProcessWorker.KEY_SUMMARIZE to summarize))
+            .setInputData(workDataOf(ProcessWorker.KEY_ID to sessionId))
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(if (settings.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
                     .build(),
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
-            .addTag(TAG)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(workName(sessionId), ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
-    /** Clears errors and queues everything that is not done yet, including the summary. */
-    fun retry(context: Context, sessionId: String, resummarize: Boolean) {
-        val store = MyRecapApp.from(context).store
-        store.update(sessionId) { s ->
+    /** Re-runs speech-to-text for one clip, or for every failed clip when [index] is null. */
+    fun retryStt(context: Context, sessionId: String, index: Int? = null) {
+        MyRecapApp.from(context).store.update(sessionId) { s ->
             s.copy(
-                segments = s.segments.map { if (it.stt == TaskStatus.ERROR) it.copy(stt = TaskStatus.PENDING, error = null) else it },
-                summary = if (resummarize || s.summary == TaskStatus.ERROR) TaskStatus.PENDING else s.summary,
+                segments = s.segments.map {
+                    val again = if (index == null) it.stt == TaskStatus.ERROR else it.index == index
+                    if (again) it.copy(stt = TaskStatus.PENDING, error = null) else it
+                },
                 error = null,
             )
         }
-        if (resummarize) store.summaryFile(sessionId).delete()
-        enqueue(context, sessionId, summarize = true)
+        enqueue(context, sessionId)
+    }
+
+    /** Creates a summary over the chosen clips and queues it. */
+    fun requestSummary(context: Context, sessionId: String, clipIndexes: List<Int>, mode: SessionMode) {
+        val job = SummaryJob(
+            id = SessionStore.newJobId(),
+            createdAt = System.currentTimeMillis(),
+            mode = mode,
+            clipIndexes = clipIndexes.sorted(),
+            status = TaskStatus.PENDING,
+        )
+        MyRecapApp.from(context).store.update(sessionId) { it.copy(summaries = it.summaries + job, error = null) }
+        enqueue(context, sessionId)
+    }
+
+    fun retrySummary(context: Context, sessionId: String, jobId: String) {
+        MyRecapApp.from(context).store.update(sessionId) { s ->
+            s.copy(summaries = s.summaries.map { if (it.id == jobId) it.copy(status = TaskStatus.PENDING, error = null) else it })
+        }
+        enqueue(context, sessionId)
     }
 
     fun cancel(context: Context, sessionId: String) {
@@ -80,7 +96,6 @@ object Processing {
     }
 
     private fun workName(id: String) = "process-$id"
-    private const val TAG = "process"
 }
 
 class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -89,13 +104,13 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val id = inputData.getString(KEY_ID) ?: return@withContext Result.failure()
-        val summarize = inputData.getBoolean(KEY_SUMMARIZE, false)
         val session = store.get(id) ?: return@withContext Result.success() // deleted meanwhile
         val settings = app.settings.current
         val deadline = SystemClock.elapsedRealtime() + TIME_BUDGET_MS
 
-        // 1) Speech-to-text for every finished segment, in order.
-        val pending = session.segments.sortedBy { it.index }.filter { it.stt != TaskStatus.DONE }
+        // 1) Speech-to-text for every clip without text, in order. RUNNING means a killed earlier run.
+        val pending = session.segments.sortedBy { it.index }
+            .filter { it.stt == TaskStatus.PENDING || it.stt == TaskStatus.RUNNING }
         if (pending.isNotEmpty()) {
             val config = settings.sttConfig()
             if (!config.isComplete) {
@@ -104,64 +119,79 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             }
             val stt = Providers.speechToText(config, settings.whisperLanguage.trim())
             for (segment in pending) {
-                if (SystemClock.elapsedRealtime() > deadline) {
-                    // WorkManager caps one run at 10 minutes; continue in a follow-up run.
-                    Processing.enqueue(applicationContext, id, summarize)
-                    return@withContext Result.success()
-                }
-                if (store.get(id) == null) return@withContext Result.success()
-                setSegment(id, segment.index, TaskStatus.RUNNING, null)
+                if (SystemClock.elapsedRealtime() > deadline) return@withContext continueLater(id)
+                val current = store.get(id) ?: return@withContext Result.success()
+                if (current.segments.none { it.index == segment.index }) continue // clip deleted
+                setSegment(id, segment.index) { it.copy(stt = TaskStatus.RUNNING, error = null) }
                 try {
                     val clip = loadClip(id, segment, config.kind)
-                    val previous = store.readTranscript(id, segment.index - 1).orEmpty()
-                    val text = stt.transcribe(SttRequest(clip, session.mode, previous))
-                    store.writeTranscript(id, segment.index, text)
-                    setSegment(id, segment.index, TaskStatus.DONE, null)
+                    val previous = current.segments.filter { it.index < segment.index }.maxByOrNull { it.index }
+                        ?.let { store.readTranscript(id, it.index) }.orEmpty()
+                    val raw = stt.transcribe(
+                        SttRequest(clip, session.mode, previous, settings.interviewerSpeech, settings.outputLanguage),
+                    )
+                    val parsed = Prompts.parseClipTranscript(raw)
+                    store.writeTranscript(id, segment.index, parsed.text)
+                    val title = parsed.title ?: fallbackTitle(parsed.text)
+                    setSegment(id, segment.index) { it.copy(stt = TaskStatus.DONE, error = null, title = title) }
                 } catch (e: ApiException) {
-                    return@withContext handleApiError(id, e) { setSegment(id, segment.index, it, e.message) }
+                    return@withContext handleApiError(id, e) { status ->
+                        setSegment(id, segment.index) { it.copy(stt = status, error = e.message) }
+                    }
                 } catch (e: Exception) {
-                    setSegment(id, segment.index, TaskStatus.ERROR, e.message)
-                    fail(id, "Đoạn ${segment.index + 1}: ${e.message ?: e.javaClass.simpleName}")
+                    setSegment(id, segment.index) { it.copy(stt = TaskStatus.ERROR, error = e.message) }
+                    fail(id, "Đoạn ${segment.number}: ${e.message ?: e.javaClass.simpleName}")
                     return@withContext Result.failure()
                 }
             }
+            store.update(id) { if (it.error?.startsWith(RETRY_PREFIX) == true) it.copy(error = null) else it }
         }
 
-        // 2) Summary, once recording has ended and every segment has text.
-        val current = store.get(id) ?: return@withContext Result.success()
-        val recordingDone = current.state == RecState.STOPPED || current.state == RecState.INTERRUPTED
-        // RUNNING here means a previous run was killed mid-request; runs for a session never overlap.
-        val wantsSummary = summarize && settings.summaryEnabled &&
-            (current.summary == TaskStatus.PENDING || current.summary == TaskStatus.RUNNING)
-        if (recordingDone && current.allTranscribed && wantsSummary) {
+        // 2) Summaries the user asked for.
+        val jobs = store.get(id)?.summaries?.filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.RUNNING }.orEmpty()
+        for (job in jobs) {
+            if (SystemClock.elapsedRealtime() > deadline) return@withContext continueLater(id)
+            val current = store.get(id) ?: return@withContext Result.success()
             val config = settings.summaryConfig()
             if (!config.isComplete) {
-                store.update(id) { it.copy(summary = TaskStatus.ERROR, error = "Chưa cấu hình dịch vụ AI tóm tắt trong Cài đặt.") }
-                return@withContext Result.failure()
+                setJob(id, job.id) { it.copy(status = TaskStatus.ERROR, error = "Chưa cấu hình AI tóm tắt trong Cài đặt.") }
+                continue
             }
-            store.update(id) { it.copy(summary = TaskStatus.RUNNING) }
+            val clips = current.segments.filter { it.index in job.clipIndexes }
+            if (clips.any { it.stt != TaskStatus.DONE }) {
+                // Should not happen (UI only offers transcribed clips); wait for STT instead of summarising gaps.
+                setJob(id, job.id) { it.copy(status = TaskStatus.ERROR, error = "Có đoạn chưa có transcript.") }
+                continue
+            }
+            setJob(id, job.id) { it.copy(status = TaskStatus.RUNNING, error = null) }
             try {
                 val message = Prompts.summaryUserMessage(
-                    mode = current.mode,
+                    mode = job.mode,
                     customPrompt = settings.customPrompt,
                     title = current.title,
-                    durationMs = current.durationMs,
+                    durationMs = clips.sumOf { it.endMs - it.startMs },
                     bookmarksMs = current.bookmarksMs,
-                    transcript = store.fullTranscript(current),
+                    transcript = store.transcript(current, job.clipIndexes),
+                    clipCount = clips.size,
+                    interviewer = settings.interviewerSpeech,
                 )
                 val summary = Providers.textGenerator(config).generate(Prompts.summarySystem(settings.outputLanguage), message)
-                store.writeSummary(id, summary)
-                store.update(id) { it.copy(summary = TaskStatus.DONE, error = null) }
-                notifyResult(current, "Đã có tóm tắt", "Chạm để xem và chia sẻ")
+                store.writeSummary(id, job.id, summary)
+                setJob(id, job.id) { it.copy(status = TaskStatus.DONE, error = null) }
+                notifyResult(current, "Đã có tóm tắt", "${clips.size} đoạn · chạm để xem và chia sẻ")
             } catch (e: ApiException) {
                 return@withContext handleApiError(id, e) { status ->
-                    store.update(id) { it.copy(summary = status) }
+                    setJob(id, job.id) { it.copy(status = status, error = e.message) }
                 }
             }
-        } else if (recordingDone && current.allTranscribed && summarize && !settings.summaryEnabled) {
-            notifyResult(current, "Đã có transcript", "Chạm để xem và chia sẻ")
         }
         Result.success()
+    }
+
+    /** WorkManager caps one run at 10 minutes; continue in a follow-up run of the same chain. */
+    private fun continueLater(id: String): Result {
+        Processing.enqueue(applicationContext, id)
+        return Result.success()
     }
 
     /** Retries transient errors with backoff; surfaces permanent ones to the user. */
@@ -172,7 +202,7 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             fail(id, e.message ?: "Lỗi dịch vụ")
             return Result.failure()
         }
-        store.update(id) { it.copy(error = "Đang thử lại: ${e.message}") }
+        store.update(id) { it.copy(error = "$RETRY_PREFIX ${e.message}") }
         return Result.retry()
     }
 
@@ -192,10 +222,12 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         }
     }
 
-    private fun setSegment(id: String, index: Int, status: TaskStatus, error: String?) {
-        store.update(id) { s ->
-            s.copy(segments = s.segments.map { if (it.index == index) it.copy(stt = status, error = error) else it })
-        }
+    private fun setSegment(id: String, index: Int, change: (Segment) -> Segment) {
+        store.update(id) { s -> s.copy(segments = s.segments.map { if (it.index == index) change(it) else it }) }
+    }
+
+    private fun setJob(id: String, jobId: String, change: (SummaryJob) -> SummaryJob) {
+        store.update(id) { s -> s.copy(summaries = s.summaries.map { if (it.id == jobId) change(it) else it }) }
     }
 
     private fun fail(id: String, message: String) {
@@ -231,8 +263,16 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
 
     companion object {
         const val KEY_ID = "sessionId"
-        const val KEY_SUMMARIZE = "summarize"
+        const val RETRY_PREFIX = "Đang thử lại:"
         private const val MAX_ATTEMPTS = 6
         private const val TIME_BUDGET_MS = 8 * 60_000L
+
+        /** Title for providers that do not write one (Whisper): the first words of the text. */
+        fun fallbackTitle(text: String): String? {
+            if (text == Prompts.NO_SPEECH || text == Prompts.INTERVIEWER_ONLY) return null
+            val words = text.substringAfter(':', text).trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (words.isEmpty()) return null
+            return words.take(8).joinToString(" ") + if (words.size > 8) "…" else ""
+        }
     }
 }
