@@ -236,9 +236,10 @@ class RecordingService : Service() {
             .setShowWhen(!paused)
             .setUsesChronometer(!paused)
             .setWhen(System.currentTimeMillis() - elapsedMs)
-            .addAction(0, if (paused) "▶ Tiếp tục" else "⏸ Tạm dừng", commandIntent(ACTION_TOGGLE_PAUSE, 1))
-            .addAction(0, "⭐ Đánh dấu", commandIntent(ACTION_BOOKMARK, 2))
-            .addAction(0, "■ Dừng", commandIntent(ACTION_STOP, 3))
+            // Plain short labels: the system truncates action text on narrow screens.
+            .addAction(0, if (paused) "Tiếp tục" else "Tạm dừng", commandIntent(ACTION_TOGGLE_PAUSE, 1))
+            .addAction(0, "Đánh dấu", commandIntent(ACTION_BOOKMARK, 2))
+            .addAction(0, "Dừng", commandIntent(ACTION_STOP, 3))
             .build()
     }
 

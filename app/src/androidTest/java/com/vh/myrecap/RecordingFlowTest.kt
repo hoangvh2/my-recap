@@ -75,7 +75,8 @@ class RecordingFlowTest {
             assertTrue(
                 "recording notification with controls not shown",
                 device.wait(Until.hasObject(By.text("● Đang ghi âm")), 5_000) &&
-                    device.wait(Until.hasObject(By.text("■ Dừng")), 5_000),
+                    device.wait(Until.hasObject(By.text("Đánh dấu")), 5_000) &&
+                    device.wait(Until.hasObject(By.text("Dừng")), 5_000),
             )
             shot("03-notification")
             device.pressBack()

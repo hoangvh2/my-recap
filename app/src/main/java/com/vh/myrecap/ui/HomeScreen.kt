@@ -131,8 +131,8 @@ fun HomeScreen(vm: AppViewModel) {
                             selected = mode == m,
                             onClick = { mode = m },
                             shape = SegmentedButtonDefaults.itemShape(i, modes.size),
-                            icon = {}, // no checkmark: keeps labels on one line on narrow screens
-                        ) { Text(m.label, fontSize = 16.sp, maxLines = 1) }
+                            icon = {}, // no checkmark: leaves room for the label on narrow screens
+                        ) { Text(m.label, fontSize = 15.sp, maxLines = 2, textAlign = TextAlign.Center) }
                     }
                 }
             }
