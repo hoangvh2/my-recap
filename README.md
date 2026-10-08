@@ -21,15 +21,14 @@ APK do GitHub Actions build tự động mỗi khi có push (xem `.github/workfl
 | Tecno/HiOS: Phone Master → Auto-start → bật My Recap; Cài đặt → Pin → tắt tiết kiệm pin cho app; khoá app trong đa nhiệm | HiOS tự kill app chạy nền rất mạnh tay |
 | Nhập Gemini API key (miễn phí tại https://aistudio.google.com) hoặc Groq key | Cần cho bước chuyển giọng nói thành văn bản và tóm tắt |
 
-## Cách dùng trong buổi họp
+## Cách dùng
 
-- **1 chạm** vào nút GHI ÂM để bắt đầu.
-- Có thể tắt màn hình. Khi bấm nút nguồn, màn hình ghi âm hiện **ngay trên màn hình khoá** với 3 nút lớn: Tạm dừng, ⭐ Đánh dấu, Dừng. Các nút này cũng có trong thông báo.
-- Máy rung để xác nhận thao tác:
-  - Rung 1 lần: đã đánh dấu.
-  - Rung 2 lần: đã tạm dừng.
-  - Rung dài: tiếp tục ghi.
-- Khi bấm Dừng, app tự chuyển âm thanh thành văn bản rồi tóm tắt theo mẫu (Phỏng vấn / Cuộc họp / Tự do). Xong sẽ có thông báo. Bấm **Chia sẻ** để gửi sang Zalo, Slack, Gmail…
+- **1 chạm GHI ÂM** → tạo 1 *folder* cho buổi phỏng vấn/họp. Có thể tắt màn hình; bấm nút nguồn để thấy 3 nút lớn (Tạm dừng / ⭐ Đánh dấu / Dừng) ngay trên màn hình khoá. Rung 1 lần = đã đánh dấu.
+- **Tự nhận biết hội thoại (VAD trên máy, miễn phí):** im lặng ≥ 6 giây (chỉnh được 4–15 s) → đóng đoạn hiện tại, chờ đoạn mới. Im lặng dài trong đoạn bị cắt bỏ, tiếng động ngắn (< 1,5 s) bị bỏ qua → chỉ gửi phần có tiếng nói.
+- Mỗi đoạn được chuyển văn bản riêng, AI tự đặt **tiêu đề** (thường là câu hỏi đang được trả lời).
+- **Tóm tắt do bạn chủ động:** trong folder chọn các đoạn cần → Tóm tắt → chọn mẫu (Phỏng vấn / Cuộc họp / Tự do). Mỗi folder giữ mọi bản tóm tắt.
+- **Ghi tiếp vào folder này** sau giờ nghỉ; **đổi tên folder** bằng nút ✏️.
+- **Lời người phỏng vấn:** Giữ nguyên / Rút gọn thành câu hỏi / Bỏ hẳn (Cài đặt → mục 3, chỉ với Gemini).
 
 ## Kiến trúc
 
@@ -38,11 +37,12 @@ core/  (Kotlin thuần, chạy unit test trên JVM)
   Providers.kt   GeminiClient (STT + tóm tắt), OpenAiTranscriber (Whisper), OpenAiChat
   Prompts.kt     prompt transcribe/tóm tắt (VI/EN/JA, nhãn người nói, mốc đánh dấu)
   Adts.kt        định dạng AAC chịu được crash (file bị cắt ngang vẫn đọc được)
+  Vad.kt         EnergyVad (ngưỡng ồn nền tự thích nghi) + ClipSegmenter (tách lượt hội thoại, cắt lặng)
 app/   (Android, Jetpack Compose)
   recorder/      RecordingService (foreground service loại microphone, wakelock)
-                 SegmentedAacRecorder (AudioRecord → AAC 32 kbps, chia đoạn liền mạch 5/10/15 phút)
-  work/          ProcessWorker (WorkManager: STT tuần tự từng đoạn → tóm tắt, tự retry khi lỗi mạng/429)
-  data/          SessionStore (mỗi bản ghi một thư mục: session.json, seg_NNN.aac/.txt, summary.md)
+                 ClipRecorder (AudioRecord → VAD → AAC 32 kbps, mỗi lượt hội thoại 1 file)
+  work/          ProcessWorker (WorkManager: STT tuần tự từng đoạn; tóm tắt khi người dùng yêu cầu; tự retry khi lỗi mạng/429)
+  data/          SessionStore (mỗi folder một thư mục: session.json, seg_NNN.aac/.txt, summary_*.md)
   settings/      API key được mã hoá bằng Android Keystore (AES-GCM)
   ui/            Home, màn hình ghi âm (hiện trên màn hình khoá), Chi tiết, Cài đặt
 ```
