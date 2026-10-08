@@ -123,7 +123,6 @@ fun HomeScreen(vm: AppViewModel) {
                     }
                 }
             }
-            item(key = "setup-$resumeTick") { SetupChecklist(context, settings, vm) }
             item {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     val modes = SessionMode.entries
@@ -160,6 +159,8 @@ fun HomeScreen(vm: AppViewModel) {
                     )
                 }
             }
+            // Below the record button on purpose: recording must always be one tap away.
+            item(key = "setup-$resumeTick") { SetupChecklist(context, settings, vm) }
             item {
                 Text("Bản ghi", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             }
