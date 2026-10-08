@@ -137,11 +137,13 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                             .padding(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        val pad = PaddingValues(horizontal = 8.dp)
                         Button(
                             onClick = { summarizing = true },
                             enabled = chosen.isNotEmpty(),
-                            modifier = Modifier.weight(1.3f).height(56.dp),
-                        ) { Text("Tóm tắt (${chosen.size})", fontSize = 16.sp) }
+                            modifier = Modifier.weight(1.4f).height(56.dp),
+                            contentPadding = pad,
+                        ) { Text("Tóm tắt (${chosen.size})", fontSize = 16.sp, maxLines = 1) }
                         FilledTonalButton(
                             onClick = {
                                 scope.launch {
@@ -150,12 +152,14 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                             },
                             enabled = chosen.isNotEmpty(),
                             modifier = Modifier.weight(1f).height(56.dp),
-                        ) { Text("Chia sẻ", fontSize = 16.sp) }
+                            contentPadding = pad,
+                        ) { Text("Chia sẻ", fontSize = 16.sp, maxLines = 1) }
                         FilledTonalButton(
                             onClick = { scope.launch { Sharing.copy(context, d.session.title, vm.clipsText(id, chosen)) } },
                             enabled = chosen.isNotEmpty(),
-                            modifier = Modifier.weight(1f).height(56.dp),
-                        ) { Text("Chép", fontSize = 16.sp) }
+                            modifier = Modifier.weight(0.8f).height(56.dp),
+                            contentPadding = pad,
+                        ) { Text("Chép", fontSize = 16.sp, maxLines = 1) }
                     }
                 }
             }
@@ -195,8 +199,8 @@ fun SessionScreen(vm: AppViewModel, id: String) {
             }
             item {
                 TabRow(selectedTabIndex = tab) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Đoạn hội thoại (${s.segments.size})") })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Tóm tắt (${s.summaries.size})") })
+                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Đoạn (${s.segments.size})", maxLines = 1) })
+                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Tóm tắt (${s.summaries.size})", maxLines = 1) })
                 }
             }
             if (tab == 0) {
@@ -243,7 +247,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                 if (jobs.isEmpty()) {
                     item {
                         Text(
-                            "Chưa có tóm tắt. Ở tab \"Đoạn hội thoại\", chọn các đoạn cần thiết rồi bấm Tóm tắt.",
+                            "Chưa có tóm tắt. Ở tab \"Đoạn\", chọn các đoạn cần thiết rồi bấm Tóm tắt.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
