@@ -178,23 +178,24 @@ class RecordingFlowTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra(MainActivity.EXTRA_SESSION_ID, folder.id)
         ActivityScenario.launch<MainActivity>(launch).use {
-            assertTrue(device.wait(Until.hasObject(By.text("Kinh nghiệm Kotlin coroutines")), 10_000))
+            // Small emulator screen: only the first clip is guaranteed to be on screen.
+            assertTrue("folder screen not shown", device.wait(Until.hasObject(By.text("Giới thiệu bản thân")), 10_000))
             shot("07-folder")
 
             device.findObject(By.textStartsWith("Chọn tất cả")).click()
             assertTrue("selecting all enables summary", device.wait(Until.hasObject(By.text("Tóm tắt (3)")), 5_000))
             shot("08-selected")
             device.findObject(By.text("Tóm tắt (3)")).click()
-            assertTrue(device.wait(Until.hasObject(By.text("Tóm tắt 3 đoạn")), 5_000))
+            assertTrue("summarize dialog not shown", device.wait(Until.hasObject(By.text("Tóm tắt 3 đoạn")), 5_000))
             shot("09-summarize-dialog")
             device.findObject(By.text("Huỷ")).click()
 
             device.findObject(By.text("Tóm tắt (1)")).click()
-            assertTrue(device.wait(Until.hasObject(By.text("Tổng quan")), 5_000))
+            assertTrue("summary not shown", device.wait(Until.hasObject(By.text("Tổng quan")), 5_000))
             shot("10-summaries")
 
             device.findObject(By.desc("Đổi tên folder")).click()
-            assertTrue(device.wait(Until.hasObject(By.text("Đổi tên folder")), 5_000))
+            assertTrue("rename dialog not shown", device.wait(Until.hasObject(By.text("Đổi tên folder")), 5_000))
             shot("11-rename")
             device.findObject(By.text("Huỷ")).click()
         }
