@@ -87,13 +87,21 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: MyRecap-apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: device-test-results
+          path: device
+      - name: Package emulator screenshots
+        run: cd device/screenshots && zip -q ../../emulator-screenshots.zip *.png
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION_NAME }}
           target_commitish: ${{ github.sha }}
           name: My Recap ${{ env.VERSION_NAME }}
           make_latest: true
-          files: MyRecap.apk
+          files: |
+            MyRecap.apk
+            emulator-screenshots.zip
           body: |
             Cài đặt: mở link này trên điện thoại → tải MyRecap.apk → mở file → cho phép "Cài ứng dụng không rõ nguồn gốc".
             Bản mới cài đè lên bản cũ, giữ nguyên dữ liệu.
