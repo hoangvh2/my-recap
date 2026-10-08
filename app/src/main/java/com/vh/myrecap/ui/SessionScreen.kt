@@ -61,7 +61,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     val detailFlow = remember(id) { vm.detail(id) }
     val detail by detailFlow.collectAsState(initial = null)
     val settings by vm.settings.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(-1) }
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
@@ -69,6 +69,8 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     var deleting by remember { mutableStateOf(false) }
 
     val d = detail
+    // Until the user picks a tab: summary when there is one, otherwise the transcript.
+    val shownTab = if (tab >= 0) tab else if (d?.summary != null) 0 else 1
     Scaffold(
         topBar = {
             TopAppBar(
@@ -108,7 +110,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                         }
                         FilledTonalButton(
                             onClick = {
-                                val text = if (tab == 0) d.summary.orEmpty() else d.transcript
+                                val text = if (shownTab == 0) d.summary.orEmpty() else d.transcript
                                 Sharing.copy(context, d.session.title, text)
                             },
                             modifier = Modifier.weight(1f).height(56.dp),
@@ -123,6 +125,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
             return@Scaffold
         }
         val s = d.session
+        val missingKey = s.segments.any { it.stt != TaskStatus.DONE } && !settings.sttConfig().isComplete
         Column(
             Modifier
                 .fillMaxSize()
@@ -139,16 +142,20 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                     (isError || (s.transcribedCount == 0 && !settings.autoProcess && s.segments.none { it.stt == TaskStatus.RUNNING }) ||
                         (s.allTranscribed && s.summary == null && settings.summaryEnabled))
                 MessageCard(status, isError) {
-                    if (canProcess) {
+                    if (missingKey) {
+                        Button(onClick = vm::openSettings, modifier = Modifier.padding(top = 8.dp).height(48.dp)) {
+                            Text("Mở Cài đặt")
+                        }
+                    } else if (canProcess) {
                         Button(onClick = { vm.process(id) }, modifier = Modifier.padding(top = 8.dp).height(48.dp)) {
                             Text(if (isError) "Thử lại" else "Xử lý ngay")
                         }
                     }
                 }
             }
-            TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Tóm tắt", fontSize = 16.sp) })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Transcript", fontSize = 16.sp) })
+            TabRow(selectedTabIndex = shownTab) {
+                Tab(selected = shownTab == 0, onClick = { tab = 0 }, text = { Text("Tóm tắt", fontSize = 16.sp) })
+                Tab(selected = shownTab == 1, onClick = { tab = 1 }, text = { Text("Transcript", fontSize = 16.sp) })
             }
             SelectionContainer(Modifier.weight(1f)) {
                 Column(
@@ -157,7 +164,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                 ) {
-                    if (tab == 0) {
+                    if (shownTab == 0) {
                         val summary = d.summary
                         when {
                             summary != null -> MarkdownText(summary)

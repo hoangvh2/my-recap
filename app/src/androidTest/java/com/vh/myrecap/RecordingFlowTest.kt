@@ -1,6 +1,7 @@
 package com.vh.myrecap
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.Intent
 import android.os.Build
 import android.os.SystemClock
@@ -71,15 +72,26 @@ class RecordingFlowTest {
             assertTrue(waitFor(5_000) { RecorderState.ui.value.bookmarks == 1 })
 
             device.openNotification()
-            device.wait(Until.hasObject(By.textContains("Đánh dấu")), 5_000)
+            assertTrue(
+                "recording notification with controls not shown",
+                device.wait(Until.hasObject(By.text("● Đang ghi âm")), 5_000) &&
+                    device.wait(Until.hasObject(By.text("■ Dừng")), 5_000),
+            )
             shot("03-notification")
             device.pressBack()
+            device.wait(Until.gone(By.text("● Đang ghi âm")), 3_000)
 
             // Screen off and on: the recording screen must come back over the lock screen, still recording.
             device.sleep()
             Thread.sleep(1_500)
             device.wakeUp()
             Thread.sleep(1_500)
+            val keyguard = context.getSystemService(KeyguardManager::class.java)
+            assertTrue("device should be locked after sleep/wake", keyguard.isKeyguardLocked)
+            assertTrue(
+                "recording controls must be visible over the lock screen",
+                device.wait(Until.hasObject(By.textContains("Dừng & lưu")), 5_000),
+            )
             shot("04-lockscreen")
             val elapsedBefore = RecorderState.ui.value.elapsedMs
             assertTrue(waitFor(5_000) { RecorderState.ui.value.elapsedMs > elapsedBefore + 1_000 })

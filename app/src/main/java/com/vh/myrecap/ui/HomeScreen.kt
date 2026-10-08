@@ -131,7 +131,8 @@ fun HomeScreen(vm: AppViewModel) {
                             selected = mode == m,
                             onClick = { mode = m },
                             shape = SegmentedButtonDefaults.itemShape(i, modes.size),
-                        ) { Text(m.label, fontSize = 16.sp) }
+                            icon = {}, // no checkmark: keeps labels on one line on narrow screens
+                        ) { Text(m.label, fontSize = 16.sp, maxLines = 1) }
                     }
                 }
             }
@@ -215,6 +216,8 @@ fun statusText(s: Session, settings: AppSettings): Pair<String, Boolean> {
             s.summary != TaskStatus.PENDING -> "⚠️ ${s.error}" to true
         s.segments.any { it.stt == TaskStatus.ERROR } || s.summary == TaskStatus.ERROR -> "⚠️ ${s.error ?: "Lỗi xử lý"}" to true
         total == 0 -> "Không có âm thanh" to true
+        s.segments.any { it.stt != TaskStatus.DONE } && !settings.sttConfig().isComplete ->
+            "⚠️ Chưa có API key chuyển giọng nói — vào Cài đặt để nhập" to true
         s.segments.any { it.stt != TaskStatus.DONE } ->
             if (!running && !settings.autoProcess && s.transcribedCount == 0) "Chưa xử lý — mở để xử lý" to false
             else "⏳ Đang chuyển thành văn bản ${s.transcribedCount}/$total" to false
