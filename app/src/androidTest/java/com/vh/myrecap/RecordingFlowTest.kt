@@ -82,8 +82,10 @@ class RecordingFlowTest {
             device.wait(Until.gone(By.text("● Đang ghi âm")), 3_000)
 
             // Screen off and on: the recording screen must come back over the lock screen, still recording.
+            // Emulator images ship with the keyguard disabled; enable the swipe lock screen.
+            device.executeShellCommand("locksettings set-disabled false")
             device.sleep()
-            Thread.sleep(1_500)
+            Thread.sleep(3_000)
             device.wakeUp()
             Thread.sleep(1_500)
             val keyguard = context.getSystemService(KeyguardManager::class.java)
