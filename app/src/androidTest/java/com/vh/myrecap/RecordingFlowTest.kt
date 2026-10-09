@@ -24,7 +24,10 @@ import com.vh.myrecap.ui.MainActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.regex.Pattern
@@ -46,6 +49,21 @@ class RecordingFlowTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val device = UiDevice.getInstance(instrumentation)
+
+    /** Screenshot of whatever is on screen when a test fails, for diagnosis from CI artifacts. */
+    @get:Rule
+    val failureShot = object : TestWatcher() {
+        override fun failed(e: Throwable?, description: Description) = shot("fail-${description.methodName}")
+    }
+
+    /** Earlier tests run without UI; the emulator screen may have timed out and locked meanwhile. */
+    @Before
+    fun screenOnAndUnlocked() {
+        device.wakeUp()
+        device.executeShellCommand("svc power stayon true")
+        device.executeShellCommand("wm dismiss-keyguard")
+        Thread.sleep(500)
+    }
 
     private fun shot(name: String) {
         device.executeShellCommand("mkdir -p $SHOTS")
