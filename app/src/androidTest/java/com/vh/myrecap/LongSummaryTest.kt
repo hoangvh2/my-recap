@@ -37,6 +37,7 @@ class LongSummaryTest {
     private val app = MyRecapApp.from(context)
     private lateinit var server: ServerSocket
     private val requests = CopyOnWriteArrayList<String>()
+    private val serverErrors = CopyOnWriteArrayList<String>()
 
     /** Minimal HTTP/1.1 server answering /chat/completions like an OpenAI-compatible API. */
     @Before
@@ -45,7 +46,7 @@ class LongSummaryTest {
         thread(isDaemon = true) {
             while (!server.isClosed) {
                 val socket = try { server.accept() } catch (_: Exception) { break }
-                socket.use { s ->
+                try { socket.use { s ->
                     val input = s.getInputStream()
                     // Headers end at CRLFCRLF; then read exactly Content-Length bytes.
                     val head = StringBuilder()
@@ -77,6 +78,8 @@ class LongSummaryTest {
                     )
                     out.write(reply)
                     out.flush()
+                } } catch (e: Exception) {
+                    serverErrors += e.toString()
                 }
             }
         }
@@ -123,7 +126,13 @@ class LongSummaryTest {
             .build()
         val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.success(), result)
+        val state = store.get(folder.id)!!
+        assertEquals(
+            "worker result; job error=${state.summaries.single().error}; folder error=${state.error}; " +
+                "server errors=$serverErrors; requests=${requests.size}",
+            ListenableWorker.Result.success(),
+            result,
+        )
         val job = store.get(folder.id)!!.summaries.single()
         assertEquals("job error: ${job.error}", TaskStatus.DONE, job.status)
         val summary = store.readSummary(folder.id, "long")!!
