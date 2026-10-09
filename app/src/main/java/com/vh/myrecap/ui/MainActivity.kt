@@ -8,21 +8,22 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.vh.myrecap.recorder.RecorderState
+import com.vh.myrecap.ui.theme.MyRecapTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -68,7 +69,7 @@ private fun AppRoot(vm: AppViewModel) {
     LaunchedEffect(recorder.finishedSessionId) {
         recorder.finishedSessionId?.let {
             vm.openSession(it)
-            com.vh.myrecap.recorder.RecorderState.consumeFinished()
+            RecorderState.consumeFinished()
         }
     }
 
@@ -76,27 +77,31 @@ private fun AppRoot(vm: AppViewModel) {
         RecordingScreen(recorder, onTogglePause = vm::togglePause, onBookmark = vm::bookmark, onStop = vm::stop)
         return
     }
-    when (val screen = vm.screen) {
-        Screen.Home -> HomeScreen(vm)
-        is Screen.Detail -> {
-            BackHandler { vm.back() }
-            SessionScreen(vm, screen.id)
-        }
-        Screen.Settings -> {
-            BackHandler { vm.back() }
-            SettingsScreen(vm)
+    val screen = vm.screen
+    if (screen != Screen.Home) BackHandler { vm.back() }
+    AnimatedContent(
+        targetState = screen,
+        transitionSpec = {
+            // Deeper screens slide in from the right; going back slides the other way.
+            val forward = depth(targetState) >= depth(initialState)
+            val dir = if (forward) 1 else -1
+            (slideInHorizontally(tween(260)) { it / 6 * dir } + fadeIn(tween(220))) togetherWith
+                (slideOutHorizontally(tween(260)) { -it / 10 * dir } + fadeOut(tween(160)))
+        },
+        label = "screens",
+    ) { target ->
+        when (target) {
+            Screen.Home -> HomeScreen(vm)
+            is Screen.Detail -> SessionScreen(vm, target.id)
+            is Screen.Clip -> ClipScreen(vm, target.id, target.index)
+            is Screen.Summary -> SummaryScreen(vm, target.id, target.jobId)
+            Screen.Settings -> SettingsScreen(vm)
         }
     }
 }
 
-@Composable
-fun MyRecapTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val context = LocalContext.current
-    val scheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> darkColorScheme(primary = Color(0xFFFFB4AB), error = Color(0xFFFFB4AB))
-        else -> lightColorScheme(primary = Color(0xFFC62828), error = Color(0xFFB3261E))
-    }
-    MaterialTheme(colorScheme = scheme, content = content)
+private fun depth(screen: Screen) = when (screen) {
+    Screen.Home -> 0
+    Screen.Settings, is Screen.Detail -> 1
+    is Screen.Clip, is Screen.Summary -> 2
 }

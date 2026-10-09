@@ -1,6 +1,12 @@
 package com.vh.myrecap.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,9 +18,14 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -61,12 +72,14 @@ fun SettingsScreen(vm: AppViewModel) {
     val update: ((AppSettings) -> AppSettings) -> Unit = { vm.updateSettings(it) }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Cài đặt") },
+                title = { Text("Cài đặt", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
-                    IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại") }
+                    IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Quay lại") }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
@@ -75,8 +88,8 @@ fun SettingsScreen(vm: AppViewModel) {
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Section("1. Chuyển giọng nói → văn bản") {
                 ProviderChoice(s.sttProvider) { k -> update { it.copy(sttProvider = k) } }
@@ -207,26 +220,35 @@ fun SettingsScreen(vm: AppViewModel) {
     }
 }
 
+/** Titled group: the label sits above a rounded card, like system settings. */
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            HorizontalDivider()
-            content()
+    Column {
+        Text(
+            title.substringAfter(". "),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                content()
+            }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> ChoiceRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { o ->
-            if (o == selected) {
-                FilledTonalButton(onClick = {}, contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(label(o)) }
-            } else {
-                OutlinedButton(onClick = { onSelect(o) }, contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(label(o)) }
-            }
+            FilterChip(
+                selected = o == selected,
+                onClick = { onSelect(o) },
+                label = { Text(label(o)) },
+                shape = RoundedCornerShape(50),
+            )
         }
     }
 }
@@ -252,9 +274,15 @@ private fun RadioRow(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, onValueChange = onChange, role = Role.Switch)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -311,17 +339,30 @@ private fun Hint(text: String) {
 @Composable
 private fun TestButton(vm: AppViewModel, config: ProviderConfig) {
     val scope = rememberCoroutineScope()
-    var result by remember(config) { mutableStateOf<String?>(null) }
+    var result by remember(config) { mutableStateOf<ConnectionResult?>(null) }
     var busy by remember { mutableStateOf(false) }
-    FilledTonalButton(
-        enabled = !busy,
-        onClick = {
-            busy = true
-            scope.launch {
-                result = vm.testConnection(config)
-                busy = false
-            }
-        },
-    ) { Text(if (busy) "Đang kiểm tra…" else "Kiểm tra kết nối") }
-    result?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        FilledTonalButton(
+            enabled = !busy,
+            onClick = {
+                busy = true
+                scope.launch {
+                    result = vm.testConnection(config)
+                    busy = false
+                }
+            },
+        ) { Text(if (busy) "Đang kiểm tra…" else "Kiểm tra kết nối") }
+    }
+    result?.let { r ->
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                if (r.ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                tint = if (r.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 2.dp).size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(r.message, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }

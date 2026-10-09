@@ -86,10 +86,10 @@ class RecordingFlowTest {
         MyRecapApp.from(context).settings.update { it.copy(autoSplit = false, trimSilence = false) }
         val launch = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launch).use {
-            device.wait(Until.hasObject(By.text("GHI ÂM")), 10_000)
+            device.wait(Until.hasObject(By.desc("Bắt đầu ghi âm")), 10_000)
             shot("01-home")
 
-            device.findObject(By.text("GHI ÂM")).click()
+            device.findObject(By.desc("Bắt đầu ghi âm")).click()
             assertTrue("recording did not start", waitFor(10_000) { RecorderState.ui.value.active })
             assertTrue("no audio captured", waitFor(10_000) { RecorderState.ui.value.elapsedMs >= 2_000 })
             shot("02-recording")
@@ -120,7 +120,7 @@ class RecordingFlowTest {
             assertTrue("device should be locked after sleep/wake", keyguard.isKeyguardLocked)
             assertTrue(
                 "recording controls must be visible over the lock screen",
-                device.wait(Until.hasObject(By.textContains("Dừng & lưu")), 5_000),
+                device.wait(Until.hasObject(By.desc("Dừng ghi âm")), 5_000),
             )
             shot("04-lockscreen")
             val elapsedBefore = RecorderState.ui.value.elapsedMs
@@ -153,7 +153,7 @@ class RecordingFlowTest {
             }
 
             device.pressBack()
-            device.wait(Until.hasObject(By.text("GHI ÂM")), 5_000)
+            device.wait(Until.hasObject(By.desc("Bắt đầu ghi âm")), 5_000)
             shot("06-home-after")
         }
     }
@@ -201,19 +201,33 @@ class RecordingFlowTest {
             assertTrue("folder screen not shown", device.wait(Until.hasObject(By.text("Giới thiệu bản thân")), 10_000))
             shot("07-folder")
 
-            device.findObject(By.textStartsWith("Chọn tất cả")).click()
-            assertTrue("selecting all enables summary", device.wait(Until.hasObject(By.text("Tóm tắt (3)")), 5_000))
-            shot("08-selected")
-            device.findObject(By.text("Tóm tắt (3)")).click()
-            assertTrue("summarize dialog not shown", device.wait(Until.hasObject(By.text("Tóm tắt 3 đoạn")), 5_000))
-            shot("09-summarize-dialog")
-            device.findObject(By.text("Huỷ")).click()
+            // Summarize: one sheet to pick the template and the clips.
+            device.findObject(By.text("Tóm tắt")).click()
+            assertTrue("summarize sheet not shown", device.wait(Until.hasObject(By.text("Tóm tắt 3 đoạn")), 5_000))
+            Thread.sleep(500)
+            shot("08-summarize-sheet")
+            device.pressBack()
+            device.wait(Until.gone(By.text("Tóm tắt 3 đoạn")), 5_000)
 
-            device.findObject(By.text("Tóm tắt (1)")).click()
-            assertTrue("summary not shown", device.wait(Until.hasObject(By.text("Tổng quan")), 5_000))
-            shot("10-summaries")
+            device.findObject(By.text("Tóm tắt · 1")).click()
+            assertTrue("summary list not shown", device.wait(Until.hasObject(By.textContains("TỔNG QUAN")), 5_000))
+            shot("09-summaries")
+            device.findObject(By.text("Xem chi tiết")).click()
+            assertTrue("summary reader not shown", device.wait(Until.hasObject(By.text("Tổng quan")), 5_000))
+            shot("10-summary-reader")
+            device.pressBack()
+
+            assertTrue(device.wait(Until.hasObject(By.text("Đoạn hội thoại · 3")), 5_000))
+            device.findObject(By.text("Đoạn hội thoại · 3")).click()
+            device.wait(Until.hasObject(By.text("Giới thiệu bản thân")), 5_000)
+            device.findObject(By.text("Giới thiệu bản thân")).click()
+            assertTrue("clip reader not shown", device.wait(Until.hasObject(By.text("Đoạn 1 / 3")), 5_000))
+            assertTrue("speaker labels shown", device.wait(Until.hasObject(By.text("Ứng viên")), 5_000))
+            shot("11-clip-reader")
+            device.pressBack()
 
             // One tap shares the whole folder (name, summary, transcripts) through the system sheet.
+            assertTrue(device.wait(Until.hasObject(By.desc("Chia sẻ cả folder")), 5_000))
             device.findObject(By.desc("Chia sẻ cả folder")).click()
             assertTrue(
                 "share sheet not shown",
@@ -222,12 +236,24 @@ class RecordingFlowTest {
             Thread.sleep(1_000)
             shot("12-share-folder")
             device.pressBack()
-            device.wait(Until.hasObject(By.desc("Đổi tên folder")), 5_000)
+            device.wait(Until.hasObject(By.desc("Tuỳ chọn folder")), 5_000)
 
-            device.findObject(By.desc("Đổi tên folder")).click()
+            device.findObject(By.desc("Tuỳ chọn folder")).click()
+            device.wait(Until.hasObject(By.text("Đổi tên")), 5_000)
+            device.findObject(By.text("Đổi tên")).click()
             assertTrue("rename dialog not shown", device.wait(Until.hasObject(By.text("Đổi tên folder")), 5_000))
-            shot("11-rename")
+            shot("13-rename")
             device.findObject(By.text("Huỷ")).click()
+
+            // Dark theme: the same screens must stay readable.
+            device.executeShellCommand("cmd uimode night yes")
+            Thread.sleep(2_500)
+            shot("14-dark-folder")
+            device.pressBack()
+            Thread.sleep(1_200)
+            shot("15-dark-home")
+            device.executeShellCommand("cmd uimode night no")
+            Thread.sleep(1_500)
         }
         store.delete(folder.id)
     }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -32,8 +33,13 @@ import kotlinx.coroutines.withContext
 sealed interface Screen {
     data object Home : Screen
     data class Detail(val id: String) : Screen
+    data class Clip(val id: String, val index: Int) : Screen
+    data class Summary(val id: String, val jobId: String) : Screen
     data object Settings : Screen
 }
+
+/** Result of the Settings "test connection" button. */
+data class ConnectionResult(val ok: Boolean, val message: String)
 
 /** A folder with the text of each clip (by index) and of each summary (by job id). */
 class FolderDetail(val session: Session, val clipText: Map<Int, String?>, val summaryText: Map<String, String?>)
@@ -42,10 +48,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as MyRecapApp
     private val store = app.store
 
-    val sessions: StateFlow<List<Session>> = store.version
-        .map { store.list() }
+    /** Folders deleted from the UI but kept on disk for a few seconds, so the user can undo. */
+    private val pendingDeletes = MutableStateFlow<Set<String>>(emptySet())
+
+    val sessions: StateFlow<List<Session>> = combine(store.version, pendingDeletes) { _, hidden -> hidden }
+        .map { hidden -> store.list().filterNot { it.id in hidden } }
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Last folder hidden by [requestDelete]; the home screen offers Undo for it. */
+    var lastDeleted by mutableStateOf<Session?>(null)
+        private set
 
     val settings: StateFlow<AppSettings> = app.settings.settings
     val recorder = RecorderState.ui
@@ -69,8 +82,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         screen = Screen.Settings
     }
 
+    fun openClip(id: String, index: Int) {
+        screen = Screen.Clip(id, index)
+    }
+
+    fun openSummary(id: String, jobId: String) {
+        screen = Screen.Summary(id, jobId)
+    }
+
+    /** One level up: readers return to their folder, everything else to the home screen. */
     fun back() {
-        screen = Screen.Home
+        screen = when (val s = screen) {
+            is Screen.Clip -> Screen.Detail(s.id)
+            is Screen.Summary -> Screen.Detail(s.id)
+            else -> Screen.Home
+        }
     }
 
     fun startRecording(mode: SessionMode) {
@@ -137,24 +163,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (title.isNotBlank()) store.update(id) { it.copy(title = title.trim()) }
     }
 
-    fun delete(id: String) = io {
-        Processing.cancel(app, id)
-        store.delete(id)
-        withContext(Dispatchers.Main) { if (screen == Screen.Detail(id)) screen = Screen.Home }
+    /** Hides the folder immediately; [commitDelete] removes it for good unless the user undoes. */
+    fun requestDelete(id: String) {
+        val session = store.get(id) ?: return
+        pendingDeletes.value = pendingDeletes.value + id
+        lastDeleted = session
+        if (screen !is Screen.Home && screen !is Screen.Settings) screen = Screen.Home
+    }
+
+    fun undoDelete(id: String) {
+        pendingDeletes.value = pendingDeletes.value - id
+        if (lastDeleted?.id == id) lastDeleted = null
+    }
+
+    fun commitDelete(id: String) {
+        if (id !in pendingDeletes.value) return
+        if (lastDeleted?.id == id) lastDeleted = null
+        io {
+            Processing.cancel(app, id)
+            store.delete(id)
+            pendingDeletes.value = pendingDeletes.value - id
+        }
+    }
+
+    override fun onCleared() {
+        // Leaving the app before the snackbar ends still deletes what the user deleted.
+        pendingDeletes.value.forEach { id ->
+            Processing.cancel(app, id)
+            store.delete(id)
+        }
+        super.onCleared()
     }
 
     fun updateSettings(transform: (AppSettings) -> AppSettings) = app.settings.update(transform)
 
-    /** Returns a human-readable result for the Settings screen. */
-    suspend fun testConnection(config: ProviderConfig): String = withContext(Dispatchers.IO) {
-        if (!config.isComplete) return@withContext "⚠️ Thiếu API key hoặc model"
+    suspend fun testConnection(config: ProviderConfig): ConnectionResult = withContext(Dispatchers.IO) {
+        if (!config.isComplete) return@withContext ConnectionResult(false, "Thiếu API key hoặc tên model")
         try {
             val models = Providers.testConnection(config)
-            val found = models.isEmpty() || models.any { it == config.model }
-            if (found) "✅ Kết nối OK" else "⚠️ Key OK nhưng không thấy model \"${config.model}\". Ví dụ có: " +
-                models.take(5).joinToString()
+            if (models.isEmpty() || models.any { it == config.model }) {
+                ConnectionResult(true, "Kết nối thành công")
+            } else {
+                ConnectionResult(
+                    false,
+                    "Key hợp lệ nhưng không có model \"${config.model}\". Có: " + models.take(5).joinToString(),
+                )
+            }
         } catch (e: Exception) {
-            "❌ ${e.message}"
+            ConnectionResult(false, e.message ?: "Không kết nối được")
         }
     }
 
