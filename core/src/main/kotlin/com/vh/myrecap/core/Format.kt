@@ -37,30 +37,29 @@ object TranscriptAssembler {
 }
 
 object ShareText {
-    enum class Content { SUMMARY, SUMMARY_AND_TRANSCRIPT, TRANSCRIPT }
-
-    fun build(
-        content: Content,
-        title: String,
-        dateLabel: String,
-        durationMs: Long,
-        summary: String?,
-        transcript: String?,
-    ): String = buildString {
-        appendLine(title)
-        appendLine("$dateLabel · ${TimeFormat.clock(durationMs)}")
-        val wantSummary = content != Content.TRANSCRIPT
-        val wantTranscript = content != Content.SUMMARY
-        if (wantSummary && !summary.isNullOrBlank()) {
+    /**
+     * Whole folder as plain text for one-tap sharing:
+     * folder name, summary (if any), a `----` divider, then each clip's transcript in order.
+     * Clips without speech are left out.
+     */
+    fun folder(title: String, summary: String?, clips: List<ClipText>): String = buildString {
+        appendLine(title.trim())
+        if (!summary.isNullOrBlank()) {
             appendLine()
             appendLine(summary.trim())
         }
-        if (wantTranscript && !transcript.isNullOrBlank()) {
+        val spoken = clips.sortedBy { it.startMs }.filter { c ->
+            val t = c.text?.trim()
+            !t.isNullOrEmpty() && t != Prompts.NO_SPEECH && t != Prompts.INTERVIEWER_ONLY
+        }
+        if (spoken.isNotEmpty()) {
             appendLine()
-            appendLine("---")
-            appendLine("TRANSCRIPT")
-            appendLine()
-            appendLine(transcript.trim())
+            appendLine("----")
+            spoken.forEachIndexed { i, c ->
+                if (i > 0) appendLine()
+                appendLine("Đoạn ${c.number}" + if (!c.title.isNullOrBlank()) " — ${c.title.trim()}" else "")
+                appendLine(c.text!!.trim())
+            }
         }
     }.trim()
 }

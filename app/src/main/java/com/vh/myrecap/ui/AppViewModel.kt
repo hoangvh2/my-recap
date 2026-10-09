@@ -7,10 +7,13 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vh.myrecap.MyRecapApp
+import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
+import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.data.Session
+import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
 import com.vh.myrecap.recorder.RecordingService
 import com.vh.myrecap.settings.AppSettings
@@ -113,6 +116,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Text of the chosen clips, for sharing or copying. */
     suspend fun clipsText(id: String, indexes: Collection<Int>): String = withContext(Dispatchers.IO) {
         store.get(id)?.let { store.transcript(it, indexes) }.orEmpty()
+    }
+
+    /**
+     * Whole folder for one-tap sharing: name, newest finished summary, then every transcript.
+     * Null when there is nothing beyond the name yet.
+     */
+    suspend fun folderShareText(id: String): String? = withContext(Dispatchers.IO) {
+        val s = store.get(id) ?: return@withContext null
+        val latest = s.summaries.filter { it.status == TaskStatus.DONE }.maxByOrNull { it.createdAt }
+        val text = ShareText.folder(
+            title = s.title,
+            summary = latest?.let { store.readSummary(id, it.id) },
+            clips = s.segments.map { ClipText(it.number, it.startMs, it.endMs, it.title, store.readTranscript(id, it.index)) },
+        )
+        text.takeIf { it != s.title.trim() }
     }
 
     fun rename(id: String, title: String) = io {

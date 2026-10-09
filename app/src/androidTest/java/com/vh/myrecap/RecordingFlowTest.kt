@@ -27,6 +27,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.regex.Pattern
 
 /**
  * End-to-end on a device/emulator: start from the UI, record with the real microphone, bookmark
@@ -193,6 +194,17 @@ class RecordingFlowTest {
             device.findObject(By.text("Tóm tắt (1)")).click()
             assertTrue("summary not shown", device.wait(Until.hasObject(By.text("Tổng quan")), 5_000))
             shot("10-summaries")
+
+            // One tap shares the whole folder (name, summary, transcripts) through the system sheet.
+            device.findObject(By.desc("Chia sẻ cả folder")).click()
+            assertTrue(
+                "share sheet not shown",
+                device.wait(Until.hasObject(By.pkg(Pattern.compile("com\\.android\\.intentresolver|android"))), 5_000),
+            )
+            Thread.sleep(1_000)
+            shot("12-share-folder")
+            device.pressBack()
+            device.wait(Until.hasObject(By.desc("Đổi tên folder")), 5_000)
 
             device.findObject(By.desc("Đổi tên folder")).click()
             assertTrue("rename dialog not shown", device.wait(Until.hasObject(By.text("Đổi tên folder")), 5_000))

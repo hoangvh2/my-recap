@@ -1,5 +1,6 @@
 package com.vh.myrecap.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -92,6 +94,16 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     var micDenied by remember { mutableStateOf(false) }
     val recordMore = rememberRecordAction(onDenied = { micDenied = true }) { vm.recordMore(id) }
 
+    suspend fun shareFolder() {
+        val title = detail?.session?.title ?: return
+        val text = vm.folderShareText(id)
+        if (text == null) {
+            Toast.makeText(context, "Chưa có tóm tắt hoặc transcript để chia sẻ", Toast.LENGTH_SHORT).show()
+        } else {
+            Sharing.shareText(context, title, text)
+        }
+    }
+
     val d = detail
     // Drop selections of clips that were deleted or are no longer selectable.
     val selectableIndexes = d?.session?.segments?.filter { selectable(it, d.clipText[it.index]) }?.map { it.index }.orEmpty()
@@ -112,9 +124,19 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                     IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại") }
                 },
                 actions = {
+                    IconButton(onClick = { scope.launch { shareFolder() } }) {
+                        Icon(Icons.Filled.Share, contentDescription = "Chia sẻ cả folder")
+                    }
                     IconButton(onClick = { renaming = true }) { Icon(Icons.Filled.Edit, contentDescription = "Đổi tên folder") }
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Thêm") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Chia sẻ cả folder (tóm tắt + transcript)") },
+                            onClick = {
+                                menu = false
+                                scope.launch { shareFolder() }
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text("Chia sẻ file ghi âm") },
                             onClick = {

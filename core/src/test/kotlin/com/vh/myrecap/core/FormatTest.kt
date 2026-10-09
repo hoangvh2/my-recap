@@ -74,10 +74,24 @@ class FormatTest {
     }
 
     @Test
-    fun shareTextRespectsContentChoice() {
-        val s = ShareText.build(ShareText.Content.SUMMARY, "T", "08/10", 61_000, "SUM", "TRANS")
-        assertTrue("SUM" in s && "TRANS" !in s && "01:01" in s)
-        val t = ShareText.build(ShareText.Content.TRANSCRIPT, "T", "08/10", 0, "SUM", "TRANS")
-        assertTrue("SUM" !in t && "TRANS" in t)
+    fun folderShareTextHasTitleSummaryDividerAndTranscripts() {
+        val text = ShareText.folder(
+            "PV Backend",
+            "## Tổng quan\nTốt",
+            listOf(
+                ClipText(2, 5_000, 9_000, null, "Ứng viên: B"),
+                ClipText(1, 0, 4_000, "Giới thiệu", "Ứng viên: A"),
+                ClipText(3, 10_000, 12_000, "Im lặng", Prompts.NO_SPEECH),
+                ClipText(4, 13_000, 14_000, null, null),
+            ),
+        )
+        val expected = "PV Backend\n\n## Tổng quan\nTốt\n\n----\nĐoạn 1 — Giới thiệu\nỨng viên: A\n\nĐoạn 2\nỨng viên: B"
+        assertEquals(expected, text)
+    }
+
+    @Test
+    fun folderShareTextWithoutSummaryOrClips() {
+        assertEquals("PV\n\n----\nĐoạn 1\nX", ShareText.folder("PV", null, listOf(ClipText(1, 0, 1, null, "X"))))
+        assertEquals("PV\n\nSUM", ShareText.folder("PV", "SUM", emptyList()))
     }
 }
