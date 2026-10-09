@@ -129,10 +129,10 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
                     val next = ordered.getOrNull(pos + 1)
                     OutlinedButton(onClick = { prev?.let { vm.openClip(id, it.index) } }, enabled = prev != null, modifier = Modifier.weight(1f)) {
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null)
-                        Text("Đoạn trước")
+                        Text("Trước", maxLines = 1)
                     }
                     OutlinedButton(onClick = { next?.let { vm.openClip(id, it.index) } }, enabled = next != null, modifier = Modifier.weight(1f)) {
-                        Text("Đoạn sau")
+                        Text("Sau", maxLines = 1)
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
                     }
                 }

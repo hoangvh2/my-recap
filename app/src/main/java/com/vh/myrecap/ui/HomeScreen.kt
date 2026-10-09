@@ -399,7 +399,8 @@ private fun SetupCard(settings: AppSettings, vm: AppViewModel) {
     )
     val remaining = steps.count { !it.done }
     if (remaining == 0) return
-    var expanded by rememberSaveable { mutableStateOf(true) }
+    // Collapsed by default so the folder list stays in view; the header still shows what is left.
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
         Column {
