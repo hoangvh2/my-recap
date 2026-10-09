@@ -92,6 +92,7 @@ class GeminiClient(
                 throw ApiException(
                     "$SERVICE: kết quả rỗng${if (finish.isNotEmpty()) " (finishReason=$finish)" else ""}",
                     retryable = finish.isEmpty() || finish == "OTHER",
+                    emptyResult = true,
                 )
             }
             if (finish == "MAX_TOKENS") text.append("\n\n[…bị cắt do vượt giới hạn độ dài đầu ra]")
@@ -174,7 +175,7 @@ class OpenAiChat(
             val choices = root.optJSONArray("choices")
             if (choices == null || choices.length() == 0) throw ApiException("$SERVICE: không có kết quả", retryable = true)
             val content = choices.getJSONObject(0).optJSONObject("message")?.optString("content", "").orEmpty()
-            if (content.isBlank()) throw ApiException("$SERVICE: kết quả rỗng", retryable = true)
+            if (content.isBlank()) throw ApiException("$SERVICE: kết quả rỗng", retryable = true, emptyResult = true)
             return content.trim()
         }
     }

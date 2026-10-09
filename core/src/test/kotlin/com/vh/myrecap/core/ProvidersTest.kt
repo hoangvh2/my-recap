@@ -100,6 +100,18 @@ class ProvidersTest {
     }
 
     @Test
+    fun emptyAnswersAreFlaggedSeparatelyFromTransportErrors() {
+        assertTrue(assertFailsWith<ApiException> { OpenAiChat.parseChatResponse("""{"choices":[{"message":{"content":" "}}]}""") }.emptyResult)
+        assertTrue(
+            assertFailsWith<ApiException> {
+                GeminiClient.parseGenerateResponse("""{"candidates":[{"content":{"parts":[]},"finishReason":"STOP"}]}""")
+            }.emptyResult,
+        )
+        val dead = GeminiClient(ProviderConfig(ProviderKind.GEMINI, "http://127.0.0.1:1", "k", "m"))
+        assertFalse(assertFailsWith<ApiException> { dead.generate("s", "u") }.emptyResult)
+    }
+
+    @Test
     fun maxTokensIsFlagged() {
         val text = GeminiClient.parseGenerateResponse("""{"candidates":[{"content":{"parts":[{"text":"abc"}]},"finishReason":"MAX_TOKENS"}]}""")
         assertTrue(text.startsWith("abc") && "bị cắt" in text)

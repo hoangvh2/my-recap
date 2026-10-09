@@ -181,20 +181,19 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 for (batch in ClipNotes.batches(clipTexts.filter { it.number !in notes })) {
                     if (SystemClock.elapsedRealtime() > deadline) return@withContext continueLater(id)
                     setJob(id, job.id) { it.copy(progress = "Đang ghi chú ${notes.size}/${clipTexts.size} đoạn…") }
-                    val parsed = ClipNotes.parse(
-                        generator.generate(ClipNotes.system(lang), ClipNotes.userMessage(job.mode, settings.interviewerSpeech, batch)),
-                        batch.map { it.number },
-                    ).toMutableMap()
+                    // An empty answer means the model skipped clips; transport errors still go to retry.
+                    fun notesFor(clips: List<ClipText>): Map<Int, String> = try {
+                        ClipNotes.parse(
+                            generator.generate(ClipNotes.system(lang), ClipNotes.userMessage(job.mode, settings.interviewerSpeech, clips)),
+                            clips.map { it.number },
+                        )
+                    } catch (e: ApiException) {
+                        if (e.emptyResult) emptyMap() else throw e
+                    }
+                    val parsed = notesFor(batch).toMutableMap()
                     // A clip the model skipped gets its own request; if that fails too, keep the transcript words.
                     for (c in batch.filter { it.number !in parsed }) {
-                        val single = if (batch.size > 1) {
-                            ClipNotes.parse(
-                                generator.generate(ClipNotes.system(lang), ClipNotes.userMessage(job.mode, settings.interviewerSpeech, listOf(c))),
-                                listOf(c.number),
-                            )[c.number]
-                        } else {
-                            null
-                        }
+                        val single = if (batch.size > 1) notesFor(listOf(c))[c.number] else null
                         parsed[c.number] = single ?: ClipNotes.fallback(c)
                     }
                     for (c in batch) {
