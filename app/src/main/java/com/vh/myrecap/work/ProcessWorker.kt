@@ -20,11 +20,14 @@ import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.R
 import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.AudioClip
+import com.vh.myrecap.core.ClipNotes
+import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.ProviderKind
 import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.SttRequest
+import com.vh.myrecap.core.SummaryComposer
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.SessionStore
@@ -165,19 +168,58 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             }
             setJob(id, job.id) { it.copy(status = TaskStatus.RUNNING, error = null) }
             try {
-                val message = Prompts.summaryUserMessage(
-                    mode = job.mode,
-                    customPrompt = settings.customPrompt,
-                    title = current.title,
-                    durationMs = clips.sumOf { it.endMs - it.startMs },
-                    bookmarksMs = current.bookmarksMs,
-                    transcript = store.transcript(current, job.clipIndexes),
-                    clipCount = clips.size,
-                    interviewer = settings.interviewerSpeech,
+                val generator = Providers.textGenerator(config)
+                val clipTexts = clips.sortedBy { it.index }
+                    .map { ClipText(it.number, it.startMs, it.endMs, it.title, store.readTranscript(id, it.index)) }
+                    .filter { ClipNotes.hasSpeech(it) }
+                val byNumber = clips.associateBy { it.number }
+                val lang = settings.outputLanguage
+
+                // Stage 1: notes for every clip, a few clips per request, cached per clip.
+                val notes = mutableMapOf<Int, String>()
+                clipTexts.forEach { c -> store.readNotes(id, byNumber.getValue(c.number).index, job.mode, lang)?.let { notes[c.number] = it } }
+                for (batch in ClipNotes.batches(clipTexts.filter { it.number !in notes })) {
+                    if (SystemClock.elapsedRealtime() > deadline) return@withContext continueLater(id)
+                    setJob(id, job.id) { it.copy(progress = "Đang ghi chú ${notes.size}/${clipTexts.size} đoạn…") }
+                    val parsed = ClipNotes.parse(
+                        generator.generate(ClipNotes.system(lang), ClipNotes.userMessage(job.mode, settings.interviewerSpeech, batch)),
+                        batch.map { it.number },
+                    ).toMutableMap()
+                    // A clip the model skipped gets its own request; if that fails too, keep the transcript words.
+                    for (c in batch.filter { it.number !in parsed }) {
+                        val single = if (batch.size > 1) {
+                            ClipNotes.parse(
+                                generator.generate(ClipNotes.system(lang), ClipNotes.userMessage(job.mode, settings.interviewerSpeech, listOf(c))),
+                                listOf(c.number),
+                            )[c.number]
+                        } else {
+                            null
+                        }
+                        parsed[c.number] = single ?: ClipNotes.fallback(c)
+                    }
+                    for (c in batch) {
+                        val note = parsed.getValue(c.number)
+                        store.writeNotes(id, byNumber.getValue(c.number).index, job.mode, lang, note)
+                        notes[c.number] = note
+                    }
+                }
+
+                // Stage 2: the model writes the evaluation; the app appends every clip's notes.
+                setJob(id, job.id) { it.copy(progress = "Đang viết tóm tắt từ ${clipTexts.size} đoạn…") }
+                val ordered = clipTexts.map { it to notes.getValue(it.number) }
+                val synthesis = generator.generate(
+                    SummaryComposer.system(lang),
+                    SummaryComposer.synthesisMessage(
+                        mode = job.mode,
+                        customPrompt = settings.customPrompt,
+                        title = current.title,
+                        durationMs = clips.sumOf { it.endMs - it.startMs },
+                        bookmarksMs = current.bookmarksMs,
+                        notes = ordered,
+                    ),
                 )
-                val summary = Providers.textGenerator(config).generate(Prompts.summarySystem(settings.outputLanguage), message)
-                store.writeSummary(id, job.id, summary)
-                setJob(id, job.id) { it.copy(status = TaskStatus.DONE, error = null) }
+                store.writeSummary(id, job.id, SummaryComposer.compose(job.mode, synthesis, ordered))
+                setJob(id, job.id) { it.copy(status = TaskStatus.DONE, error = null, progress = null) }
                 notifyResult(current, "Đã có tóm tắt", "${clips.size} đoạn · chạm để xem và chia sẻ")
             } catch (e: ApiException) {
                 return@withContext handleApiError(id, e) { status ->

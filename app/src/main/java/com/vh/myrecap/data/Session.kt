@@ -36,6 +36,8 @@ data class SummaryJob(
     val clipIndexes: List<Int>,
     val status: TaskStatus,
     val error: String? = null,
+    /** Human-readable progress while running (long folders take several requests). */
+    val progress: String? = null,
 )
 
 /**
@@ -98,7 +100,8 @@ data class Session(
                         .put("mode", j.mode.name)
                         .put("clips", JSONArray().also { c -> j.clipIndexes.forEach { c.put(it) } })
                         .put("status", j.status.name)
-                        .putOpt("error", j.error),
+                        .putOpt("error", j.error)
+                        .putOpt("progress", j.progress),
                 )
             }
         })
@@ -136,6 +139,7 @@ data class Session(
                     clipIndexes = (0 until clips.length()).map { clips.getInt(it) },
                     status = enumOr(j.optString("status"), TaskStatus.PENDING),
                     error = j.optStringOrNull("error"),
+                    progress = j.optStringOrNull("progress"),
                 )
             }
             // v0.1 kept one automatic summary per recording in "summary" + summary.md.

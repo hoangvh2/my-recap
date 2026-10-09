@@ -1,6 +1,7 @@
 package com.vh.myrecap.data
 
 import com.vh.myrecap.core.ClipText
+import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.TranscriptAssembler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,7 @@ class SessionStore(private val root: File) {
             write(session.copy(segments = session.segments - clip))
             audioFile(id, clip).delete()
             transcriptFile(id, index).delete()
+            deleteNotes(id, index)
         }
     }
 
@@ -89,8 +91,24 @@ class SessionStore(private val root: File) {
     fun readTranscript(id: String, index: Int): String? = transcriptFile(id, index).takeIf { it.exists() }?.readText()
 
     fun writeTranscript(id: String, index: Int, text: String) {
+        deleteNotes(id, index) // notes were made from the old text
         writeAtomic(transcriptFile(id, index), text)
         _version.value++
+    }
+
+    /** Cached per-clip summary notes; they depend on the template and the output language. */
+    private fun notesFile(id: String, index: Int, mode: SessionMode, language: OutputLanguage) =
+        File(dir(id), String.format(Locale.ROOT, "seg_%03d.notes.%s.%s.md", index, mode.name, language.name))
+
+    fun readNotes(id: String, index: Int, mode: SessionMode, language: OutputLanguage): String? =
+        notesFile(id, index, mode, language).takeIf { it.exists() }?.readText()
+
+    fun writeNotes(id: String, index: Int, mode: SessionMode, language: OutputLanguage, text: String) =
+        writeAtomic(notesFile(id, index, mode, language), text)
+
+    private fun deleteNotes(id: String, index: Int) {
+        val prefix = String.format(Locale.ROOT, "seg_%03d.notes.", index)
+        dir(id).listFiles { f -> f.name.startsWith(prefix) }?.forEach { it.delete() }
     }
 
     fun readSummary(id: String, jobId: String): String? = summaryFile(id, jobId).takeIf { it.exists() }?.readText()

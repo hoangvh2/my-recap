@@ -471,7 +471,7 @@ private fun SummaryCard(
                 )
             }
             when (job.status) {
-                TaskStatus.PENDING, TaskStatus.RUNNING -> Text("⏳ Đang tóm tắt…")
+                TaskStatus.PENDING, TaskStatus.RUNNING -> Text("⏳ ${job.progress ?: "Đang tóm tắt…"}")
                 TaskStatus.ERROR -> {
                     Text("⚠️ ${job.error ?: "Lỗi"}", color = MaterialTheme.colorScheme.error)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

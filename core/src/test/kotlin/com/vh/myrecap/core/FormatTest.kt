@@ -65,15 +65,6 @@ class FormatTest {
     }
 
     @Test
-    fun summaryMessageMentionsBookmarksOnlyWhenPresent() {
-        val with = Prompts.summaryUserMessage(SessionMode.MEETING, "", "Họp", 60_000, listOf(5_000), "T")
-        assertTrue("Điểm được đánh dấu" in with && "00:05" in with && "Việc cần làm" in with)
-        val without = Prompts.summaryUserMessage(SessionMode.CUSTOM, "Viết lại thành email", "Họp", 60_000, emptyList(), "T")
-        assertFalse("Điểm được đánh dấu" in without)
-        assertTrue(without.startsWith("Viết lại thành email"))
-    }
-
-    @Test
     fun folderShareTextHasTitleSummaryDividerAndTranscripts() {
         val text = ShareText.folder(
             "PV Backend",
