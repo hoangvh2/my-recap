@@ -46,7 +46,7 @@ object ShareText {
         appendLine(title.trim())
         if (!summary.isNullOrBlank()) {
             appendLine()
-            appendLine(summary.trim())
+            appendLine(plain(summary))
         }
         val spoken = clips.sortedBy { it.startMs }.filter { c ->
             val t = c.text?.trim()
@@ -62,4 +62,21 @@ object ShareText {
             }
         }
     }.trim()
+
+    /**
+     * Markdown → readable plain text for chat apps (Zalo, Messenger) that show symbols literally:
+     * headings become UPPERCASE lines, bullets become "•", bold markers and table rules are removed.
+     */
+    fun plain(markdown: String): String = markdown.trim().lines().mapNotNull { raw ->
+        val line = raw.trimEnd()
+        val trimmed = line.trimStart()
+        val indent = line.length - trimmed.length
+        when {
+            trimmed.startsWith("#") -> trimmed.trimStart('#').trim().replace("**", "").uppercase()
+            trimmed.startsWith("|") && trimmed.replace(Regex("[|:\\-\\s]"), "").isEmpty() -> null
+            trimmed.startsWith("- ") || trimmed.startsWith("* ") ->
+                " ".repeat(indent) + "• " + trimmed.drop(2).replace("**", "")
+            else -> line.replace("**", "")
+        }
+    }.joinToString("\n")
 }

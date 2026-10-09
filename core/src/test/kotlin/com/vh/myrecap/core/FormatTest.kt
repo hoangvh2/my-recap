@@ -85,8 +85,14 @@ class FormatTest {
                 ClipText(4, 13_000, 14_000, null, null),
             ),
         )
-        val expected = "PV Backend\n\n## Tổng quan\nTốt\n\n----\nĐoạn 1 — Giới thiệu\nỨng viên: A\n\nĐoạn 2\nỨng viên: B"
+        val expected = "PV Backend\n\nTỔNG QUAN\nTốt\n\n----\nĐoạn 1 — Giới thiệu\nỨng viên: A\n\nĐoạn 2\nỨng viên: B"
         assertEquals(expected, text)
+    }
+
+    @Test
+    fun markdownBecomesPlainText() {
+        val md = "## Điểm **mạnh**\n- Hiểu **coroutines**\n  - Flow\n| Việc | Hạn |\n|---|:-:|\n| Gửi CV | 10/10 |\nKết luận **tốt**."
+        assertEquals("ĐIỂM MẠNH\n• Hiểu coroutines\n  • Flow\n| Việc | Hạn |\n| Gửi CV | 10/10 |\nKết luận tốt.", ShareText.plain(md))
     }
 
     @Test

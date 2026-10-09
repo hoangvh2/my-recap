@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.SessionMode
+import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.core.TimeFormat
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.Session
@@ -279,8 +280,8 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                         job = job,
                         text = d.summaryText[job.id],
                         initiallyExpanded = job == jobs.firstOrNull(),
-                        onShare = { t -> Sharing.shareText(context, s.title, s.title + "\n\n" + t) },
-                        onCopy = { t -> Sharing.copy(context, s.title, t) },
+                        onShare = { t -> Sharing.shareText(context, s.title, s.title + "\n\n" + ShareText.plain(t)) },
+                        onCopy = { t -> Sharing.copy(context, s.title, ShareText.plain(t)) },
                         onRetry = { vm.retrySummary(id, job.id) },
                         onDelete = { vm.deleteSummary(id, job.id) },
                     )
