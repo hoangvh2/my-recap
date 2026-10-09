@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -552,48 +554,55 @@ private fun SummarizeSheet(
     var mode by remember { mutableStateOf(session.mode) }
     var chosen by remember { mutableStateOf(clips.map { it.index }.toSet()) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = c.surfaceContainerLow) {
-        Column(Modifier.padding(horizontal = 20.dp).navigationBarsPadding()) {
-            Text("Tạo tóm tắt", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "AI chỉ đọc transcript đã có, không gửi lại âm thanh.",
-                style = MaterialTheme.typography.bodySmall,
-                color = c.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(18.dp))
-            Text("Mẫu", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SessionMode.entries.forEach { m ->
-                    val style = modeStyle(m)
-                    val on = m == mode
-                    Surface(
-                        onClick = { mode = m },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (on) c.primaryContainer.copy(alpha = 0.55f) else c.surfaceContainer,
-                        border = if (on) BorderStroke(1.5.dp, c.primary) else null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconTile(style.icon, style.container, style.content, size = 36.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(m.label, style = MaterialTheme.typography.titleSmall)
-                                Text(templateHint(m), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
+        // The confirm button stays pinned at the bottom; everything above scrolls, so it is always
+        // reachable on small screens and with many clips.
+        Column(Modifier.navigationBarsPadding()) {
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+            ) {
+                Text("Tạo tóm tắt", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "AI chỉ đọc transcript đã có, không gửi lại âm thanh.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Mẫu", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SessionMode.entries.forEach { m ->
+                        val style = modeStyle(m)
+                        val on = m == mode
+                        Surface(
+                            onClick = { mode = m },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (on) c.primaryContainer.copy(alpha = 0.55f) else c.surfaceContainer,
+                            border = if (on) BorderStroke(1.5.dp, c.primary) else null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                IconTile(style.icon, style.container, style.content, size = 34.dp)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(m.label, style = MaterialTheme.typography.titleSmall)
+                                    Text(templateHint(m), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
+                                }
                             }
                         }
                     }
                 }
-            }
-            Spacer(Modifier.height(18.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Đoạn hội thoại", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                val all = chosen.size == clips.size
-                TextButton(onClick = { chosen = if (all) emptySet() else clips.map { it.index }.toSet() }) {
-                    Text(if (all) "Bỏ chọn tất cả" else "Chọn tất cả")
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Đoạn hội thoại", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    val all = chosen.size == clips.size
+                    TextButton(onClick = { chosen = if (all) emptySet() else clips.map { it.index }.toSet() }) {
+                        Text(if (all) "Bỏ chọn tất cả" else "Chọn tất cả")
+                    }
                 }
-            }
-            LazyColumn(Modifier.heightIn(max = 300.dp)) {
-                items(clips, key = { it.index }) { seg ->
+                clips.forEach { seg ->
                     val on = seg.index in chosen
                     Row(
                         Modifier
@@ -614,14 +623,18 @@ private fun SummarizeSheet(
                         }
                     }
                 }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(14.dp))
-            Button(
-                onClick = { onConfirm(chosen.toList(), mode) },
-                enabled = chosen.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text("Tóm tắt ${chosen.size} đoạn") }
-            Spacer(Modifier.height(16.dp))
+            Surface(color = c.surfaceContainerLow) {
+                Button(
+                    onClick = { onConfirm(chosen.toList(), mode) },
+                    enabled = chosen.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .height(52.dp),
+                ) { Text("Tóm tắt ${chosen.size} đoạn") }
+            }
         }
     }
 }
