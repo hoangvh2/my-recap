@@ -231,11 +231,12 @@ class Phase3Test {
             shot("31a-settings-top")
             // Settings is one long page: swipe until the backup section shows.
             var backup: UiObject2? = null
-            repeat(25) {
+            repeat(40) {
                 if (backup == null) {
                     backup = device.findObject(By.text("Sao lưu ngay"))
                     if (backup == null) {
-                        device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 30)
+                        // Slow, short drag (many steps): a fast swipe flings past the section between checks.
+                        device.swipe(device.displayWidth / 2, device.displayHeight * 2 / 3, device.displayWidth / 2, device.displayHeight / 3, 120)
                         Thread.sleep(300)
                     }
                 }
