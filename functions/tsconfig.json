@@ -3,17 +3,23 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "target": "es2022",
-    "lib": ["es2023"],
-    "types": ["node"],
-    "outDir": "lib",
-    "rootDir": ".",
+    "lib": [
+      "es2023"
+    ],
+    "types": [
+      "node"
+    ],
     "strict": true,
     "noUnusedLocals": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "sourceMap": false
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../shared/**/*.ts"
+  ]
 }

@@ -1,34 +1,9 @@
 import { DateTime, IANAZone } from "luxon";
+import type { Item, ItemType, Recurrence } from "../../shared/model";
 import { EXPENSE_CATEGORIES, LIMITS } from "./config";
 import { parseVnd } from "./money";
 
-export type ItemType = "TASK" | "EVENT" | "EXPENSE" | "NOTE";
-export type ItemStatus = "DRAFT" | "OPEN" | "DONE";
-export type Recurrence = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY";
-
-/**
- * One thing the secretary keeps. Same shape as the Android `Item`, with absent values left out
- * (Firestore rejects `undefined`). `whenAt` is epoch ms; with `allDay` only its date matters.
- */
-export interface Item {
-  id: string;
-  type: ItemType;
-  status: ItemStatus;
-  title: string;
-  details: string;
-  whenAt?: number;
-  allDay: boolean;
-  /** Whole VND, expenses only. */
-  amount?: number;
-  category?: string;
-  place?: string;
-  person?: string;
-  sourceId?: string;
-  quote?: string;
-  createdAt: number;
-  doneAt?: number;
-  recurrence?: Recurrence;
-}
+export type { Item, ItemStatus, ItemType, Recurrence } from "../../shared/model";
 
 export const MAX_LEN = { title: 120, details: 2_000, place: 120, person: 120, quote: 400, category: 40 } as const;
 
@@ -54,14 +29,7 @@ export const ItemExtraction = {
   },
 
   userMessage(transcript: string, now: DateTime): string {
-    const lines: string[] = [];
-    const wd = (d: DateTime) => WEEKDAY_VI[d.weekday - 1];
-    lines.push(`Thời điểm hiện tại: ${wd(now)}, ${now.toFormat("yyyy-MM-dd HH:mm")} (${now.zoneName}).`);
-    lines.push("Lịch 14 ngày tới để quy đổi ngày tương đối (mai, mốt, thứ 5 tuần sau…):");
-    for (let d = 0; d < 14; d++) {
-      const day = now.startOf("day").plus({ days: d });
-      lines.push(`- ${wd(day)} ${day.toFormat("yyyy-MM-dd")}` + (d === 0 ? " (hôm nay)" : d === 1 ? " (mai)" : ""));
-    }
+    const lines: string[] = [...calendarLines(now)];
     lines.push(
       "",
       "Loại mục:",
@@ -96,75 +64,102 @@ export const ItemExtraction = {
   parse(raw: string, zone: string, nowMs: number, sourceId: string | undefined, newId: () => string): Item[] | null {
     const array = itemsArray(raw);
     if (!array) return null;
-    const now = DateTime.fromMillis(nowMs, { zone });
     const items: Item[] = [];
     for (const o of array) {
       if (items.length >= LIMITS.maxItems) break;
       if (!o || typeof o !== "object" || Array.isArray(o)) continue;
-      const rec = o as Record<string, unknown>;
-      const type = typeFrom(str(rec.type));
-      const title = clean(str(rec.title) ?? "", MAX_LEN.title);
-      const details = cleanMultiline(str(rec.details) ?? "", MAX_LEN.details);
-      if (!title && !details) continue;
-
-      const date = parseDate(str(rec.date));
-      const time = parseTime(str(rec.time));
-      const amountRaw = rec.amount;
-      const amount =
-        typeof amountRaw === "number" ? (Math.trunc(amountRaw) > 0 ? Math.trunc(amountRaw) : null)
-        : typeof amountRaw === "string" ? parseVnd(amountRaw)
-        : null;
-
-      let whenAt: number | undefined;
-      let allDay = false;
-      if (date && time) {
-        whenAt = DateTime.fromObject({ ...date, ...time }, { zone }).toMillis();
-      } else if (date) {
-        whenAt = DateTime.fromObject({ ...date }, { zone }).startOf("day").toMillis();
-        allDay = true;
-      } else if (time && type !== "NOTE") {
-        // A time without a day means today, or tomorrow when that time has passed.
-        let at = now.startOf("day").set({ hour: time.hour, minute: time.minute });
-        if (at.toMillis() < nowMs) at = at.plus({ days: 1 });
-        whenAt = at.toMillis();
-      } else if (type === "EXPENSE") {
-        whenAt = now.startOf("day").toMillis();
-        allDay = true;
-      }
-      if (whenAt !== undefined && !Number.isFinite(whenAt)) {
-        whenAt = undefined;
-        allDay = false;
-      }
-
-      const item: Item = {
-        id: newId(),
-        type,
-        status: "DRAFT",
-        title: title || details.slice(0, 60),
-        details: title ? details : "",
-        allDay,
-        createdAt: nowMs,
-      };
-      if (whenAt !== undefined) item.whenAt = whenAt;
-      if (type === "EXPENSE") {
-        if (amount) item.amount = amount;
-        const c = clean(str(rec.category) ?? "", MAX_LEN.category);
-        item.category = EXPENSE_CATEGORIES.find((x) => x.toLowerCase() === c.toLowerCase()) ?? "Khác";
-      }
-      const place = clean(str(rec.place) ?? "", MAX_LEN.place);
-      if (place) item.place = place;
-      const person = clean(str(rec.person) ?? "", MAX_LEN.person);
-      if (person) item.person = person;
-      if (sourceId) item.sourceId = sourceId;
-      const quote = clean(str(rec.quote) ?? "", MAX_LEN.quote);
-      if (quote) item.quote = quote;
-      const repeat = (type === "TASK" || type === "EVENT") && whenAt !== undefined ? recurrenceFrom(str(rec.repeat)) : undefined;
-      if (repeat) item.recurrence = repeat;
-      items.push(item);
+      const item = itemFromRecord(o as Record<string, unknown>, { zone, nowMs, sourceId, newId });
+      if (item) items.push(item);
     }
     return items;
   },
 };
+
+/** Today and the next two weeks spelled out with weekdays, so "mai", "thứ 5 tuần sau" resolve to real dates. */
+export function calendarLines(now: DateTime): string[] {
+  const wd = (d: DateTime) => WEEKDAY_VI[d.weekday - 1];
+  const lines = [
+    `Thời điểm hiện tại: ${wd(now)}, ${now.toFormat("yyyy-MM-dd HH:mm")} (${now.zoneName}).`,
+    "Lịch 14 ngày tới để quy đổi ngày tương đối (mai, mốt, thứ 5 tuần sau…):",
+  ];
+  for (let d = 0; d < 14; d++) {
+    const day = now.startOf("day").plus({ days: d });
+    lines.push(`- ${wd(day)} ${day.toFormat("yyyy-MM-dd")}` + (d === 0 ? " (hôm nay)" : d === 1 ? " (mai)" : ""));
+  }
+  return lines;
+}
+
+export interface ItemContext {
+  zone: string;
+  nowMs: number;
+  sourceId: string | undefined;
+  newId: () => string;
+}
+
+/** One entry of the model's `items` array → a draft item, or null when it holds nothing worth keeping. */
+export function itemFromRecord(rec: Record<string, unknown>, ctx: ItemContext): Item | null {
+  const { zone, nowMs, sourceId, newId } = ctx;
+  const now = DateTime.fromMillis(nowMs, { zone });
+  const type = typeFrom(str(rec.type));
+  const title = clean(str(rec.title) ?? "", MAX_LEN.title);
+  const details = cleanMultiline(str(rec.details) ?? "", MAX_LEN.details);
+  if (!title && !details) return null;
+
+  const date = parseDate(str(rec.date));
+  const time = parseTime(str(rec.time));
+  const amountRaw = rec.amount;
+  const amount =
+    typeof amountRaw === "number" ? (Math.trunc(amountRaw) > 0 ? Math.trunc(amountRaw) : null)
+    : typeof amountRaw === "string" ? parseVnd(amountRaw)
+    : null;
+
+  let whenAt: number | undefined;
+  let allDay = false;
+  if (date && time) {
+    whenAt = DateTime.fromObject({ ...date, ...time }, { zone }).toMillis();
+  } else if (date) {
+    whenAt = DateTime.fromObject({ ...date }, { zone }).startOf("day").toMillis();
+    allDay = true;
+  } else if (time && type !== "NOTE") {
+    // A time without a day means today, or tomorrow when that time has passed.
+    let at = now.startOf("day").set({ hour: time.hour, minute: time.minute });
+    if (at.toMillis() < nowMs) at = at.plus({ days: 1 });
+    whenAt = at.toMillis();
+  } else if (type === "EXPENSE") {
+    whenAt = now.startOf("day").toMillis();
+    allDay = true;
+  }
+  if (whenAt !== undefined && !Number.isFinite(whenAt)) {
+    whenAt = undefined;
+    allDay = false;
+  }
+
+  const item: Item = {
+    id: newId(),
+    type,
+    status: "DRAFT",
+    title: title || details.slice(0, 60),
+    details: title ? details : "",
+    allDay,
+    createdAt: nowMs,
+  };
+  if (whenAt !== undefined) item.whenAt = whenAt;
+  if (type === "EXPENSE") {
+    if (amount) item.amount = amount;
+    const c = clean(str(rec.category) ?? "", MAX_LEN.category);
+    item.category = EXPENSE_CATEGORIES.find((x) => x.toLowerCase() === c.toLowerCase()) ?? "Khác";
+  }
+  const place = clean(str(rec.place) ?? "", MAX_LEN.place);
+  if (place) item.place = place;
+  const person = clean(str(rec.person) ?? "", MAX_LEN.person);
+  if (person) item.person = person;
+  if (sourceId) item.sourceId = sourceId;
+  const quote = clean(str(rec.quote) ?? "", MAX_LEN.quote);
+  if (quote) item.quote = quote;
+  const repeat = (type === "TASK" || type === "EVENT") && whenAt !== undefined ? recurrenceFrom(str(rec.repeat)) : undefined;
+  if (repeat) item.recurrence = repeat;
+  return item;
+}
 
 function typeFrom(s: string | null): ItemType {
   switch (s?.toLowerCase().trim()) {
@@ -186,7 +181,7 @@ function recurrenceFrom(s: string | null): Recurrence | undefined {
 }
 
 /** String/number/boolean → string, everything else (null, objects) → null; "" and "null" count as absent. */
-function str(v: unknown): string | null {
+export function str(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v === "string") return v === "" || v === "null" ? null : v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
@@ -194,16 +189,16 @@ function str(v: unknown): string | null {
 }
 
 /** Single line, no control characters, trimmed and capped. */
-function clean(s: string, max: number): string {
+export function clean(s: string, max: number): string {
   return s.replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 /** Keeps line breaks, drops other control characters. */
-function cleanMultiline(s: string, max: number): string {
+export function cleanMultiline(s: string, max: number): string {
   return s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u2028\u2029]/g, "").replace(/\r\n?/g, "\n").trim().slice(0, max);
 }
 
-function itemsArray(raw: string): unknown[] | null {
+export function itemsArray(raw: string): unknown[] | null {
   const text = raw.trim().replace(/^```json/, "").replace(/^```/, "").replace(/```$/, "").trim();
   const start = text.search(/[{[]/);
   if (start < 0) return null;

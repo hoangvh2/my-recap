@@ -1,36 +1,6 @@
-export type ItemType = "TASK" | "EVENT" | "EXPENSE" | "NOTE";
-export type ItemStatus = "DRAFT" | "OPEN" | "DONE";
-export type Recurrence = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY";
-
-/** One thing the secretary keeps. Same shape as the Android app and the Firestore rules. */
-export interface Item {
-  id: string;
-  type: ItemType;
-  status: ItemStatus;
-  title: string;
-  details: string;
-  /** Deadline, start or expense date (epoch ms). With `allDay` only the date matters. */
-  whenAt?: number;
-  allDay: boolean;
-  /** Whole VND, expenses only. */
-  amount?: number;
-  category?: string;
-  place?: string;
-  person?: string;
-  sourceId?: string;
-  quote?: string;
-  createdAt: number;
-  doneAt?: number;
-  recurrence?: Recurrence;
-}
-
-export interface Capture {
-  id: string;
-  kind: "voice" | "text";
-  transcript: string;
-  createdAt: number;
-  itemCount: number;
-}
+// Data types shared with the server live in /shared; this file adds the labels the screens use.
+export * from "../../../shared/model";
+import type { ItemType, Recurrence } from "../../../shared/model";
 
 export const TYPE_LABEL: Record<ItemType, string> = { TASK: "Việc", EVENT: "Lịch hẹn", EXPENSE: "Chi tiêu", NOTE: "Ghi chú" };
 export const TYPES: ItemType[] = ["TASK", "EVENT", "EXPENSE", "NOTE"];

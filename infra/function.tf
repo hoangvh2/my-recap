@@ -146,3 +146,114 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# ---------------------------------------------------------------- calendar subscription
+# Two small functions, no Gemini key: one the signed-in app calls to make or revoke the secret
+# calendar link, and one public address phone calendars poll (the token in the path is the access).
+
+locals {
+  small_function_env = merge(
+    {
+      ALLOWED_EMAILS  = join(",", local.emails)
+      GCLOUD_PROJECT  = var.project_id
+      FIREBASE_CONFIG = jsonencode({ projectId = var.project_id })
+    },
+    var.custom_domain == null ? {} : { EXTRA_ORIGINS = "https://${var.custom_domain}" },
+  )
+}
+
+resource "google_cloudfunctions2_function" "calendarlink" {
+  project  = var.project_id
+  name     = "calendarlink"
+  location = var.region
+
+  build_config {
+    runtime               = "nodejs22"
+    entry_point           = "calendarlink"
+    service_account       = google_service_account.build.id
+    environment_variables = { GOOGLE_NODE_RUN_SCRIPTS = "" }
+    source {
+      storage_source {
+        bucket = google_storage_bucket.source.name
+        object = google_storage_bucket_object.functions.name
+      }
+    }
+  }
+
+  service_config {
+    service_account_email            = google_service_account.runtime.email
+    available_memory                 = "256Mi"
+    available_cpu                    = "1"
+    timeout_seconds                  = 30
+    min_instance_count               = 0
+    max_instance_count               = 2
+    max_instance_request_concurrency = 8
+    ingress_settings                 = "ALLOW_ALL"
+    all_traffic_on_latest_revision   = true
+    environment_variables            = local.small_function_env
+  }
+
+  depends_on = [
+    google_project_iam_member.build,
+    google_project_iam_member.runtime,
+    google_storage_bucket_iam_member.build_reads_source,
+    google_firestore_database.default,
+  ]
+}
+
+# Same as capture: reachable by the browser, authenticated inside the code (App Check, sign-in, allowlist).
+resource "google_cloud_run_v2_service_iam_member" "calendarlink_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloudfunctions2_function.calendarlink.service_config[0].service
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_cloudfunctions2_function" "calendarfeed" {
+  project  = var.project_id
+  name     = "calendarfeed"
+  location = var.region
+
+  build_config {
+    runtime               = "nodejs22"
+    entry_point           = "calendarfeed"
+    service_account       = google_service_account.build.id
+    environment_variables = { GOOGLE_NODE_RUN_SCRIPTS = "" }
+    source {
+      storage_source {
+        bucket = google_storage_bucket.source.name
+        object = google_storage_bucket_object.functions.name
+      }
+    }
+  }
+
+  service_config {
+    service_account_email            = google_service_account.runtime.email
+    available_memory                 = "256Mi"
+    available_cpu                    = "1"
+    timeout_seconds                  = 30
+    min_instance_count               = 0
+    max_instance_count               = 2
+    max_instance_request_concurrency = 20
+    ingress_settings                 = "ALLOW_ALL"
+    all_traffic_on_latest_revision   = true
+    environment_variables            = local.small_function_env
+  }
+
+  depends_on = [
+    google_project_iam_member.build,
+    google_project_iam_member.runtime,
+    google_storage_bucket_iam_member.build_reads_source,
+    google_firestore_database.default,
+  ]
+}
+
+# Public on purpose: calendar apps cannot sign in. Only the unguessable token opens a calendar.
+resource "google_cloud_run_v2_service_iam_member" "calendarfeed_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloudfunctions2_function.calendarfeed.service_config[0].service
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}

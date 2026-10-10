@@ -15,6 +15,9 @@
     "public": "web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
+    "rewrites": [
+      { "source": "/calendar/**", "run": { "serviceId": "calendarfeed", "region": "asia-southeast1" } }
+    ],
     "headers": [
       {
         "source": "**",

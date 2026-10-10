@@ -30,9 +30,14 @@ variable "gemini_model" {
 }
 
 variable "region" {
-  description = "Region of the capture function. Must match the web app (default in the code: asia-southeast1)."
+  description = "Region of the functions. The web app and firebase.json (calendar rewrite) are built for asia-southeast1; change them together."
   type        = string
   default     = "asia-southeast1"
+
+  validation {
+    condition     = var.region == "asia-southeast1"
+    error_message = "Only asia-southeast1 is supported: it is fixed in functions/src/config.ts and in the calendar rewrite of firebase.json."
+  }
 }
 
 variable "firestore_location" {
