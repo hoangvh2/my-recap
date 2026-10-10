@@ -2,7 +2,16 @@ name: Android
 
 on:
   push:
+    paths-ignore: &web_paths
+      - "web/**"
+      - "functions/**"
+      - "tests/**"
+      - "scripts/**"
+      - "firebase.json"
+      - "firestore.*"
+      - ".github/workflows/web.yml"
   pull_request:
+    paths-ignore: *web_paths
   workflow_dispatch:
 
 concurrency:

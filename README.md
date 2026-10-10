@@ -30,6 +30,10 @@ APK do GitHub Actions build tự động mỗi khi có push (xem `.github/workfl
 - **Ghi tiếp vào folder này** sau giờ nghỉ; **đổi tên folder** bằng nút ✏️.
 - **Lời người phỏng vấn:** Giữ nguyên / Rút gọn thành câu hỏi / Bỏ hẳn (Cài đặt → mục 3, chỉ với Gemini).
 
+## Bản web cho iPhone (chỉ Thư ký)
+
+Không cần tài khoản Apple Developer: PWA + Firebase, dữ liệu và khoá Gemini lưu trên Google, chỉ email được cấp quyền mới dùng được. Xem [docs/web-secretary.md](docs/web-secretary.md) (kiến trúc, bảo mật, thiết lập, phần chưa kiểm chứng).
+
 ## Kiến trúc
 
 ```
