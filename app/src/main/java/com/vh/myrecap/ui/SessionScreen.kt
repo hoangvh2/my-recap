@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -310,6 +312,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FolderHeader(s: Session, audioBytes: Long, onRename: () -> Unit) {
     val style = modeStyle(s.mode)
@@ -331,7 +334,7 @@ private fun FolderHeader(s: Session, audioBytes: Long, onRename: () -> Unit) {
             )
         }
     }
-    Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         MetaChip(Icons.Rounded.ViewAgenda, "${s.segments.size} đoạn")
         MetaChip(Icons.Rounded.Schedule, TimeFormat.clock(s.audioMs))
         if (s.bookmarksMs.isNotEmpty()) MetaChip(Icons.Rounded.Bookmark, "${s.bookmarksMs.size}", Brand.Bookmark)

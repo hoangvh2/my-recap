@@ -112,6 +112,25 @@ class SecretaryFlowTest {
         device.executeShellCommand("screencap -p $SHOTS/$name.png")
     }
 
+    /** Taps a filter chip, swiping the chip row sideways until it is on screen. */
+    private fun clickChip(label: String) {
+        val row = device.findObject(By.textStartsWith("Tổng quan")) ?: device.findObject(By.textStartsWith("Chi tiêu"))
+            ?: device.findObject(By.textStartsWith("Việc"))
+        assertNotNull("filter chips not on screen", row)
+        val y = row!!.visibleBounds.centerY()
+        val w = device.displayWidth
+        repeat(4) { attempt ->
+            device.findObject(By.textStartsWith(label))?.let {
+                it.click()
+                return
+            }
+            // First look to the right, then back to the left.
+            if (attempt < 2) device.swipe(w * 3 / 4, y, w / 4, y, 20) else device.swipe(w / 4, y, w * 3 / 4, y, 20)
+            Thread.sleep(400)
+        }
+        throw AssertionError("chip $label not found")
+    }
+
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {
         val end = SystemClock.uptimeMillis() + timeoutMs
         while (SystemClock.uptimeMillis() < end) {
@@ -174,11 +193,12 @@ class SecretaryFlowTest {
             Thread.sleep(500)
             shot("18-agenda")
 
-            device.findObject(By.text("Chi tiêu")).click()
+            // The filter chips scroll sideways on a narrow screen.
+            clickChip("Chi tiêu")
             assertTrue("expense total", device.wait(Until.hasObject(By.text("65.000 đ")), 5_000))
             shot("19-expenses")
 
-            device.findObject(By.textStartsWith("Việc")).click()
+            clickChip("Việc")
             assertTrue(device.wait(Until.hasObject(By.text("Gửi báo giá cho khách")), 5_000))
             device.findObject(By.text("Gửi báo giá cho khách")).click()
             assertTrue("item editor not shown", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000))
@@ -191,7 +211,7 @@ class SecretaryFlowTest {
             device.wait(Until.hasObject(By.textStartsWith("Đã xong")), 5_000)
             device.executeShellCommand("cmd uimode night yes")
             Thread.sleep(2_500)
-            device.findObject(By.text("Tổng quan"))?.click()
+            clickChip("Tổng quan")
             Thread.sleep(800)
             shot("21-dark-agenda")
             device.executeShellCommand("cmd uimode night no")

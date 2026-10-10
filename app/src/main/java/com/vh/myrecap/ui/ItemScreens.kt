@@ -6,7 +6,12 @@ import android.content.Intent
 import android.provider.CalendarContract
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -297,7 +302,7 @@ private fun DraftCard(item: Item, onType: (ItemType) -> Unit, onEdit: () -> Unit
                         Text(item.title, style = MaterialTheme.typography.titleMedium)
                         val sub = itemSubtitle(item)
                         if (sub.isNotEmpty()) {
-                            Text(sub, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(sub, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                         if (item.type != ItemType.NOTE && item.details.isNotBlank()) {
                             Text(item.details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -330,21 +335,39 @@ private fun DraftCard(item: Item, onType: (ItemType) -> Unit, onEdit: () -> Unit
     }
 }
 
+/** Four-way type switch: icon over a short label, so all four fit on a 320dp screen. */
 @Composable
 private fun TypeSelector(selected: ItemType, onSelect: (ItemType) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         ItemType.entries.forEach { t ->
             val style = typeStyle(t)
-            val icon: (@Composable () -> Unit)? = if (t != selected) null else {
-                { Icon(style.icon, null, Modifier.size(16.dp)) }
+            val on = t == selected
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (on) style.container else Color.Transparent)
+                    .selectable(selected = on, role = Role.RadioButton) { onSelect(t) }
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(style.icon, null, Modifier.size(20.dp), tint = if (on) style.content else MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    t.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (on) style.content else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
             }
-            FilterChip(
-                selected = t == selected,
-                onClick = { onSelect(t) },
-                label = { Text(t.label, maxLines = 1, style = MaterialTheme.typography.labelMedium) },
-                leadingIcon = icon,
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 }
