@@ -564,7 +564,7 @@ private fun SummaryRow(
 private fun templateHint(mode: SessionMode) = when (mode) {
     SessionMode.INTERVIEW -> "Đánh giá ứng viên + chi tiết từng câu hỏi"
     SessionMode.MEETING -> "Quyết định, việc cần làm, vấn đề mở"
-    SessionMode.CUSTOM -> "Theo yêu cầu bạn viết trong Cài đặt"
+    SessionMode.CUSTOM, SessionMode.MEMO -> "Theo yêu cầu bạn viết trong Cài đặt"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -599,7 +599,7 @@ private fun SummarizeSheet(
                 Text("Mẫu", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SessionMode.entries.forEach { m ->
+                    SessionMode.entries.filter { it.isFolderMode }.forEach { m ->
                         val style = modeStyle(m)
                         val on = m == mode
                         Surface(
