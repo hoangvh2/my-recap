@@ -2,6 +2,7 @@ package com.vh.myrecap.data
 
 import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.OutputLanguage
+import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.TranscriptAssembler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,8 @@ import java.util.UUID
  * All metadata writes go through [update] under one lock: the recording service, the background
  * worker and the UI all modify folders.
  */
+data class StorageStats(val audioBytes: Long, val otherBytes: Long)
+
 class SessionStore(private val root: File) {
     private val lock = Any()
     private val _version = MutableStateFlow(0L)
@@ -44,6 +47,7 @@ class SessionStore(private val root: File) {
             mode = mode,
             createdAt = now,
             state = RecState.RECORDING,
+            extract = if (mode == SessionMode.MEMO) TaskStatus.PENDING else null,
         )
         synchronized(lock) {
             dir(id).mkdirs()
@@ -82,6 +86,45 @@ class SessionStore(private val root: File) {
     }
 
     fun audioFile(id: String, segment: Segment) = File(dir(id), segment.fileName)
+
+    /**
+     * Deletes the audio of transcribed clips (all of them when [indexes] is null) and keeps their
+     * text. Clips still waiting for speech-to-text keep their audio. Returns the bytes freed.
+     */
+    fun deleteAudio(id: String, indexes: Collection<Int>? = null): Long = synchronized(lock) {
+        val session = read(id) ?: return 0
+        var freed = 0L
+        val targets = session.segments
+            .filter { it.hasAudio && it.stt == TaskStatus.DONE && (indexes == null || it.index in indexes) }
+            .map { it.index }.toSet()
+        if (targets.isEmpty()) return 0
+        for (seg in session.segments.filter { it.index in targets }) {
+            val f = audioFile(id, seg)
+            freed += f.length()
+            f.delete()
+        }
+        write(session.copy(segments = session.segments.map { if (it.index in targets) it.copy(hasAudio = false) else it }))
+        freed
+    }
+
+    /** Bytes of audio still stored for this folder. */
+    fun audioBytes(session: Session): Long = session.audioClips.sumOf { audioFile(session.id, it).length() }
+
+    /** Disk use of all folders and captures, split into audio and everything else (text, metadata). */
+    fun storageStats(): StorageStats = synchronized(lock) {
+        var audio = 0L
+        var other = 0L
+        root.walkTopDown().filter { it.isFile }.forEach { f ->
+            if (f.name.endsWith(".aac")) audio += f.length() else other += f.length()
+        }
+        StorageStats(audio, other)
+    }
+
+    /** Plain text of a quick capture (all its clips, without headers). */
+    fun memoText(session: Session): String = session.segments.sortedBy { it.index }
+        .mapNotNull { readTranscript(session.id, it.index)?.trim() }
+        .filter { it.isNotEmpty() && it != Prompts.NO_SPEECH }
+        .joinToString("\n")
 
     fun transcriptFile(id: String, index: Int) = File(dir(id), String.format(Locale.ROOT, "seg_%03d.txt", index))
 

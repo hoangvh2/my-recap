@@ -61,7 +61,7 @@ object ClipNotes {
                 appendLine("Quyết định: <nếu có, nếu không ghi 'Không'>")
                 appendLine("Việc cần làm: <việc – người phụ trách – hạn, nếu có>")
             }
-            SessionMode.CUSTOM -> {
+            SessionMode.CUSTOM, SessionMode.MEMO -> {
                 appendLine("Nội dung:")
                 appendLine("- <từng ý quan trọng, kèm chi tiết cụ thể>")
             }
@@ -141,7 +141,7 @@ object SummaryComposer {
                         "Xét TẤT CẢ ${notes.size} đoạn.",
                 )
             }
-            SessionMode.CUSTOM -> {
+            SessionMode.CUSTOM, SessionMode.MEMO -> {
                 appendLine(customPrompt.ifBlank { "Tóm tắt nội dung chính, các quyết định và việc cần làm." })
                 appendLine()
                 appendLine("Dùng thông tin từ TẤT CẢ ${notes.size} đoạn.")
@@ -170,7 +170,7 @@ object SummaryComposer {
         val details = when (mode) {
             SessionMode.INTERVIEW -> DETAILS_INTERVIEW
             SessionMode.MEETING -> DETAILS_MEETING
-            SessionMode.CUSTOM -> return synthesis.trim()
+            SessionMode.CUSTOM, SessionMode.MEMO -> return synthesis.trim()
         }
         return buildString {
             appendLine(synthesis.trim())

@@ -66,6 +66,7 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
     val detail by detailFlow.collectAsState(initial = null)
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmAudio by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
 
     val d = detail ?: return
@@ -99,6 +100,8 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
                             DropdownMenuItem(
                                 text = { Text("Chuyển văn bản lại") },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, null) },
+                                // Needs the audio; once deleted, the transcript is final.
+                                enabled = seg.hasAudio,
                                 onClick = { menu = false; vm.retranscribe(id, seg.index) },
                             )
                             DropdownMenuItem(
@@ -127,11 +130,11 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
                 ) {
                     val prev = ordered.getOrNull(pos - 1)
                     val next = ordered.getOrNull(pos + 1)
-                    OutlinedButton(onClick = { prev?.let { vm.openClip(id, it.index) } }, enabled = prev != null, modifier = Modifier.weight(1f)) {
+                    OutlinedButton(onClick = { prev?.let { vm.replaceTop(Screen.Clip(id, it.index)) } }, enabled = prev != null, modifier = Modifier.weight(1f)) {
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null)
                         Text("Trước", maxLines = 1)
                     }
-                    OutlinedButton(onClick = { next?.let { vm.openClip(id, it.index) } }, enabled = next != null, modifier = Modifier.weight(1f)) {
+                    OutlinedButton(onClick = { next?.let { vm.replaceTop(Screen.Clip(id, it.index)) } }, enabled = next != null, modifier = Modifier.weight(1f)) {
                         Text("Sau", maxLines = 1)
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
                     }
@@ -153,6 +156,16 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
                 val marks = d.session.bookmarksMs.count { it >= seg.startMs && it <= seg.endMs }
                 if (marks > 0) MetaChip(Icons.Rounded.Bookmark, "$marks", Brand.Bookmark)
             }
+            if (seg.hasAudio) {
+                val parts = remember(seg.index, seg.fileName) { vm.audioParts(d.session.copy(segments = listOf(seg))) }
+                AudioPlayerCard(
+                    parts = parts,
+                    sizeLabel = formatBytes(parts.sumOf { it.first.length() }),
+                    // Audio still waiting for speech-to-text cannot go yet.
+                    onDelete = if (seg.stt == TaskStatus.DONE) ({ confirmAudio = true }) else null,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+            }
             HorizontalDivider(Modifier.padding(vertical = 18.dp), color = MaterialTheme.colorScheme.outlineVariant)
             when (seg.stt) {
                 TaskStatus.DONE -> SelectionContainer { SpeakerTranscript(text) }
@@ -171,6 +184,16 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
         }
     }
 
+    if (confirmAudio) {
+        ConfirmDialog(
+            "Xoá file ghi âm của đoạn ${seg.number}?",
+            "Transcript vẫn được giữ. Sau khi xoá sẽ không nghe lại hay chuyển văn bản lại được.",
+            "Xoá ghi âm",
+            destructive = true,
+            onConfirm = { vm.deleteAudio(id, listOf(seg.index)) },
+            onDismiss = { confirmAudio = false },
+        )
+    }
     if (confirmDelete) {
         ConfirmDialog(
             "Xoá đoạn ${seg.number}?",

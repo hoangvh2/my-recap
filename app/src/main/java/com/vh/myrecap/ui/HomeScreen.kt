@@ -26,7 +26,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import com.vh.myrecap.core.ItemStatus
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
@@ -97,9 +107,47 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Two home tabs: the secretary (quick captures and items) and recordings (folders). */
 @Composable
 fun HomeScreen(vm: AppViewModel) {
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val items by vm.items.collectAsStateWithLifecycle()
+    val memos by vm.memos.collectAsStateWithLifecycle()
+    val tab = settings.homeTab.coerceIn(0, 1)
+    val waiting = items.count { it.status == ItemStatus.DRAFT } + memos.count { it.extractBusy }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                NavigationBarItem(
+                    selected = tab == 0,
+                    onClick = { vm.setHomeTab(0) },
+                    icon = {
+                        BadgedBox(badge = { if (waiting > 0) Badge { Text("$waiting") } }) {
+                            Icon(if (tab == 0) Icons.Rounded.Inbox else Icons.Outlined.Inbox, null)
+                        }
+                    },
+                    label = { Text("Thư ký") },
+                )
+                NavigationBarItem(
+                    selected = tab == 1,
+                    onClick = { vm.setHomeTab(1) },
+                    icon = { Icon(if (tab == 1) Icons.Rounded.Folder else Icons.Outlined.Folder, null) },
+                    label = { Text("Ghi âm") },
+                )
+            }
+        },
+    ) { outer ->
+        Box(Modifier.padding(bottom = outer.calculateBottomPadding())) {
+            if (tab == 0) AgendaTab(vm) else FoldersTab(vm)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FoldersTab(vm: AppViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -128,12 +176,13 @@ fun HomeScreen(vm: AppViewModel) {
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("My Recap", style = MaterialTheme.typography.titleLarge)
+                        Text("Ghi âm", style = MaterialTheme.typography.titleLarge)
                         Text(
                             todayLabel(),
                             style = MaterialTheme.typography.bodySmall,
@@ -178,7 +227,7 @@ fun HomeScreen(vm: AppViewModel) {
                     EmptyState(
                         Icons.Rounded.FolderOpen,
                         "Chưa có buổi ghi nào",
-                        "Mỗi lần ghi âm tạo một folder. Các đoạn hội thoại, transcript và tóm tắt của buổi đó nằm gọn trong folder.",
+                        "Mỗi buổi phỏng vấn hay cuộc họp là một folder: các đoạn hội thoại, transcript và tóm tắt nằm gọn trong đó.",
                     )
                 }
             }
@@ -221,6 +270,7 @@ private fun modeHint(mode: SessionMode) = when (mode) {
     SessionMode.INTERVIEW -> "Tự tách từng lượt hỏi–đáp. Có thể tắt màn hình."
     SessionMode.MEETING -> "Ghi biên bản, quyết định và việc cần làm."
     SessionMode.CUSTOM -> "Ghi tự do, tóm tắt theo yêu cầu của bạn."
+    SessionMode.MEMO -> "Nói nhanh việc, lịch hẹn, khoản chi."
 }
 
 @Composable
@@ -257,7 +307,7 @@ private fun ModeSwitch(mode: SessionMode, onMode: (SessionMode) -> Unit) {
             .background(Color.White.copy(alpha = 0.10f))
             .padding(4.dp),
     ) {
-        SessionMode.entries.forEach { m ->
+        SessionMode.entries.filter { it.isFolderMode }.forEach { m ->
             val selected = m == mode
             Box(
                 Modifier
@@ -280,7 +330,7 @@ private fun ModeSwitch(mode: SessionMode, onMode: (SessionMode) -> Unit) {
 }
 
 @Composable
-private fun RecordButton(onClick: () -> Unit) {
+fun RecordButton(onClick: () -> Unit, description: String = "Bắt đầu ghi âm") {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "press")
@@ -291,7 +341,7 @@ private fun RecordButton(onClick: () -> Unit) {
             .clip(CircleShape)
             .border(3.dp, Color.White.copy(alpha = 0.22f), CircleShape)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "Bắt đầu ghi âm" },
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(66.dp).clip(CircleShape).background(Brand.Record), contentAlignment = Alignment.Center) {
@@ -373,7 +423,7 @@ private class SetupStep(
 )
 
 @Composable
-private fun SetupCard(settings: AppSettings, vm: AppViewModel) {
+fun SetupCard(settings: AppSettings, vm: AppViewModel) {
     val context = LocalContext.current
     val steps = listOf(
         SetupStep(
@@ -490,7 +540,7 @@ fun groupByDay(sessions: List<Session>): List<Pair<String, List<Session>>> {
     }
 }
 
-private fun todayLabel(): String {
+fun todayLabel(): String {
     val cal = Calendar.getInstance()
     val weekday = when (cal.get(Calendar.DAY_OF_WEEK)) {
         Calendar.MONDAY -> "Thứ Hai"

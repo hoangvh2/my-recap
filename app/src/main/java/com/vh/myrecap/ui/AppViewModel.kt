@@ -7,14 +7,20 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vh.myrecap.MyRecapApp
+import androidx.compose.runtime.mutableStateListOf
 import com.vh.myrecap.core.ClipText
+import com.vh.myrecap.core.Item
+import com.vh.myrecap.core.ItemStatus
+import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.data.Session
+import com.vh.myrecap.data.StorageStats
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
+import com.vh.myrecap.reminder.Reminders
 import com.vh.myrecap.recorder.RecordingService
 import com.vh.myrecap.settings.AppSettings
 import com.vh.myrecap.work.Processing
@@ -35,14 +41,46 @@ sealed interface Screen {
     data class Detail(val id: String) : Screen
     data class Clip(val id: String, val index: Int) : Screen
     data class Summary(val id: String, val jobId: String) : Screen
+    /** A quick capture: its words, the AI proposals to confirm and the items saved from it. */
+    data class Review(val id: String) : Screen
+    /** An item, or a new one of [type] when [id] is null. */
+    data class ItemEdit(val id: String?, val type: ItemType = ItemType.TASK) : Screen
     data object Settings : Screen
+
+    /** Whether this screen shows folder/capture [folderId] (closed when that is deleted). */
+    fun shows(folderId: String): Boolean = when (this) {
+        is Detail -> id == folderId
+        is Clip -> id == folderId
+        is Summary -> id == folderId
+        is Review -> id == folderId
+        else -> false
+    }
+}
+
+/** Screen plus its depth in the back stack, so transitions know the direction. */
+data class NavEntry(val screen: Screen, val depth: Int)
+
+/** A quick capture with its text, the items taken from it and the audio still kept. */
+class MemoDetail(val session: Session, val text: String, val items: List<Item>, val audioBytes: Long)
+
+/** "4,2 MB" */
+fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_000_000_000 -> String.format(java.util.Locale("vi"), "%.1f GB", bytes / 1e9)
+    bytes >= 1_000_000 -> String.format(java.util.Locale("vi"), "%.1f MB", bytes / 1e6)
+    bytes >= 1_000 -> "${bytes / 1_000} KB"
+    else -> "$bytes B"
 }
 
 /** Result of the Settings "test connection" button. */
 data class ConnectionResult(val ok: Boolean, val message: String)
 
 /** A folder with the text of each clip (by index) and of each summary (by job id). */
-class FolderDetail(val session: Session, val clipText: Map<Int, String?>, val summaryText: Map<String, String?>)
+class FolderDetail(
+    val session: Session,
+    val clipText: Map<Int, String?>,
+    val summaryText: Map<String, String?>,
+    val audioBytes: Long,
+)
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as MyRecapApp
@@ -51,10 +89,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Folders deleted from the UI but kept on disk for a few seconds, so the user can undo. */
     private val pendingDeletes = MutableStateFlow<Set<String>>(emptySet())
 
-    val sessions: StateFlow<List<Session>> = combine(store.version, pendingDeletes) { _, hidden -> hidden }
+    private val all: StateFlow<List<Session>> = combine(store.version, pendingDeletes) { _, hidden -> hidden }
         .map { hidden -> store.list().filterNot { it.id in hidden } }
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Recording folders (interviews, meetings…). */
+    val sessions: StateFlow<List<Session>> = all.map { list -> list.filterNot { it.isMemo } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Quick captures, newest first. */
+    val memos: StateFlow<List<Session>> = all.map { list -> list.filter { it.isMemo } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val items: StateFlow<List<Item>> = app.items.items
 
     /** Last folder hidden by [requestDelete]; the home screen offers Undo for it. */
     var lastDeleted by mutableStateOf<Session?>(null)
@@ -67,36 +115,61 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _resumeTick = MutableStateFlow(0)
     val resumeTick: StateFlow<Int> = _resumeTick
 
-    var screen by mutableStateOf<Screen>(Screen.Home)
-        private set
+    /** Back stack; the home screen is always at the bottom. */
+    private val stack = mutableStateListOf<Screen>(Screen.Home)
+
+    val screen: Screen get() = stack.last()
+    val nav: NavEntry get() = NavEntry(stack.last(), stack.size)
 
     fun onResume() {
         _resumeTick.value++
     }
 
+    private fun push(target: Screen) {
+        if (stack.last() != target) stack.add(target)
+    }
+
+    /** Opens a folder, or the review screen for a quick capture. */
     fun openSession(id: String) {
-        screen = Screen.Detail(id)
+        val session = store.get(id) ?: return
+        push(if (session.isMemo) Screen.Review(id) else Screen.Detail(id))
     }
 
-    fun openSettings() {
-        screen = Screen.Settings
+    fun openSettings() = push(Screen.Settings)
+    fun openClip(id: String, index: Int) = push(Screen.Clip(id, index))
+    fun openSummary(id: String, jobId: String) = push(Screen.Summary(id, jobId))
+    fun openItem(id: String) = push(Screen.ItemEdit(id))
+    fun newItem(type: ItemType) = push(Screen.ItemEdit(null, type))
+
+    /** A reader opened from a notification replaces the reader already open, not stacks on it. */
+    fun replaceTop(target: Screen) {
+        if (stack.size > 1) stack[stack.size - 1] = target else push(target)
     }
 
-    fun openClip(id: String, index: Int) {
-        screen = Screen.Clip(id, index)
-    }
-
-    fun openSummary(id: String, jobId: String) {
-        screen = Screen.Summary(id, jobId)
-    }
-
-    /** One level up: readers return to their folder, everything else to the home screen. */
     fun back() {
-        screen = when (val s = screen) {
-            is Screen.Clip -> Screen.Detail(s.id)
-            is Screen.Summary -> Screen.Detail(s.id)
-            else -> Screen.Home
-        }
+        if (stack.size > 1) stack.removeAt(stack.size - 1)
+    }
+
+    fun setHomeTab(tab: Int) = app.settings.update { it.copy(homeTab = tab) }
+
+    /** Set by the launcher shortcut; the secretary tab starts the capture (it owns the permission prompt). */
+    var quickCapturePending by mutableStateOf(false)
+        private set
+
+    fun requestQuickCapture() {
+        stack.clear()
+        stack.add(Screen.Home)
+        setHomeTab(0)
+        quickCapturePending = true
+    }
+
+    fun consumeQuickCapture() {
+        quickCapturePending = false
+    }
+
+    private fun closeScreensOf(id: String) {
+        stack.removeAll { it.shows(id) }
+        if (stack.isEmpty()) stack.add(Screen.Home)
     }
 
     fun startRecording(mode: SessionMode) {
@@ -112,6 +185,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         RecordingService.start(app, folder.mode, folder.title, folderId)
     }
 
+    /** Quick capture: one tap, speak, tap Xong; the AI proposes items afterwards. */
+    fun startMemo() {
+        RecorderState.clearError()
+        RecordingService.start(app, SessionMode.MEMO, "Ghi nhanh " + clock(System.currentTimeMillis()))
+    }
+
+    fun discardRecording() = RecordingService.command(app, RecordingService.ACTION_DISCARD)
     fun togglePause() = RecordingService.command(app, RecordingService.ACTION_TOGGLE_PAUSE)
     fun bookmark() = RecordingService.command(app, RecordingService.ACTION_BOOKMARK)
     fun stop() = RecordingService.command(app, RecordingService.ACTION_STOP)
@@ -123,6 +203,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     session = s,
                     clipText = s.segments.associate { it.index to store.readTranscript(id, it.index) },
                     summaryText = s.summaries.associate { it.id to store.readSummary(id, it.id) },
+                    audioBytes = store.audioBytes(s),
                 )
             }
         }
@@ -168,7 +249,83 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val session = store.get(id) ?: return
         pendingDeletes.value = pendingDeletes.value + id
         lastDeleted = session
-        if (screen !is Screen.Home && screen !is Screen.Settings) screen = Screen.Home
+        closeScreensOf(id)
+    }
+
+    // ---- Audio storage ----
+
+    /** Deletes the audio of transcribed clips (all when [indexes] is null); text stays. */
+    fun deleteAudio(id: String, indexes: Collection<Int>? = null) = io {
+        val freed = store.deleteAudio(id, indexes)
+        if (freed > 0) toast("Đã giải phóng ${formatBytes(freed)}")
+    }
+
+    suspend fun storageStats(): StorageStats = withContext(Dispatchers.IO) { store.storageStats() }
+
+    /** Settings "clean up now": audio of every transcribed clip in every folder and capture. */
+    suspend fun deleteAllTranscribedAudio(): Long = withContext(Dispatchers.IO) {
+        store.list().filterNot { it.isRecording }.sumOf { store.deleteAudio(it.id) }
+    }
+
+    // ---- Secretary items ----
+
+    fun memoDetail(id: String): Flow<MemoDetail?> = combine(store.version, app.items.items) { _, items -> items }
+        .map { items ->
+            store.get(id)?.let { s ->
+                MemoDetail(s, store.memoText(s), items.filter { it.sourceId == id }, store.audioBytes(s))
+            }
+        }
+        .flowOn(Dispatchers.IO)
+
+    /** Captures, by id, for linking items to where they came from. */
+    fun memo(id: String): Session? = memos.value.firstOrNull { it.id == id }
+
+    fun audioParts(session: Session): List<Pair<java.io.File, Long>> =
+        session.audioClips.sortedBy { it.index }.map { store.audioFile(session.id, it) to it.durationMs }
+
+    /** Confirms AI proposals; only then do they count and remind. */
+    fun confirm(ids: Collection<String>) = io {
+        ids.forEach { id ->
+            app.items.update(id) { if (it.status == ItemStatus.DRAFT) it.copy(status = ItemStatus.OPEN) else it }
+                ?.let { Reminders.sync(app, it) }
+        }
+    }
+
+    fun saveItem(item: Item) = io {
+        app.items.upsert(item)
+        Reminders.sync(app, item)
+    }
+
+    fun setDone(id: String, done: Boolean) = io {
+        app.items.update(id) {
+            if (done) it.copy(status = ItemStatus.DONE, doneAt = System.currentTimeMillis()) else it.copy(status = ItemStatus.OPEN, doneAt = null)
+        }?.let { Reminders.sync(app, it) }
+        if (done) Reminders.cancel(app, id)
+    }
+
+    fun deleteItem(id: String) = io {
+        app.items.delete(id)
+        Reminders.cancel(app, id)
+    }
+
+    /** Runs the AI analysis of a capture again, replacing its unconfirmed proposals. */
+    fun reanalyze(id: String) = io {
+        store.update(id) { it.copy(extract = TaskStatus.PENDING, error = null) }
+        Processing.retryStt(app, id)
+    }
+
+    /** Deletes a capture (audio and text) and its unconfirmed proposals; confirmed items stay. */
+    fun deleteMemo(id: String) {
+        closeScreensOf(id)
+        io {
+            Processing.cancel(app, id)
+            app.items.deleteDrafts(id)
+            store.delete(id)
+        }
+    }
+
+    private suspend fun toast(text: String) = withContext(Dispatchers.Main) {
+        android.widget.Toast.makeText(app, text, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     fun undoDelete(id: String) {

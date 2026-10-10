@@ -22,12 +22,17 @@ import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.AudioClip
 import com.vh.myrecap.core.ClipNotes
 import com.vh.myrecap.core.ClipText
+import com.vh.myrecap.core.Item
+import com.vh.myrecap.core.ItemExtraction
+import com.vh.myrecap.core.ItemStatus
+import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.ProviderKind
 import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.SttRequest
 import com.vh.myrecap.core.SummaryComposer
+import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.SessionStore
@@ -38,6 +43,9 @@ import com.vh.myrecap.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
 object Processing {
@@ -150,7 +158,12 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             store.update(id) { if (it.error?.startsWith(RETRY_PREFIX) == true) it.copy(error = null) else it }
         }
 
-        // 2) Summaries the user asked for.
+        // 2) Quick capture: AI proposes items; the user confirms them in the app.
+        store.get(id)?.takeIf { it.isMemo && it.extractBusy && it.allTranscribed }?.let { memo ->
+            extractItems(memo)?.let { return@withContext it }
+        }
+
+        // 3) Summaries the user asked for.
         val jobs = store.get(id)?.summaries?.filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.RUNNING }.orEmpty()
         for (job in jobs) {
             if (SystemClock.elapsedRealtime() > deadline) return@withContext continueLater(id)
@@ -227,6 +240,54 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             }
         }
         Result.success()
+    }
+
+    /** Returns a Result to end the run with, or null to carry on. */
+    private fun extractItems(memo: Session): Result? {
+        val id = memo.id
+        val settings = app.settings.current
+        val text = store.memoText(memo)
+        if (text.isBlank()) {
+            store.update(id) { it.copy(extract = TaskStatus.DONE, error = "Không nghe thấy lời nói trong ghi chú này.") }
+            cleanUpMemoAudio(id)
+            return null
+        }
+        val config = settings.summaryConfig()
+        if (!config.isComplete) {
+            store.update(id) { it.copy(extract = TaskStatus.ERROR, error = "Chưa cấu hình AI (API key/model) trong Cài đặt.") }
+            return Result.failure()
+        }
+        store.update(id) { it.copy(extract = TaskStatus.RUNNING, error = null) }
+        return try {
+            val zone = ZoneId.systemDefault()
+            val now = System.currentTimeMillis()
+            val raw = try {
+                Providers.textGenerator(config).generate(
+                    ItemExtraction.system(),
+                    ItemExtraction.userMessage(text, ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), zone)),
+                )
+            } catch (e: ApiException) {
+                if (e.emptyResult) "" else throw e
+            }
+            // Unreadable answer: keep the words as one note rather than losing the capture.
+            val drafts = ItemExtraction.parse(raw, zone, now, id, ItemStore::newId)
+                ?: listOf(Item(ItemStore.newId(), ItemType.NOTE, ItemStatus.DRAFT, fallbackTitle(text) ?: "Ghi chú", text, sourceId = id, createdAt = now))
+            app.items.replaceDrafts(id, drafts)
+            store.update(id) { it.copy(extract = TaskStatus.DONE, error = null) }
+            cleanUpMemoAudio(id)
+            val current = store.get(id) ?: memo
+            if (drafts.isNotEmpty()) {
+                notifyResult(current, "${drafts.size} mục chờ xác nhận", drafts.joinToString(" · ") { it.title })
+            }
+            null
+        } catch (e: ApiException) {
+            handleApiError(id, e) { status -> store.update(id) { it.copy(extract = status) } }
+        }
+    }
+
+    /** Capture audio is only needed until the text exists, unless the user chose to keep it. */
+    private fun cleanUpMemoAudio(id: String) {
+        if (!app.settings.current.keepMemoAudio) store.deleteAudio(id)
     }
 
     /** WorkManager caps one run at 10 minutes; continue in a follow-up run of the same chain. */

@@ -1,5 +1,10 @@
 package com.vh.myrecap.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -43,6 +48,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalContext
+import com.vh.myrecap.data.StorageStats
+import com.vh.myrecap.reminder.Reminders
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -158,6 +167,22 @@ fun SettingsScreen(vm: AppViewModel) {
                     update { it.copy(customPrompt = v) }
                 }
                 Hint("Ví dụ: \"Viết lại thành email gửi khách hàng, giọng lịch sự\".")
+            }
+
+            Section("5. Thư ký & dung lượng máy") {
+                Hint("Ghi nhanh dùng dịch vụ ở mục 1 để nghe và AI ở mục 4 để tách việc, lịch hẹn, chi tiêu, ghi chú.")
+                SwitchRow("Giữ file ghi âm của Ghi nhanh", s.keepMemoAudio) { v -> update { it.copy(keepMemoAudio = v) } }
+                Hint(
+                    if (s.keepMemoAudio) "Ghi âm được giữ để nghe lại; xoá từng cái trong màn hình ghi chú."
+                    else "Khuyên dùng: xoá ngay sau khi đã chuyển thành chữ, chỉ giữ văn bản (vài KB).",
+                )
+                Text("Tự xoá ghi âm phỏng vấn/họp đã có transcript sau", fontWeight = FontWeight.SemiBold)
+                ChoiceRow(listOf(7, 30, 90, 0), s.audioRetentionDays, { if (it == 0) "Không xoá" else "$it ngày" }) { v ->
+                    update { it.copy(audioRetentionDays = v) }
+                }
+                Hint("Transcript và tóm tắt luôn được giữ. Ghi âm (~14 MB mỗi giờ lời nói) là phần duy nhất chiếm nhiều chỗ.")
+                StorageCard(vm)
+                ExactAlarmRow(vm)
             }
 
             val usesGemini = s.sttProvider == ProviderKind.GEMINI || s.summaryProvider == ProviderKind.GEMINI
@@ -364,5 +389,72 @@ private fun TestButton(vm: AppViewModel, config: ProviderConfig) {
             Spacer(Modifier.width(8.dp))
             Text(r.message, style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+@Composable
+private fun StorageCard(vm: AppViewModel) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var refresh by remember { mutableIntStateOf(0) }
+    var stats by remember { mutableStateOf<StorageStats?>(null) }
+    var confirm by remember { mutableStateOf(false) }
+    LaunchedEffect(refresh) { stats = vm.storageStats() }
+    val st = stats
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Đang dùng", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (st == null) "…" else "Ghi âm ${formatBytes(st.audioBytes)}  ·  Văn bản ${formatBytes(st.otherBytes)}",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            OutlinedButton(onClick = { confirm = true }, enabled = (st?.audioBytes ?: 0) > 0) {
+                Text("Xoá mọi ghi âm đã có transcript")
+            }
+        }
+    }
+    if (confirm) {
+        ConfirmDialog(
+            title = "Xoá mọi ghi âm đã có transcript?",
+            text = "Toàn bộ văn bản, tóm tắt và các mục thư ký vẫn được giữ. Đoạn chưa chuyển văn bản không bị xoá.",
+            confirmLabel = "Xoá ghi âm",
+            destructive = true,
+            onConfirm = {
+                scope.launch {
+                    val freed = vm.deleteAllTranscribedAudio()
+                    Toast.makeText(context, "Đã giải phóng ${formatBytes(freed)}", Toast.LENGTH_SHORT).show()
+                    refresh++
+                }
+            },
+            onDismiss = { confirm = false },
+        )
+    }
+}
+
+/** Android 12+ asks the user before an app may fire reminders at the exact minute. */
+@Composable
+private fun ExactAlarmRow(vm: AppViewModel) {
+    val context = LocalContext.current
+    val tick by vm.resumeTick.collectAsStateWithLifecycle()
+    val exact = remember(tick) { Reminders.canExact(context) }
+    if (exact || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Nhắc việc đúng giờ", fontWeight = FontWeight.SemiBold)
+            Text(
+                "Chưa cho phép nên nhắc nhở có thể trễ vài phút.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        FilledTonalButton(onClick = {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")),
+                )
+            } catch (_: Exception) {
+                openAppSettings(context)
+            }
+        }) { Text("Cho phép") }
     }
 }

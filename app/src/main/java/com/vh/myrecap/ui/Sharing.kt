@@ -29,7 +29,7 @@ object Sharing {
     }
 
     fun shareAudio(context: Context, store: SessionStore, session: Session) {
-        val uris = ArrayList(session.segments.sortedBy { it.index }.map { uri(context, store.audioFile(session.id, it)) })
+        val uris = ArrayList(session.audioClips.sortedBy { it.index }.map { uri(context, store.audioFile(session.id, it)) })
         if (uris.isEmpty()) return
         val intent = Intent(Intent.ACTION_SEND_MULTIPLE)
             .setType("audio/aac")

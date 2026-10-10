@@ -37,6 +37,9 @@ object Prompts {
                     )
                 }
             }
+            SessionMode.MEMO -> appendLine(
+                "This is a short personal voice note, usually one speaker. Do not add speaker labels.",
+            )
             SessionMode.MEETING, SessionMode.CUSTOM -> appendLine(
                 "This is a meeting. Start each speaker turn on a new line with a label 'Người nói 1:', " +
                     "'Người nói 2:' and so on. If a speaker's name is clearly stated, use 'Name:' instead.",

@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Stop
@@ -63,6 +65,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.TimeFormat
 import com.vh.myrecap.recorder.RecorderUi
 import com.vh.myrecap.ui.theme.BeVietnamPro
@@ -81,8 +84,10 @@ fun RecordingScreen(
     onTogglePause: () -> Unit,
     onBookmark: () -> Unit,
     onStop: () -> Unit,
+    onDiscard: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    val memo = ui.mode == SessionMode.MEMO
     var confirmStop by remember { mutableStateOf(false) }
     LightSystemBars()
 
@@ -97,6 +102,7 @@ fun RecordingScreen(
     val stateLabel = when {
         ui.stopping -> "Đang lưu"
         ui.paused -> "Tạm dừng"
+        memo -> if (ui.speaking) "Đang nghe" else "Đang ghi"
         !ui.autoSplit -> "Đang ghi"
         ui.speaking -> "Đang nghe"
         else -> "Chờ giọng nói"
@@ -136,10 +142,19 @@ fun RecordingScreen(
             Spacer(Modifier.height(20.dp))
             Waveform(levels, dimmed = ui.paused, modifier = Modifier.fillMaxWidth().height(84.dp))
             Spacer(Modifier.height(28.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Stat("${ui.clips}", "đoạn đã lưu")
-                Stat("${ui.bookmarks}", "đánh dấu")
-                Stat(TimeFormat.clock(ui.skippedMs), "im lặng đã bỏ")
+            if (memo) {
+                Text(
+                    "Nói tự nhiên: việc cần làm, lịch hẹn, khoản chi, điều cần nhớ.\nXong thì bấm Xong — thư ký sẽ tách và hỏi bạn xác nhận.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Stat("${ui.clips}", "đoạn đã lưu")
+                    Stat("${ui.bookmarks}", "đánh dấu")
+                    Stat(TimeFormat.clock(ui.skippedMs), "im lặng đã bỏ")
+                }
             }
             Spacer(Modifier.weight(1f))
 
@@ -148,7 +163,18 @@ fun RecordingScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RoundControl(
+                if (memo) {
+                    RoundControl(
+                        icon = Icons.Rounded.Close,
+                        label = "Huỷ",
+                        description = "Huỷ ghi nhanh",
+                        size = 64.dp,
+                        container = Color.White.copy(alpha = 0.12f),
+                        tint = Color.White,
+                        enabled = !ui.stopping,
+                        onClick = onDiscard,
+                    )
+                } else RoundControl(
                     icon = if (ui.bookmarks > 0) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
                     label = "Đánh dấu",
                     size = 64.dp,
@@ -161,14 +187,15 @@ fun RecordingScreen(
                     },
                 )
                 RoundControl(
-                    icon = Icons.Rounded.Stop,
-                    label = "Dừng",
-                    description = "Dừng ghi âm",
+                    icon = if (memo) Icons.Rounded.Check else Icons.Rounded.Stop,
+                    label = if (memo) "Xong" else "Dừng",
+                    description = if (memo) "Xong, phân tích ghi chú" else "Dừng ghi âm",
                     size = 84.dp,
                     container = Brand.Record,
                     tint = Color.White,
                     enabled = !ui.stopping,
-                    onClick = { confirmStop = true },
+                    // A quick capture ends in one tap; a long recording asks first.
+                    onClick = { if (memo) onStop() else confirmStop = true },
                 )
                 RoundControl(
                     icon = if (ui.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,

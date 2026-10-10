@@ -83,7 +83,8 @@ class RecordingFlowTest {
     fun recordBookmarkLockAndStop() {
         // The emulator microphone delivers silence, which voice detection (tested in ClipRecorderTest)
         // would rightly drop. Record everything here to exercise the service, screens and storage.
-        MyRecapApp.from(context).settings.update { it.copy(autoSplit = false, trimSilence = false) }
+        // Start on the recordings tab (the app opens on the secretary tab by default).
+        MyRecapApp.from(context).settings.update { it.copy(autoSplit = false, trimSilence = false, homeTab = 1) }
         val launch = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launch).use {
             device.wait(Until.hasObject(By.desc("Bắt đầu ghi âm")), 10_000)
@@ -181,6 +182,8 @@ class RecordingFlowTest {
                 ),
             )
         }
+        // Placeholder audio so the folder shows its storage use and the clip reader its player.
+        titles.indices.forEach { i -> store.audioFile(folder.id, store.get(folder.id)!!.segments[i]).writeBytes(ByteArray(180_000)) }
         titles.forEachIndexed { i, _ ->
             store.writeTranscript(
                 folder.id, i,

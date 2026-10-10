@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -65,6 +66,7 @@ fun modeStyle(mode: SessionMode): ModeStyle {
         SessionMode.INTERVIEW -> ModeStyle(Icons.Rounded.RecordVoiceOver, c.primaryContainer, c.onPrimaryContainer)
         SessionMode.MEETING -> ModeStyle(Icons.Rounded.Groups, c.secondaryContainer, c.onSecondaryContainer)
         SessionMode.CUSTOM -> ModeStyle(Icons.Rounded.EditNote, c.tertiaryContainer, c.onTertiaryContainer)
+        SessionMode.MEMO -> ModeStyle(Icons.Rounded.Mic, c.secondaryContainer, c.onSecondaryContainer)
     }
 }
 

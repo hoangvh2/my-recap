@@ -54,6 +54,7 @@ class RecordingService : Service() {
             ACTION_TOGGLE_PAUSE -> togglePause()
             ACTION_BOOKMARK -> bookmark()
             ACTION_STOP -> stopRecording()
+            ACTION_DISCARD -> discardRecording()
         }
         if (recorder == null && !stopping) stopSelf()
         return START_NOT_STICKY
@@ -92,8 +93,8 @@ class RecordingService : Service() {
         val rec = ClipRecorder(
             source = MicPcmSource(),
             outDir = app.store.dir(session.id),
-            config = settings.segmenterConfig(),
-            useVad = settings.usesVad,
+            config = if (mode == SessionMode.MEMO) settings.memoSegmenterConfig() else settings.segmenterConfig(),
+            useVad = mode == SessionMode.MEMO || settings.usesVad,
             sensitivity = settings.vadSensitivity,
             firstIndex = session.nextSegmentIndex,
             timelineOffsetMs = session.durationMs,
@@ -110,7 +111,7 @@ class RecordingService : Service() {
                 elapsedMs = session.durationMs,
                 bookmarks = session.bookmarksMs.size,
                 clips = clipCount,
-                autoSplit = settings.autoSplit,
+                autoSplit = settings.autoSplit && mode != SessionMode.MEMO,
             )
         }
         refreshNotification()
@@ -185,8 +186,15 @@ class RecordingService : Service() {
         finish(RecState.STOPPED, null)
     }
 
+    /** Quick capture cancelled: nothing is kept. */
+    private fun discardRecording() {
+        if (recorder == null || stopping) return
+        Haptics.stopped(this)
+        finish(RecState.STOPPED, null, discard = true)
+    }
+
     /** Stops the recorder off the main thread (it joins the encoder thread), then tears down. */
-    private fun finish(finalState: RecState, error: String?) {
+    private fun finish(finalState: RecState, error: String?, discard: Boolean = false) {
         if (stopping) return
         stopping = true
         val rec = recorder
@@ -196,6 +204,8 @@ class RecordingService : Service() {
             rec?.stop()
             main.post {
                 recorder = null
+                var kept = false
+                var emptyMemo = false
                 if (id != null) {
                     val session = app.store.update(id) { s ->
                         s.copy(
@@ -204,14 +214,20 @@ class RecordingService : Service() {
                             error = error ?: s.error,
                         )
                     }
-                    if (session != null && session.segments.isEmpty() && createdFolder) {
+                    if (session != null && createdFolder && (discard || session.segments.isEmpty())) {
                         app.store.delete(id) // Nothing recorded (stopped immediately, silence only, or mic failed).
-                    } else if (session != null && app.settings.current.autoProcess) {
-                        Processing.enqueue(this, id)
+                        emptyMemo = !discard && mode == SessionMode.MEMO
+                    } else if (session != null) {
+                        kept = true
+                        // A quick capture is pointless without its analysis, so it always runs.
+                        if (app.settings.current.autoProcess || mode == SessionMode.MEMO) Processing.enqueue(this, id)
                     }
                 }
                 RecorderState.set {
-                    RecorderUi(finishedSessionId = if (finalState == RecState.STOPPED) id else null, error = it.error)
+                    RecorderUi(
+                        finishedSessionId = if (finalState == RecState.STOPPED && kept) id else null,
+                        error = it.error ?: if (emptyMemo) "Không nghe thấy lời nói nên chưa lưu gì. Thử nói gần micro hơn." else null,
+                    )
                 }
                 wakeLock?.let { if (it.isHeld) it.release() }
                 wakeLock = null
@@ -259,7 +275,7 @@ class RecordingService : Service() {
         )
         val title = if (paused) "⏸ Đã tạm dừng · ${TimeFormat.clock(elapsedMs)}" else "● Đang ghi âm"
         val text = "${mode.label} · $clipCount đoạn · ⭐ $bookmarks"
-        return NotificationCompat.Builder(this, MyRecapApp.CHANNEL_RECORDING)
+        val builder = NotificationCompat.Builder(this, MyRecapApp.CHANNEL_RECORDING)
             .setSmallIcon(R.drawable.ic_stat_mic)
             .setContentTitle(title)
             .setContentText(text)
@@ -274,11 +290,19 @@ class RecordingService : Service() {
             .setShowWhen(!paused)
             .setUsesChronometer(!paused)
             .setWhen(System.currentTimeMillis() - elapsedMs)
-            // Plain short labels: the system truncates action text on narrow screens.
-            .addAction(0, if (paused) "Tiếp tục" else "Tạm dừng", commandIntent(ACTION_TOGGLE_PAUSE, 1))
-            .addAction(0, "Đánh dấu", commandIntent(ACTION_BOOKMARK, 2))
-            .addAction(0, "Dừng", commandIntent(ACTION_STOP, 3))
-            .build()
+        // Plain short labels: the system truncates action text on narrow screens.
+        if (mode == SessionMode.MEMO) {
+            builder.setContentTitle(if (paused) title else "● Đang ghi nhanh")
+                .setContentText("Nói việc cần làm, lịch hẹn, khoản chi…")
+                .addAction(0, "Huỷ", commandIntent(ACTION_DISCARD, 4))
+                .addAction(0, if (paused) "Tiếp tục" else "Tạm dừng", commandIntent(ACTION_TOGGLE_PAUSE, 1))
+                .addAction(0, "Xong", commandIntent(ACTION_STOP, 3))
+        } else {
+            builder.addAction(0, if (paused) "Tiếp tục" else "Tạm dừng", commandIntent(ACTION_TOGGLE_PAUSE, 1))
+                .addAction(0, "Đánh dấu", commandIntent(ACTION_BOOKMARK, 2))
+                .addAction(0, "Dừng", commandIntent(ACTION_STOP, 3))
+        }
+        return builder.build()
     }
 
     private fun commandIntent(action: String, requestCode: Int): PendingIntent = PendingIntent.getService(
@@ -296,6 +320,7 @@ class RecordingService : Service() {
         const val ACTION_TOGGLE_PAUSE = "com.vh.myrecap.TOGGLE_PAUSE"
         const val ACTION_BOOKMARK = "com.vh.myrecap.BOOKMARK"
         const val ACTION_STOP = "com.vh.myrecap.STOP"
+        const val ACTION_DISCARD = "com.vh.myrecap.DISCARD"
         private const val EXTRA_MODE = "mode"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_FOLDER = "folder"

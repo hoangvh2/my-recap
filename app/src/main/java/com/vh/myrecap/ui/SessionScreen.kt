@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
@@ -108,6 +109,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     var renaming by remember { mutableStateOf(false) }
     var summarizing by remember { mutableStateOf(false) }
     var micDenied by remember { mutableStateOf(false) }
+    var confirmAudio by remember { mutableStateOf(false) }
     val recordMore = rememberRecordAction(onDenied = { micDenied = true }) { vm.recordMore(id) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -143,13 +145,21 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                                 leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                                 onClick = { menu = false; renaming = true },
                             )
+                            val hasAudio = d != null && d.session.audioClips.isNotEmpty()
                             DropdownMenuItem(
                                 text = { Text("Chia sẻ file ghi âm") },
                                 leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
+                                enabled = hasAudio,
                                 onClick = {
                                     menu = false
                                     d?.let { Sharing.shareAudio(context, MyRecapApp.from(context).store, it.session) }
                                 },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Xoá file ghi âm (giữ văn bản)") },
+                                leadingIcon = { Icon(Icons.Rounded.DeleteSweep, null) },
+                                enabled = hasAudio && d?.session?.isRecording == false,
+                                onClick = { menu = false; confirmAudio = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Xoá folder", color = MaterialTheme.colorScheme.error) },
@@ -181,7 +191,7 @@ fun SessionScreen(vm: AppViewModel, id: String) {
             ),
         ) {
             item {
-                FolderHeader(s, onRename = { renaming = true })
+                FolderHeader(s, d.audioBytes, onRename = { renaming = true })
             }
             if (status.kind in setOf(StatusKind.WARNING, StatusKind.ERROR, StatusKind.WORKING, StatusKind.IDLE) && s.segments.isNotEmpty()) {
                 item {
@@ -282,13 +292,26 @@ fun SessionScreen(vm: AppViewModel, id: String) {
         }
     }
 
+    if (confirmAudio) {
+        val d2 = detail
+        val pending = d2?.session?.audioClips?.count { it.stt != TaskStatus.DONE } ?: 0
+        ConfirmDialog(
+            title = "Xoá file ghi âm của folder?",
+            text = "Giải phóng khoảng ${formatBytes(d2?.audioBytes ?: 0)}. Transcript và tóm tắt vẫn giữ nguyên; " +
+                "sau khi xoá sẽ không nghe lại được." + if (pending > 0) " $pending đoạn chưa có transcript sẽ được giữ lại." else "",
+            confirmLabel = "Xoá ghi âm",
+            destructive = true,
+            onConfirm = { vm.deleteAudio(id) },
+            onDismiss = { confirmAudio = false },
+        )
+    }
     if (renaming) {
         detail?.let { RenameDialog(it.session.title, onRename = { t -> vm.rename(id, t) }, onDismiss = { renaming = false }) }
     }
 }
 
 @Composable
-private fun FolderHeader(s: Session, onRename: () -> Unit) {
+private fun FolderHeader(s: Session, audioBytes: Long, onRename: () -> Unit) {
     val style = modeStyle(s.mode)
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         IconTile(style.icon, style.container, style.content, size = 52.dp)
@@ -312,6 +335,9 @@ private fun FolderHeader(s: Session, onRename: () -> Unit) {
         MetaChip(Icons.Rounded.ViewAgenda, "${s.segments.size} đoạn")
         MetaChip(Icons.Rounded.Schedule, TimeFormat.clock(s.audioMs))
         if (s.bookmarksMs.isNotEmpty()) MetaChip(Icons.Rounded.Bookmark, "${s.bookmarksMs.size}", Brand.Bookmark)
+        if (s.segments.isNotEmpty()) {
+            MetaChip(Icons.Rounded.GraphicEq, if (audioBytes == 0L) "Đã xoá ghi âm" else formatBytes(audioBytes))
+        }
     }
 }
 

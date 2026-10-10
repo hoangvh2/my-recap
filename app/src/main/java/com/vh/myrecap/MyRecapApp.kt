@@ -5,11 +5,19 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Notification
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
+import com.vh.myrecap.ui.MainActivity
 import com.vh.myrecap.core.Adts
 import com.vh.myrecap.core.TimeFormat
+import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.RecState
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.SessionStore
+import com.vh.myrecap.data.StorageJanitor
+import com.vh.myrecap.reminder.Reminders
 import com.vh.myrecap.recorder.RecorderState
 import com.vh.myrecap.settings.SettingsRepository
 import com.vh.myrecap.work.Processing
@@ -20,13 +28,21 @@ class MyRecapApp : Application() {
         private set
     lateinit var settings: SettingsRepository
         private set
+    lateinit var items: ItemStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
         store = SessionStore(File(filesDir, "sessions"))
         settings = SettingsRepository(this)
+        items = ItemStore(File(filesDir, "items/items.json"))
         createChannels()
+        addShortcuts()
         recoverInterruptedSessions()
+        Thread {
+            StorageJanitor.run(store, settings.current, cacheDir)
+            Reminders.syncAll(this)
+        }.start()
     }
 
     private fun createChannels() {
@@ -45,6 +61,27 @@ class MyRecapApp : Application() {
                 description = "Báo khi transcript/tóm tắt đã sẵn sàng hoặc gặp lỗi"
             },
         )
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_REMINDERS, "Nhắc việc & lịch hẹn", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Nhắc việc đến hạn và lịch hẹn sắp tới"
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            },
+        )
+    }
+
+    /** Long-press the launcher icon → "Ghi nhanh" opens straight into a quick capture. */
+    private fun addShortcuts() {
+        val capture = ShortcutInfoCompat.Builder(this, "quick-capture")
+            .setShortLabel("Ghi nhanh")
+            .setLongLabel("Ghi nhanh việc, lịch, chi tiêu")
+            .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_mic))
+            .setIntent(Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_QUICK_CAPTURE))
+            .build()
+        try {
+            ShortcutManagerCompat.setDynamicShortcuts(this, listOf(capture))
+        } catch (_: Exception) {
+            // Launchers without shortcut support: the in-app button remains.
+        }
     }
 
     /**
@@ -88,6 +125,7 @@ class MyRecapApp : Application() {
     companion object {
         const val CHANNEL_RECORDING = "recording"
         const val CHANNEL_RESULTS = "results"
+        const val CHANNEL_REMINDERS = "reminders"
 
         fun from(context: Context): MyRecapApp = context.applicationContext as MyRecapApp
     }

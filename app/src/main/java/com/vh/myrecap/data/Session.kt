@@ -24,6 +24,8 @@ data class Segment(
     val endMs: Long = startMs + durationMs,
     /** Wall-clock time the clip started, for display. 0 for old data. */
     val recordedAt: Long = 0,
+    /** False once the audio file was deleted to save space; the transcript stays. */
+    val hasAudio: Boolean = true,
 ) {
     val number: Int get() = index + 1
 }
@@ -57,7 +59,13 @@ data class Session(
     val summaries: List<SummaryJob> = emptyList(),
     /** Last processing error shown to the user. */
     val error: String? = null,
+    /** Quick captures only: AI analysis into items (null for folders). */
+    val extract: TaskStatus? = null,
 ) {
+    val isMemo: Boolean get() = mode == SessionMode.MEMO
+    val extractBusy: Boolean get() = extract == TaskStatus.PENDING || extract == TaskStatus.RUNNING
+    val audioClips: List<Segment> get() = segments.filter { it.hasAudio }
+
     val isRecording: Boolean get() = state == RecState.RECORDING || state == RecState.PAUSED
     val transcribedCount: Int get() = segments.count { it.stt == TaskStatus.DONE }
     val allTranscribed: Boolean get() = segments.isNotEmpty() && segments.all { it.stt == TaskStatus.DONE }
@@ -86,6 +94,7 @@ data class Session(
                         .put("recordedAt", s.recordedAt)
                         .put("stt", s.stt.name)
                         .putOpt("title", s.title)
+                        .put("audio", s.hasAudio)
                         .putOpt("error", s.error),
                 )
             }
@@ -106,6 +115,7 @@ data class Session(
             }
         })
         .putOpt("error", error)
+        .putOpt("extract", extract?.name)
 
     companion object {
         fun fromJson(o: JSONObject): Session {
@@ -127,6 +137,7 @@ data class Session(
                     title = s.optStringOrNull("title"),
                     endMs = if (s.has("endMs")) s.getLong("endMs") else start + duration,
                     recordedAt = s.optLong("recordedAt", 0),
+                    hasAudio = s.optBoolean("audio", true),
                 )
             }
             var summaries = (0 until jobs.length()).map { i ->
@@ -167,6 +178,7 @@ data class Session(
                 bookmarksMs = (0 until marks.length()).map { marks.getLong(it) },
                 summaries = summaries,
                 error = o.optStringOrNull("error"),
+                extract = o.optStringOrNull("extract")?.let { enumOr(it, TaskStatus.PENDING) },
             )
         }
 
