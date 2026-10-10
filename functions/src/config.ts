@@ -23,3 +23,16 @@ export const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta
 
 /** Region of the callable. Must match the web app's `getFunctions(app, region)`. */
 export const REGION = "asia-southeast1";
+
+/**
+ * Browser origins allowed to call the function: the two default Firebase Hosting hosts plus an
+ * optional custom domain. Entries may be bare hostnames or https URLs; anything else is dropped.
+ */
+export function allowedOrigins(project: string, extra: string | undefined): string[] {
+  const origins = [`https://${project}.web.app`, `https://${project}.firebaseapp.com`];
+  for (const raw of (extra ?? "").split(/[\s,;]+/)) {
+    const host = raw.trim().toLowerCase().replace(/^https:\/\//, "").replace(/\/$/, "");
+    if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) origins.push(`https://${host}`);
+  }
+  return [...new Set(origins)];
+}

@@ -15,3 +15,6 @@ allowed_emails = [
 # billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
 # monthly_budget     = 5
 # budget_currency    = "USD" # must match the billing account's currency
+
+# Optional: your own hostname, after connecting it to Firebase Hosting (see docs/web-secretary.md).
+# custom_domain = "recap.example.com"

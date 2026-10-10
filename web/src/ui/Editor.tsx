@@ -5,6 +5,7 @@ import { formatVnd, parseVnd } from "../lib/money";
 import { EXPENSE_CATEGORIES, MAX, RECURRENCES, RECURRENCE_LABEL, TYPES, TYPE_LABEL, type Item, type ItemType, type Recurrence } from "../lib/model";
 import { saveFile } from "./download";
 import { Icon } from "./icons";
+import { CustomerPicker, LicensePicker } from "./pickers";
 
 export interface EditorProps {
   item: Item;
@@ -27,6 +28,8 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
   const [place, setPlace] = useState(item.place ?? "");
   const [person, setPerson] = useState(item.person ?? "");
   const [repeat, setRepeat] = useState<Recurrence | "">(item.recurrence ?? "");
+  const [customerId, setCustomerId] = useState<string | undefined>(item.customerId);
+  const [licenseId, setLicenseId] = useState<string | undefined>(item.licenseId);
   const [error, setError] = useState("");
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
@@ -43,6 +46,10 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
     if (!t) return fail("Cần nhập tiêu đề");
     if (t.length > MAX.title) return fail(`Tiêu đề dài quá ${MAX.title} ký tự`);
     const out: Item = { id: item.id, type, status: wasDraft ? "OPEN" : item.status, title: t, details: details.trim().slice(0, MAX.details), allDay: false, createdAt: item.createdAt };
+    if (type !== "EXPENSE" && customerId) {
+      out.customerId = customerId;
+      if (licenseId) out.licenseId = licenseId;
+    }
     if (item.sourceId) out.sourceId = item.sourceId;
     if (item.quote) out.quote = item.quote;
     if (item.doneAt !== undefined && out.status === "DONE") out.doneAt = item.doneAt;
@@ -102,6 +109,15 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
         )}
 
         <label>Tiêu đề<input ref={first} value={title} maxLength={MAX.title} onInput={(e) => setTitle((e.target as HTMLInputElement).value)} /></label>
+
+        {type !== "EXPENSE" && (
+          <>
+            <label>Khách liên quan (tuỳ chọn)
+              <CustomerPicker optional value={customerId} label="Không gắn với khách nào" onChange={(id) => { setCustomerId(id); setLicenseId(undefined); }} />
+            </label>
+            <LicensePicker customerId={customerId} value={licenseId} onChange={setLicenseId} />
+          </>
+        )}
 
         {type === "EXPENSE" && (
           <>

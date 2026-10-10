@@ -7,11 +7,11 @@
 //   node infra/deploy.mjs --yes      no questions (re-deploys)
 //   node infra/deploy.mjs --plan     show what Terraform would change, change nothing
 //   node infra/deploy.mjs --skip-web only the Terraform part (function, rules, allowlist...)
+//   node infra/deploy.mjs --skip-terraform  only build + publish the web app (e.g. after fixing the Firebase sign-in)
 //
 // Needs: terraform (>= 1.10), gcloud, node 22, npm. Reads infra/terraform.tfvars (never committed).
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,6 +20,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const infra = join(root, "infra");
 const win = process.platform === "win32";
 const args = new Set(process.argv.slice(2));
+const skipTf = args.has("--skip-terraform");
 
 const say = (m) => console.log(`\n\x1b[1m▶ ${m}\x1b[0m`);
 const die = (m) => {
@@ -58,13 +59,13 @@ if (!capture("gcloud", ["auth", "application-default", "print-access-token"]).ok
 }
 
 // ---------------------------------------------------------------- function build
-if (!args.has("--skip-build")) {
+if (!skipTf && !args.has("--skip-build")) {
   say("Building the capture function");
   run("npm", ["ci", "--prefix", "functions"], { cwd: root });
   run("npm", ["test", "--prefix", "functions"], { cwd: root });
   run("npm", ["run", "build", "--prefix", "functions"], { cwd: root });
 }
-{
+if (!skipTf) {
   const out = join(infra, ".build", "functions");
   rmSync(join(infra, ".build"), { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
@@ -76,13 +77,15 @@ if (!args.has("--skip-build")) {
 }
 
 // ---------------------------------------------------------------- terraform
-say("Terraform");
-run("terraform", ["init", "-input=false", "-upgrade=false"], { cwd: infra });
-if (args.has("--plan")) {
-  run("terraform", ["plan", "-input=false"], { cwd: infra });
-  process.exit(0);
+if (!skipTf) {
+  say("Terraform");
+  run("terraform", ["init", "-input=false", "-upgrade=false"], { cwd: infra });
+  if (args.has("--plan")) {
+    run("terraform", ["plan", "-input=false"], { cwd: infra });
+    process.exit(0);
+  }
+  run("terraform", ["apply", "-input=false", ...(args.has("--yes") ? ["-auto-approve"] : [])], { cwd: infra });
 }
-run("terraform", ["apply", "-input=false", ...(args.has("--yes") ? ["-auto-approve"] : [])], { cwd: infra });
 
 if (args.has("--skip-web")) {
   console.log("\nTerraform part done (--skip-web).");
@@ -103,15 +106,58 @@ run("npm", ["ci", "--prefix", "web"], { cwd: root });
 run("npm", ["run", "build", "--prefix", "web"], { cwd: root, env: { ...process.env, ...webEnv } });
 
 say("Publishing to Firebase Hosting");
-const adc = process.env.GOOGLE_APPLICATION_CREDENTIALS
-  || join(win ? process.env.APPDATA ?? homedir() : join(homedir(), ".config"), "gcloud", "application_default_credentials.json");
-const fbEnv = { ...process.env, ...(existsSync(adc) ? { GOOGLE_APPLICATION_CREDENTIALS: adc } : {}) };
+// The Firebase CLI keeps its OWN sign-in (`firebase login`). Being signed in to gcloud does not carry over to it.
 const firebase = (a) => ["--yes", FIREBASE_TOOLS, ...a];
+const fb = (a) => capture("npx", firebase(a), { cwd: root });
+// The real reason for a failure: with --json the CLI prints errors on stdout, and npm prints its own
+// warnings on stderr, so neither stream's first line says what went wrong.
+const explain = (r) => {
+  let msg = "";
+  try {
+    msg = String(JSON.parse(r.out).error ?? "");
+  } catch {
+    /* not JSON */
+  }
+  if (!msg) {
+    msg = `${r.out}\n${r.err}`
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !/^npm (warn|notice)/i.test(l))
+      .join("\n");
+  }
+  return msg || "(the Firebase CLI gave no message)";
+};
+const signedInAs = () => /Logged in as ([^\s]+)/i.exec(fb(["login:list"]).out)?.[1] ?? null;
+const loginHelp = `Sign in to the Firebase CLI once, in PowerShell or CMD (not Git Bash):
+    npx ${FIREBASE_TOOLS} login
+  with the Google account that owns the project, then check it with:
+    npx ${FIREBASE_TOOLS} login:list
+  and finish with:
+    node infra/deploy.mjs --skip-terraform`;
 
-const sites = capture("npx", firebase(["hosting:sites:list", "--project", projectId, "--json"]), { cwd: root, env: fbEnv });
-if (!sites.ok) die(`Firebase CLI could not list Hosting sites (${sites.err.split("\n")[0]}). Run "npx ${FIREBASE_TOOLS} login" once, then run this script again.`);
-if (!sites.out.includes(`/sites/${projectId}"`)) run("npx", firebase(["hosting:sites:create", projectId, "--project", projectId]), { cwd: root, env: fbEnv });
-run("npx", firebase(["deploy", "--only", "hosting", "--project", projectId, "--non-interactive"]), { cwd: root, env: fbEnv });
+let account = signedInAs();
+if (!account) {
+  say("The Firebase CLI needs its own sign-in (separate from gcloud)");
+  // Git Bash is not a real terminal for Node, so the CLI falls back to a manual code flow that is easy to get wrong.
+  if (process.env.MSYSTEM) die(`Not signed in to the Firebase CLI, and Git Bash cannot complete the sign-in.\n  ${loginHelp}`);
+  run("npx", firebase(["login"]), { cwd: root });
+  account = signedInAs();
+  if (!account) die(`The Firebase CLI sign-in did not complete.\n  ${loginHelp}`);
+}
+console.log(`Firebase CLI account: ${account}`);
+
+const sites = fb(["hosting:sites:list", "--project", projectId, "--json"]);
+if (!sites.ok) {
+  const why = explain(sites);
+  const hint = /authenticat|login|credential/i.test(why)
+    ? loginHelp
+    : /403|permission|PERMISSION_DENIED|not been used|disabled/i.test(why)
+      ? `Is ${account} the Google account that owns project ${projectId}? Hosting also needs the Firebase Hosting API enabled (Terraform does this). Check with: npx ${FIREBASE_TOOLS} login:list`
+      : "";
+  die(`Firebase CLI could not list Hosting sites for ${projectId}:\n${why}${hint ? `\n  ${hint}` : ""}`);
+}
+if (!sites.out.includes(`/sites/${projectId}"`)) run("npx", firebase(["hosting:sites:create", projectId, "--project", projectId]), { cwd: root });
+run("npx", firebase(["deploy", "--only", "hosting", "--project", projectId, "--non-interactive"]), { cwd: root });
 
 // ---------------------------------------------------------------- done
 const emails = outputs("allowed_emails");
@@ -127,4 +173,5 @@ One-time manual step (about a minute), only the first time:
   2. "Get started" > Google > Enable > pick a support email > Save.
      (Keep every other sign-in method disabled.)
 Then on the iPhone: open ${url} in Safari > Share > Add to Home Screen > sign in.
+Custom domain, DNS records and common errors: infra/README.md
 `);

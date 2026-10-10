@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { ApiError, capture, type CaptureResult } from "../api";
 import { toBase64 } from "../lib/wav";
 import { MAX_SECONDS, MicError, micSupported, Recorder } from "../recorder";
+import { buildContext } from "../lib/context";
 import { Icon } from "./icons";
+import { useGraph } from "./hooks";
+import { go, to } from "../lib/router";
 import { showToast } from "./toast";
+import type { ReviewFilter } from "./Review";
 
 type Phase =
   | { k: "idle" }
@@ -14,7 +18,24 @@ type Phase =
 
 const MAX_TEXT = 2_000;
 
-export function Capture() {
+/** "2 việc, 1 khách mới…": what the note turned into. */
+export function describeResult(r: CaptureResult): string {
+  const parts = [
+    r.itemCount && `${r.itemCount} việc/ghi chú`,
+    r.customerCount && `${r.customerCount} khách mới`,
+    r.licenseCount && `${r.licenseCount} license`,
+    r.proposalCount && `${r.proposalCount} cập nhật gia hạn`,
+  ].filter(Boolean);
+  return parts.join(", ");
+}
+
+export function Capture(props: { focus?: ReviewFilter; onDone?: () => void; sheet?: boolean }) {
+  const g = useGraph();
+  const focusName = props.focus?.licenseId
+    ? g.licenseById.get(props.focus.licenseId)?.product
+    : props.focus?.customerId
+      ? g.customerById.get(props.focus.customerId)?.name
+      : undefined;
   const [phase, setPhase] = useState<Phase>({ k: "idle" });
   const [error, setError] = useState<{ msg: string; retry?: () => void } | null>(null);
   const [text, setText] = useState("");
@@ -28,16 +49,19 @@ export function Capture() {
   }, []);
 
   const report = (r: CaptureResult) => {
+    const what = describeResult(r);
     if (r.outcome === "no_speech") showToast("Không nghe thấy lời nói nào");
-    else if (r.itemCount === 0) showToast("Không có gì cần lưu trong ghi chú này");
-    else showToast(`Đã thêm ${r.itemCount} mục nháp. Xem lại bên dưới rồi bấm Lưu`);
+    else if (!what) showToast("Không có gì cần lưu trong ghi chú này");
+    else if (props.onDone) showToast(`Đã hiểu: ${what}. Xem lại rồi bấm Lưu tất cả`, { label: "Xem", run: () => go(to.today) });
+    else showToast(`Đã hiểu: ${what}. Xem lại bên dưới rồi bấm Lưu tất cả`);
+    props.onDone?.();
   };
 
   const send = async (input: { text: string } | { audioBase64: string }) => {
     setPhase({ k: "sending" });
     setError(null);
     try {
-      report(await capture(input));
+      report(await capture(input, buildContext(g, props.focus)));
       setText("");
       setPhase({ k: "idle" });
     } catch (e) {
@@ -98,7 +122,8 @@ export function Capture() {
 
   const busy = phase.k === "starting" || phase.k === "sending";
   return (
-    <section class="hero" aria-label="Ghi nhanh">
+    <section class={`hero ${props.sheet ? "in-sheet" : ""}`} aria-label="Ghi nhanh">
+      {focusName && <p class="focus-pill"><Icon name="link" size={14} /> Ghi về: <strong>{focusName}</strong></p>}
       {phase.k === "recording" ? (
         <div class="rec">
           <div class="rec-top">
@@ -117,7 +142,7 @@ export function Capture() {
           <textarea
             value={text}
             maxLength={MAX_TEXT}
-            placeholder="VD: mai 3 giờ chiều họp anh Nam, trưa nay ăn phở 65 nghìn"
+            placeholder="VD: gọi anh Nam bên ABC, mai gửi báo giá gia hạn kế toán, thứ 5 họp lúc 3 giờ"
             onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
             rows={4}
             autofocus
@@ -137,7 +162,7 @@ export function Capture() {
             <p class="hint">
               {phase.k === "sending" ? "Đang nghe và phân loại…"
                 : phase.k === "starting" ? "Đang bật micro…"
-                : micSupported() ? "“Mai 3 giờ chiều họp anh Nam, trưa nay ăn phở 65 nghìn”"
+                : micSupported() ? "“Vừa gọi anh Nam bên ABC, anh ấy đồng ý gia hạn, mai gửi hợp đồng”"
                 : "Trình duyệt này không ghi âm được, hãy gõ ghi chú"}
             </p>
           </div>

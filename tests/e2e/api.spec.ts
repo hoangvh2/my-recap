@@ -93,3 +93,52 @@ test.describe("capture function, over HTTP", () => {
     expect((await call(request, { text: "vẫn dùng được", zone }, owner.idToken)).status()).toBe(200);
   });
 });
+
+test.describe("customer context and the calendar link, over HTTP", () => {
+  const LINK = "http://127.0.0.1:5001/demo-myrecap/asia-southeast1/calendarlink";
+  const FEED = "http://127.0.0.1:5001/demo-myrecap/asia-southeast1/calendarfeed";
+  const link = (request: import("@playwright/test").APIRequestContext, data: unknown, token?: string) =>
+    request.post(LINK, { headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, data: { data } });
+
+  test("capture refuses a malformed context and accepts a well-formed one", async ({ request }) => {
+    const { idToken } = await idTokenFor(request, OWNER);
+    const good = { customers: [{ id: "c1", name: "Công ty ABC" }], licenses: [{ id: "l1", customerId: "c1", product: "Kế toán", endDate: "2027-01-01", stage: "ACTIVE" }], focus: { customerId: "c1" } };
+    expect((await call(request, { text: "gọi anh Nam", zone, context: good }, idToken)).status()).toBe(200);
+    const bads = [
+      { customers: "x" }, { customers: [{ id: "a b", name: "n" }] }, { customers: [{ id: "c1", name: "n", ssn: "1" }] },
+      { licenses: [{ id: "l1", customerId: "c1", product: "p", endDate: "2027-13-01", stage: "ACTIVE" }] }, { extra: 1 },
+      { customers: Array.from({ length: 301 }, (_, i) => ({ id: `c${i}`, name: "n" })) },
+    ];
+    for (const context of bads) expect((await call(request, { text: "x", zone, context }, idToken)).status(), JSON.stringify(context).slice(0, 50)).toBe(400);
+  });
+
+  test("the calendar link needs a signed-in, allow-listed account and a valid request", async ({ request }) => {
+    expect((await link(request, { action: "get", zone })).status()).toBe(401);
+    const stranger = await idTokenFor(request, STRANGER);
+    expect((await link(request, { action: "get", zone }, stranger.idToken)).status()).toBe(403);
+    const { idToken } = await idTokenFor(request, OWNER);
+    for (const bad of [{}, { action: "get" }, { action: "delete", zone }, { action: "get", zone: "Mars/Base" }, { action: "get", zone, uid: "someone-else" }]) {
+      expect((await link(request, bad, idToken)).status(), JSON.stringify(bad)).toBe(400);
+    }
+  });
+
+  test("the feed needs the exact secret and does not leak whose it is", async ({ request }) => {
+    const { idToken } = await idTokenFor(request, OWNER);
+    const made = (await (await link(request, { action: "rotate", zone }, idToken)).json()).result.token as string;
+    expect(made).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect((await link(request, { action: "get", zone }, idToken).then((r) => r.json())).result.token).toBe(made);
+    const ok = await request.get(`${FEED}/calendar/${made}.ics`);
+    expect(ok.status()).toBe(200);
+    expect(ok.headers()["cache-control"]).toContain("no-store");
+    expect(ok.headers()["x-robots-tag"]).toBe("noindex");
+    const wrong = await request.get(`${FEED}/calendar/${"A".repeat(43)}.ics`);
+    expect(wrong.status()).toBe(404);
+    expect(await wrong.text()).toBe("");
+    expect((await request.post(`${FEED}/calendar/${made}.ics`)).status()).toBe(405);
+    // Nobody can read the lookup or the token with a client login.
+    const { uid } = await idTokenFor(request, OWNER);
+    expect((await request.get(`${FS}/users/${uid}/meta/feed`, { headers: { authorization: `Bearer ${idToken}` } })).status()).toBe(403);
+    expect((await request.get(`${FS}/feeds`, { headers: { authorization: `Bearer ${idToken}` } })).status()).toBe(403);
+    await link(request, { action: "revoke", zone }, idToken);
+  });
+});

@@ -30,9 +30,14 @@ variable "gemini_model" {
 }
 
 variable "region" {
-  description = "Region of the capture function. Must match the web app (default in the code: asia-southeast1)."
+  description = "Region of the functions. The web app and firebase.json (calendar rewrite) are built for asia-southeast1; change them together."
   type        = string
   default     = "asia-southeast1"
+
+  validation {
+    condition     = var.region == "asia-southeast1"
+    error_message = "Only asia-southeast1 is supported: it is fixed in functions/src/config.ts and in the calendar rewrite of firebase.json."
+  }
 }
 
 variable "firestore_location" {
@@ -69,4 +74,14 @@ variable "budget_currency" {
   description = "Must equal the billing account's currency, e.g. USD or VND."
   type        = string
   default     = "USD"
+}
+
+variable "custom_domain" {
+  description = "Optional. A hostname you connected to Firebase Hosting, e.g. recap.example.com. The app then signs in and serves from it (see docs/web-secretary.md)."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.custom_domain == null ? true : can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$", var.custom_domain))
+    error_message = "custom_domain must be a plain lowercase hostname such as recap.example.com (no https://, no path)."
+  }
 }

@@ -30,7 +30,8 @@ service cloud.firestore {
     function validItem(d, id) {
       return d.keys().hasAll(['id', 'type', 'status', 'title', 'details', 'allDay', 'createdAt'])
         && d.keys().hasOnly(['id', 'type', 'status', 'title', 'details', 'whenAt', 'allDay', 'amount',
-                             'category', 'place', 'person', 'sourceId', 'quote', 'createdAt', 'doneAt', 'recurrence'])
+                             'category', 'place', 'person', 'sourceId', 'quote', 'createdAt', 'doneAt', 'recurrence',
+                             'customerId', 'licenseId'])
         && id.matches('^[A-Za-z0-9_-]{1,64}$')
         && d.id == id
         && d.type in ['TASK', 'EVENT', 'EXPENSE', 'NOTE']
@@ -48,8 +49,89 @@ service cloud.firestore {
         && optString(d, 'person', 120)
         && optString(d, 'sourceId', 64)
         && optString(d, 'quote', 400)
+        && optString(d, 'customerId', 64)
+        && optString(d, 'licenseId', 64)
         && (!('recurrence' in d) || d.recurrence == null
             || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY']);
+    }
+
+    function optDate(d, k) {
+      return !(k in d) || d[k] == null || (d[k] is string && d[k].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
+    function optIntBetween(d, k, lo, hi) {
+      return !(k in d) || d[k] == null || (d[k] is int && d[k] >= lo && d[k] <= hi);
+    }
+
+    function validCustomer(d, id) {
+      return d.keys().hasAll(['id', 'status', 'name', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'status', 'name', 'contact', 'phone', 'email', 'note', 'sourceId', 'createdAt', 'updatedAt'])
+        && id.matches('^[A-Za-z0-9_-]{1,64}$')
+        && d.id == id
+        && d.status in ['DRAFT', 'OPEN']
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 120
+        && optString(d, 'contact', 120)
+        && optString(d, 'phone', 40)
+        && optString(d, 'email', 120)
+        && optString(d, 'note', 2000)
+        && optString(d, 'sourceId', 64)
+        && d.createdAt is int
+        && d.updatedAt is int;
+    }
+
+    function validLicense(d, id) {
+      return d.keys().hasAll(['id', 'customerId', 'status', 'product', 'kind', 'endDate', 'stage', 'stageAt', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['id', 'customerId', 'status', 'product', 'kind', 'startDate', 'endDate', 'termMonths', 'noticeDays', 'value',
+                             'contractNo', 'note', 'stage', 'stageAt', 'snoozeUntil', 'lostReason', 'renewedFromId', 'renewedToId',
+                             'sourceId', 'createdAt', 'updatedAt'])
+        && id.matches('^[A-Za-z0-9_-]{1,64}$')
+        && d.id == id
+        && d.customerId is string && d.customerId.matches('^[A-Za-z0-9_-]{1,64}$')
+        && d.status in ['DRAFT', 'OPEN']
+        && d.product is string && d.product.size() > 0 && d.product.size() <= 120
+        && d.kind in ['LICENSE', 'WARRANTY', 'MAINTENANCE', 'SUBSCRIPTION']
+        && d.stage in ['ACTIVE', 'ASKED', 'QUOTED', 'CONTRACTING', 'RENEWED', 'LOST']
+        && d.endDate is string && d.endDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && optDate(d, 'startDate')
+        && optDate(d, 'snoozeUntil')
+        && optIntBetween(d, 'termMonths', 1, 120)
+        && optIntBetween(d, 'noticeDays', 0, 365)
+        && optIntBetween(d, 'value', 0, 10000000000000)
+        && optString(d, 'contractNo', 60)
+        && optString(d, 'note', 2000)
+        && optString(d, 'lostReason', 200)
+        && optString(d, 'renewedFromId', 64)
+        && optString(d, 'renewedToId', 64)
+        && optString(d, 'sourceId', 64)
+        && d.stageAt is int
+        && d.createdAt is int
+        && d.updatedAt is int;
+    }
+
+    // Four whole day counts, each larger than the next (e.g. 90, 60, 30, 14).
+    function validMilestones(l) {
+      return l is list && l.size() == 4
+        && l[0] is int && l[1] is int && l[2] is int && l[3] is int
+        && l[0] <= 365 && l[0] > l[1] && l[1] > l[2] && l[2] > l[3] && l[3] >= 1;
+    }
+
+    function validColumns(m) {
+      return m is map
+        && m.keys().hasOnly(['customer', 'contact', 'phone', 'email', 'product', 'kind', 'startDate', 'endDate', 'termMonths', 'value', 'contractNo', 'note'])
+        && optString(m, 'customer', 200) && optString(m, 'contact', 200) && optString(m, 'phone', 200) && optString(m, 'email', 200)
+        && optString(m, 'product', 200) && optString(m, 'kind', 200) && optString(m, 'startDate', 200) && optString(m, 'endDate', 200)
+        && optString(m, 'termMonths', 200) && optString(m, 'value', 200) && optString(m, 'contractNo', 200) && optString(m, 'note', 200);
+    }
+
+    function validPrefs(d) {
+      return d.keys().hasOnly(['milestones', 'shortMilestones', 'shortTermMonths', 'staleDays', 'quietDays', 'importColumns', 'updatedAt'])
+        && (!('milestones' in d) || validMilestones(d.milestones))
+        && (!('shortMilestones' in d) || validMilestones(d.shortMilestones))
+        && optIntBetween(d, 'shortTermMonths', 1, 60)
+        && optIntBetween(d, 'staleDays', 1, 60)
+        && optIntBetween(d, 'quietDays', 1, 365)
+        && (!('importColumns' in d) || validColumns(d.importColumns))
+        && optIntBetween(d, 'updatedAt', 0, 100000000000000);
     }
 
     match /users/{uid}/items/{id} {
@@ -61,6 +143,38 @@ service cloud.firestore {
       allow delete: if owner(uid);
     }
 
+    match /users/{uid}/customers/{id} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 2000;
+      allow create: if owner(uid) && validCustomer(request.resource.data, id);
+      allow update: if owner(uid) && validCustomer(request.resource.data, id)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if owner(uid);
+    }
+
+    match /users/{uid}/licenses/{id} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 3000;
+      allow create: if owner(uid) && validLicense(request.resource.data, id);
+      allow update: if owner(uid) && validLicense(request.resource.data, id)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if owner(uid);
+    }
+
+    // Changes the AI proposes to a licence: written only by the capture function; the owner applies or discards.
+    match /users/{uid}/proposals/{id} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 500;
+      allow delete: if owner(uid);
+    }
+
+    // The owner's reminder rhythm and import column names: one document.
+    match /users/{uid}/settings/prefs {
+      allow get: if owner(uid);
+      allow create, update: if owner(uid) && validPrefs(request.resource.data);
+      allow delete: if owner(uid);
+    }
+
     // Written only by the capture function (admin SDK, which bypasses rules).
     match /users/{uid}/captures/{id} {
       allow get: if owner(uid);
@@ -68,7 +182,7 @@ service cloud.firestore {
       allow delete: if owner(uid);
     }
 
-    // Quota counters (users/{uid}/meta/usage) and anything unknown: no client access at all.
+    // Quota counters (users/{uid}/meta/usage), calendar feed tokens (/feeds) and anything unknown: no client access at all.
     match /{document=**} {
       allow read, write: if false;
     }

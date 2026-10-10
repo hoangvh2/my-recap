@@ -32,6 +32,46 @@ export function startFakeGemini(port = 8787) {
       // "Thời điểm hiện tại: Thứ X, 2026-10-10 14:00 (zone)" and the "(mai)" line give the dates.
       const tomorrow = /- [^\n]*? (\d{4}-\d{2}-\d{2}) \(mai\)/.exec(text)?.[1] ?? "2026-01-02";
       const today = /\(hôm nay\)/.test(text) ? /- [^\n]*? (\d{4}-\d{2}-\d{2}) \(hôm nay\)/.exec(text)?.[1] : null;
+      if (/FAKE_SALES_NEW/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [{ key: "n1", name: "Công ty Delta", contact: "chị Lan", phone: null, email: null }],
+          items: [{ type: "task", title: "Gửi báo giá ERP", details: "", date: tomorrow, time: null, customer: "n1", license: null, quote: "gửi báo giá" }],
+          licenses: [{ customer: "n1", product: "Phần mềm ERP", kind: "license", startDate: null, endDate: "2027-06-30", termMonths: null, value: "120 triệu", contractNo: null }],
+          updates: [],
+        }));
+      }
+      // Updates and links to the first customer / licence of the context the app sent (aliases c1 / l1).
+      if (/FAKE_SALES_UPDATE/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [],
+          items: [{ type: "task", title: "Gọi lại khách", details: "", date: tomorrow, time: null, customer: "c1", license: "l1", quote: "gọi lại" }],
+          licenses: [],
+          updates: [{ license: "l1", stage: "quoted", value: 50000000, endDate: null, note: "Đã gửi báo giá qua email", lostReason: null }],
+        }));
+      }
+      // The usual mistake of a model: an agreed renewal filed as a note. NEW declares the customer, KNOWN uses c1.
+      if (/FAKE_RENEW_NOTE_NEW/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [{ key: "n1", name: "Khánh", contact: null, phone: null, email: null }],
+          items: [{ type: "note", title: "Anh Khánh đồng ý gia hạn license đến 12/2027", details: "", customer: "n1", license: null, quote: "đồng ý gia hạn" }],
+          licenses: [], updates: [],
+        }));
+      }
+      if (/FAKE_RENEW_NOTE_KNOWN/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [],
+          items: [{ type: "note", title: "Khánh đồng ý gia hạn license đến 2027", details: "", customer: "c1", license: null, quote: "đồng ý gia hạn" }],
+          licenses: [], updates: [],
+        }));
+      }
+      if (/FAKE_SALES_BAD/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [],
+          items: [{ type: "task", title: "Việc bịa mã", details: "", date: tomorrow, time: null, customer: "c99", license: "l99", quote: "x" }],
+          licenses: [],
+          updates: [{ license: "l99", stage: "renewed" }],
+        }));
+      }
       reply(JSON.stringify({
         items: [
           { type: "event", title: "Họp anh Nam", details: "", date: tomorrow, time: "15:00", place: null, person: "anh Nam", repeat: null, quote: "mai 3 giờ chiều họp anh Nam" },

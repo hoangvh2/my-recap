@@ -1,11 +1,12 @@
 import { whenLabel } from "../lib/format";
 import { formatVnd } from "../lib/money";
 import { RECURRENCE_LABEL, type Item } from "../lib/model";
+import { CustomerChip, LicenseChip } from "./common";
 import { Icon, type IconName } from "./icons";
 
 export const TYPE_ICON: Record<Item["type"], IconName> = { TASK: "task", EVENT: "calendar", EXPENSE: "coin", NOTE: "note" };
 
-export function ItemRow(props: { item: Item; onOpen: (i: Item) => void; onToggle?: (i: Item, done: boolean) => void; showDate?: boolean }) {
+export function ItemRow(props: { item: Item; onOpen: (i: Item) => void; onToggle?: (i: Item, done: boolean) => void; showDate?: boolean; hideCustomer?: boolean }) {
   const { item, onOpen, onToggle } = props;
   const done = item.status === "DONE";
   const meta = [
@@ -39,6 +40,12 @@ export function ItemRow(props: { item: Item; onOpen: (i: Item) => void; onToggle
         )}
       </button>
       {item.type === "EXPENSE" && item.amount !== undefined && <span class="amount">{formatVnd(item.amount)}</span>}
+      {((!props.hideCustomer && item.customerId) || item.licenseId) && (
+        <div class="links">
+          {!props.hideCustomer && <CustomerChip id={item.customerId} />}
+          <LicenseChip id={item.licenseId} />
+        </div>
+      )}
     </li>
   );
 }
