@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget: big record button + today's agenda at a glance. RemoteViews-safe views only. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="16dp">
+
+    <FrameLayout
+        android:id="@+id/widget_mic"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:background="@drawable/widget_mic_bg"
+        android:contentDescription="@string/quick_capture">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_stat_mic" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_info"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/quick_capture"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/widget_summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/widget_loading"
+            android:textColor="#C8FFFFFF"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_next"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#9EFFFFFF"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

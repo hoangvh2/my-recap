@@ -1,98 +1,83 @@
 package com.vh.myrecap.data
 
 import com.vh.myrecap.core.Item
-import com.vh.myrecap.core.ItemStatus
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.vh.myrecap.core.TextSearch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import org.json.JSONArray
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
 /**
- * The secretary's items in one small JSON file. A personal list stays in the hundreds to low
- * thousands of short records (~300 bytes each), so a full rewrite per change is cheap and keeps
- * the file readable and crash-safe (atomic rename). Kept in memory after the first read.
+ * The secretary's items, stored in SQLite (Room). Blocking calls: use them from a background
+ * thread (Room refuses the main thread). The UI observes [items], which updates after every write.
+ *
+ * [legacyJson] is the v0.2 JSON file; its items are imported once, then it is renamed so the
+ * import never runs twice.
  */
-class ItemStore(private val file: File) {
-    private val lock = Any()
-    private var cache: List<Item>? = null
-    private val _items = MutableStateFlow<List<Item>>(emptyList())
+class ItemStore(
+    private val db: AppDatabase,
+    scope: CoroutineScope,
+    private val legacyJson: File? = null,
+) {
+    private val dao = db.items()
+    private val _ready = MutableStateFlow(false)
 
-    /** All items, newest first; updated on every write. */
-    val items: StateFlow<List<Item>> = _items
+    /** True once the first list was read, so screens can tell "not loaded yet" from "not found". */
+    val ready: StateFlow<Boolean> = _ready
 
-    init {
-        file.parentFile?.mkdirs()
-        synchronized(lock) { _items.value = load() }
-    }
+    /** All items, newest first. */
+    val items: StateFlow<List<Item>> = dao.observeAll()
+        .map { rows -> rows.map { it.toItem() } }
+        .onEach { _ready.value = true }
+        .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    fun list(): List<Item> = synchronized(lock) { load() }
-
-    fun get(id: String): Item? = list().firstOrNull { it.id == id }
-
-    fun bySource(sourceId: String): List<Item> = list().filter { it.sourceId == sourceId }
-
-    fun upsert(item: Item) = mutate { all ->
-        if (all.any { it.id == item.id }) all.map { if (it.id == item.id) item else it } else listOf(item) + all
-    }
-
-    fun update(id: String, transform: (Item) -> Item): Item? {
-        var result: Item? = null
-        mutate { all ->
-            all.map {
-                if (it.id == id) transform(it).also { n -> result = n } else it
-            }
-        }
-        return result
-    }
-
-    fun delete(id: String) = mutate { all -> all.filterNot { it.id == id } }
-
-    /** Replaces the AI proposals of one capture (a re-analysis must not stack duplicates). */
-    fun replaceDrafts(sourceId: String, drafts: List<Item>) = mutate { all ->
-        drafts + all.filterNot { it.sourceId == sourceId && it.status == ItemStatus.DRAFT }
-    }
-
-    fun deleteDrafts(sourceId: String) = mutate { all ->
-        all.filterNot { it.sourceId == sourceId && it.status == ItemStatus.DRAFT }
-    }
-
-    private fun mutate(transform: (List<Item>) -> List<Item>) {
-        synchronized(lock) {
-            val next = transform(load())
-            save(next)
-            cache = next
-            _items.value = next
-        }
-    }
-
-    private fun load(): List<Item> {
-        cache?.let { return it }
-        val loaded = try {
-            if (!file.exists()) {
-                emptyList()
-            } else {
-                val arr = JSONObject(file.readText()).optJSONArray("items") ?: JSONArray()
-                (0 until arr.length()).mapNotNull { i -> runCatching { Item.fromJson(arr.getJSONObject(i)) }.getOrNull() }
-            }
+    /** Imports the old JSON list once; safe to call on every start. */
+    fun migrateLegacy() {
+        val file = legacyJson?.takeIf { it.exists() } ?: return
+        val imported = try {
+            val arr = JSONObject(file.readText()).optJSONArray("items")
+            (0 until (arr?.length() ?: 0)).mapNotNull { i -> runCatching { Item.fromJson(arr!!.getJSONObject(i)) }.getOrNull() }
         } catch (_: Exception) {
-            // Keep the unreadable file for inspection instead of overwriting it with an empty list.
-            file.renameTo(File(file.parentFile, file.name + ".broken-" + System.currentTimeMillis()))
             emptyList()
         }
-        cache = loaded
-        return loaded
+        dao.upsertAll(imported.map(ItemEntity::of))
+        file.renameTo(File(file.parentFile, file.name + ".imported"))
     }
 
-    private fun save(items: List<Item>) {
-        val json = JSONObject().put("version", 1).put("items", JSONArray().also { a -> items.forEach { a.put(it.toJson()) } })
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(json.toString())
-        if (!tmp.renameTo(file)) {
-            file.delete()
-            tmp.renameTo(file)
-        }
+    fun list(): List<Item> = dao.all().map { it.toItem() }
+
+    fun get(id: String): Item? = dao.get(id)?.toItem()
+
+    fun bySource(sourceId: String): List<Item> = dao.bySource(sourceId).map { it.toItem() }
+
+    fun upsert(item: Item) = dao.upsert(ItemEntity.of(item))
+
+    /** Applies [transform] atomically; returns the new item, or null when it does not exist. */
+    fun update(id: String, transform: (Item) -> Item): Item? = db.runInTransaction<Item?> {
+        val current = dao.get(id)?.toItem() ?: return@runInTransaction null
+        transform(current).also { dao.upsert(ItemEntity.of(it)) }
+    }
+
+    fun delete(id: String) = dao.delete(id)
+
+    /** Replaces the AI proposals of one capture (a re-analysis must not stack duplicates). */
+    fun replaceDrafts(sourceId: String, drafts: List<Item>) = dao.replaceDrafts(sourceId, drafts.map(ItemEntity::of))
+
+    fun deleteDrafts(sourceId: String) = dao.deleteDrafts(sourceId)
+
+    /** Accent-insensitive: every word of [query] must appear in the item. */
+    fun search(query: String): List<Item> {
+        val tokens = TextSearch.tokens(query)
+        if (tokens.isEmpty()) return emptyList()
+        return dao.searchCandidates(tokens.maxBy { it.length })
+            .filter { TextSearch.matches(it.search, tokens) }
+            .map { it.toItem() }
     }
 
     companion object {

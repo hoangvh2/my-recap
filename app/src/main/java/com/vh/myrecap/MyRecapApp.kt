@@ -12,7 +12,16 @@ import androidx.core.graphics.drawable.IconCompat
 import com.vh.myrecap.ui.MainActivity
 import com.vh.myrecap.core.Adts
 import com.vh.myrecap.core.TimeFormat
+import com.vh.myrecap.data.AppDatabase
 import com.vh.myrecap.data.ItemStore
+import com.vh.myrecap.widget.CaptureWidget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import com.vh.myrecap.data.RecState
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.SessionStore
@@ -31,18 +40,27 @@ class MyRecapApp : Application() {
     lateinit var items: ItemStore
         private set
 
+    /** Background work that outlives screens (database observation, start-up housekeeping). */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
         store = SessionStore(File(filesDir, "sessions"))
         settings = SettingsRepository(this)
-        items = ItemStore(File(filesDir, "items/items.json"))
+        items = ItemStore(AppDatabase.open(this), appScope, legacyJson = File(filesDir, "items/items.json"))
         createChannels()
         addShortcuts()
         recoverInterruptedSessions()
-        Thread {
+        appScope.launch {
+            items.migrateLegacy()
             StorageJanitor.run(store, settings.current, cacheDir)
-            Reminders.syncAll(this)
-        }.start()
+            Reminders.syncAll(this@MyRecapApp)
+        }
+        // Keep the home-screen widget's counts in step with the data.
+        appScope.launch {
+            items.items.drop(1).debounce(500).collect { CaptureWidget.refresh(this@MyRecapApp) }
+        }
     }
 
     private fun createChannels() {

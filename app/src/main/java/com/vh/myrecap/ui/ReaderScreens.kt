@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
@@ -67,6 +68,7 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmAudio by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
 
     val d = detail ?: return
@@ -97,6 +99,12 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Tuỳ chọn") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (seg.stt == TaskStatus.DONE) "Sửa transcript" else "Tự nhập transcript") },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                                enabled = seg.stt == TaskStatus.DONE || seg.stt == TaskStatus.ERROR,
+                                onClick = { menu = false; editing = true },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Chuyển văn bản lại") },
                                 leadingIcon = { Icon(Icons.Rounded.Refresh, null) },
@@ -184,6 +192,16 @@ fun ClipScreen(vm: AppViewModel, id: String, index: Int) {
         }
     }
 
+    if (editing) {
+        TextEditorDialog(
+            title = "Đoạn ${seg.number}",
+            initial = if (seg.stt == TaskStatus.DONE) text else "",
+            saveLabel = "Lưu",
+            hint = "Giữ nhãn người nói ở đầu dòng (vd: “Ứng viên: …”) để transcript hiển thị theo lượt.",
+            onSave = { vm.editClipText(id, seg.index, it) },
+            onDismiss = { editing = false },
+        )
+    }
     if (confirmAudio) {
         ConfirmDialog(
             "Xoá file ghi âm của đoạn ${seg.number}?",

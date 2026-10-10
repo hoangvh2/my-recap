@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -60,6 +61,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -128,12 +130,15 @@ fun ReviewScreen(vm: AppViewModel, id: String) {
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmAudio by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    val undo = rememberItemUndo(vm)
     val d = detail
     val drafts = d?.items?.filter { it.status == ItemStatus.DRAFT }.orEmpty()
     val saved = d?.items?.filter { it.status != ItemStatus.DRAFT }.orEmpty()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(undo) },
         topBar = {
             TopAppBar(
                 title = {
@@ -210,12 +215,24 @@ fun ReviewScreen(vm: AppViewModel, id: String) {
                         Column(Modifier.padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Bạn đã nói", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                                IconButton(onClick = { editing = true }, enabled = !s.extractBusy && !s.sttBusy) {
+                                    Icon(Icons.Rounded.Edit, contentDescription = "Sửa lời ghi", Modifier.size(20.dp))
+                                }
                                 IconButton(onClick = { Sharing.copy(context, "Ghi nhanh", d.text) }) {
                                     Icon(Icons.Rounded.ContentCopy, contentDescription = "Sao chép", Modifier.size(20.dp))
                                 }
                             }
                             Text(d.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(end = 12.dp))
                         }
+                    }
+                }
+            }
+            if (d.text.isBlank() && failed && !s.sttBusy) {
+                item {
+                    OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tự nhập nội dung")
                     }
                 }
             }
@@ -264,6 +281,16 @@ fun ReviewScreen(vm: AppViewModel, id: String) {
         }
     }
 
+    if (editing && d != null) {
+        TextEditorDialog(
+            title = "Sửa lời ghi",
+            initial = d.text,
+            saveLabel = "Lưu & phân tích",
+            hint = "Sau khi lưu, thư ký phân tích lại; các đề xuất chưa lưu được thay mới, mục đã lưu giữ nguyên.",
+            onSave = { vm.editMemoText(id, it) },
+            onDismiss = { editing = false },
+        )
+    }
     if (confirmDelete) {
         ConfirmDialog(
             title = "Xoá ghi chú này?",
@@ -392,16 +419,16 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
         ).let { if (newType == ItemType.EXPENSE) it.withType(ItemType.EXPENSE) else it }
     }
     val original = stored ?: if (id == null) template else null
+    val ready by vm.itemsReady.collectAsStateWithLifecycle()
     if (original == null) {
-        // Deleted elsewhere (e.g. "Xong" on the reminder deleted nothing, but the capture was removed).
-        LaunchedEffect(Unit) { vm.back() }
+        // Not loaded yet (opened from a reminder at cold start): wait. Loaded but missing: deleted elsewhere.
+        if (ready) LaunchedEffect(Unit) { vm.back() }
         return
     }
     var edit by remember(original.id) { mutableStateOf(original) }
     var amountText by remember(original.id) { mutableStateOf(original.amount?.toString().orEmpty()) }
     var pickDate by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
 
     val parsedAmount = Money.parseVnd(amountText)
@@ -432,7 +459,11 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                         IconButton(onClick = { Sharing.shareText(context, current.title, ItemText.line(current, zone)) }) {
                             Icon(Icons.Rounded.Share, contentDescription = "Chia sẻ")
                         }
-                        IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, contentDescription = "Xoá mục") }
+                        // No confirmation: the previous screen offers Undo.
+                        IconButton(onClick = {
+                            vm.deleteItem(original.id)
+                            vm.back()
+                        }) { Icon(Icons.Rounded.Delete, contentDescription = "Xoá mục") }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -595,19 +626,6 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     TextButton(onClick = { pickTime = false }) { Text("Huỷ") }
                 }
             },
-        )
-    }
-    if (confirmDelete) {
-        ConfirmDialog(
-            title = "Xoá “${original.title}”?",
-            text = null,
-            confirmLabel = "Xoá",
-            destructive = true,
-            onConfirm = {
-                vm.deleteItem(original.id)
-                vm.back()
-            },
-            onDismiss = { confirmDelete = false },
         )
     }
     if (confirmLeave) {

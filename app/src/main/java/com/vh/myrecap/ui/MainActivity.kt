@@ -32,7 +32,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        // A recreated activity (rotation, dark mode) must not replay the launch intent, e.g. start a second capture.
+        if (savedInstanceState == null) handleIntent(intent)
         // While recording, this screen may appear over the lock screen so the big controls work without
         // unlocking. Only the recording screen is shown then (see AppRoot), never the session list.
         lifecycleScope.launch {
@@ -110,6 +111,7 @@ private fun AppRoot(vm: AppViewModel) {
             is Screen.Review -> ReviewScreen(vm, target.id)
             is Screen.ItemEdit -> ItemEditScreen(vm, target.id, target.type)
             Screen.Settings -> SettingsScreen(vm)
+            Screen.Search -> SearchScreen(vm)
         }
     }
 }

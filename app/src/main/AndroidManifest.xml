@@ -58,6 +58,32 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".widget.CaptureWidget"
+            android:exported="true"
+            android:label="@string/quick_capture">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_capture_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.QuickCaptureTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_mic"
+            android:label="@string/quick_capture"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

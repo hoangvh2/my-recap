@@ -1,6 +1,12 @@
 package com.vh.myrecap.ui
 
+import android.app.StatusBarManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
+import android.graphics.drawable.Icon as SystemIcon
+import com.vh.myrecap.widget.CaptureWidget
+import com.vh.myrecap.widget.QuickCaptureTile
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -183,6 +189,7 @@ fun SettingsScreen(vm: AppViewModel) {
                 Hint("Transcript và tóm tắt luôn được giữ. Ghi âm (~14 MB mỗi giờ lời nói) là phần duy nhất chiếm nhiều chỗ.")
                 StorageCard(vm)
                 ExactAlarmRow(vm)
+                ShortcutRow()
             }
 
             val usesGemini = s.sttProvider == ProviderKind.GEMINI || s.summaryProvider == ProviderKind.GEMINI
@@ -457,4 +464,37 @@ private fun ExactAlarmRow(vm: AppViewModel) {
             }
         }) { Text("Cho phép") }
     }
+}
+
+/** One tap to place the capture widget or the Quick Settings tile, where the launcher supports it. */
+@Composable
+private fun ShortcutRow() {
+    val context = LocalContext.current
+    val widgets = context.getSystemService(AppWidgetManager::class.java)
+    val canPinWidget = widgets?.isRequestPinAppWidgetSupported == true
+    val canAddTile = Build.VERSION.SDK_INT >= 33
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Lối tắt Ghi nhanh", fontWeight = FontWeight.SemiBold)
+        Hint("Ghi nhanh không cần mở app: widget ngoài màn hình chính, nút trong thanh cài đặt nhanh, hoặc giữ icon app.")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (canPinWidget) {
+                OutlinedButton(onClick = {
+                    widgets.requestPinAppWidget(ComponentName(context, CaptureWidget::class.java), null, null)
+                }) { Text("Thêm widget") }
+            }
+            if (canAddTile) {
+                OutlinedButton(onClick = { if (Build.VERSION.SDK_INT >= 33) requestTile(context) }) { Text("Thêm vào cài đặt nhanh") }
+            }
+        }
+    }
+}
+
+@androidx.annotation.RequiresApi(33)
+private fun requestTile(context: android.content.Context) {
+    context.getSystemService(StatusBarManager::class.java).requestAddTileService(
+        ComponentName(context, QuickCaptureTile::class.java),
+        context.getString(com.vh.myrecap.R.string.quick_capture),
+        SystemIcon.createWithResource(context, com.vh.myrecap.R.drawable.ic_tile_mic),
+        context.mainExecutor,
+    ) { }
 }

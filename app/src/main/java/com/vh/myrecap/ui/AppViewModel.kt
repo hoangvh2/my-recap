@@ -12,10 +12,12 @@ import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.ShareText
+import com.vh.myrecap.core.TextSearch
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.StorageStats
 import com.vh.myrecap.data.TaskStatus
@@ -46,6 +48,7 @@ sealed interface Screen {
     /** An item, or a new one of [type] when [id] is null. */
     data class ItemEdit(val id: String?, val type: ItemType = ItemType.TASK) : Screen
     data object Settings : Screen
+    data object Search : Screen
 
     /** Whether this screen shows folder/capture [folderId] (closed when that is deleted). */
     fun shows(folderId: String): Boolean = when (this) {
@@ -63,10 +66,24 @@ data class NavEntry(val screen: Screen, val depth: Int)
 /** A quick capture with its text, the items taken from it and the audio still kept. */
 class MemoDetail(val session: Session, val text: String, val items: List<Item>, val audioBytes: Long)
 
+private val VI: java.util.Locale = java.util.Locale.forLanguageTag("vi")
+
+/** A transcript passage that matched a search: folder, clip (null for a folder-title match) and excerpt. */
+class ClipHit(val session: Session, val index: Int?, val label: String, val snippet: String)
+
+class SearchResults(
+    val query: String,
+    val items: List<Item>,
+    val memos: List<Pair<Session, String>>,
+    val clips: List<ClipHit>,
+) {
+    val isEmpty: Boolean get() = items.isEmpty() && memos.isEmpty() && clips.isEmpty()
+}
+
 /** "4,2 MB" */
 fun formatBytes(bytes: Long): String = when {
-    bytes >= 1_000_000_000 -> String.format(java.util.Locale("vi"), "%.1f GB", bytes / 1e9)
-    bytes >= 1_000_000 -> String.format(java.util.Locale("vi"), "%.1f MB", bytes / 1e6)
+    bytes >= 1_000_000_000 -> String.format(VI, "%.1f GB", bytes / 1e9)
+    bytes >= 1_000_000 -> String.format(VI, "%.1f MB", bytes / 1e6)
     bytes >= 1_000 -> "${bytes / 1_000} KB"
     else -> "$bytes B"
 }
@@ -103,6 +120,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val items: StateFlow<List<Item>> = app.items.items
+    val itemsReady: StateFlow<Boolean> = app.items.ready
 
     /** Last folder hidden by [requestDelete]; the home screen offers Undo for it. */
     var lastDeleted by mutableStateOf<Session?>(null)
@@ -136,6 +154,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openSettings() = push(Screen.Settings)
+    fun openSearch() = push(Screen.Search)
     fun openClip(id: String, index: Int) = push(Screen.Clip(id, index))
     fun openSummary(id: String, jobId: String) = push(Screen.Summary(id, jobId))
     fun openItem(id: String) = push(Screen.ItemEdit(id))
@@ -157,6 +176,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     fun requestQuickCapture() {
+        if (RecorderState.ui.value.active) return // already recording: the recording screen is showing
         stack.clear()
         stack.add(Screen.Home)
         setHomeTab(0)
@@ -303,9 +323,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (done) Reminders.cancel(app, id)
     }
 
+    /** Last item deleted from the UI; screens offer Undo for a few seconds. */
+    var lastDeletedItem by mutableStateOf<Item?>(null)
+        private set
+
     fun deleteItem(id: String) = io {
+        val item = app.items.get(id)
         app.items.delete(id)
         Reminders.cancel(app, id)
+        withContext(Dispatchers.Main) { lastDeletedItem = item }
+    }
+
+    fun undoDeleteItem(item: Item) {
+        if (lastDeletedItem?.id == item.id) lastDeletedItem = null
+        saveItem(item)
+    }
+
+    fun clearDeletedItem(item: Item) {
+        if (lastDeletedItem?.id == item.id) lastDeletedItem = null
     }
 
     /** Runs the AI analysis of a capture again, replacing its unconfirmed proposals. */
@@ -322,6 +357,61 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             app.items.deleteDrafts(id)
             store.delete(id)
         }
+    }
+
+    // ---- Transcript editing ----
+
+    /** Replaces one clip's transcript (fixing speech-to-text); summaries notes made from it are dropped. */
+    fun editClipText(id: String, index: Int, text: String) = io {
+        if (text.isBlank()) return@io
+        store.writeTranscript(id, index, text)
+        store.update(id) { s -> s.copy(segments = s.segments.map { if (it.index == index) it.copy(stt = TaskStatus.DONE, error = null) else it }) }
+    }
+
+    /** Replaces what a quick capture said, then analyses it again (its unconfirmed proposals are replaced). */
+    fun editMemoText(id: String, text: String) = io {
+        val s = store.get(id) ?: return@io
+        val segs = s.segments.sortedBy { it.index }
+        if (segs.isEmpty() || text.isBlank()) return@io
+        store.writeTranscript(id, segs.first().index, text)
+        segs.drop(1).forEach { store.writeTranscript(id, it.index, Prompts.NO_SPEECH) }
+        store.update(id) { m ->
+            m.copy(segments = m.segments.map { it.copy(stt = TaskStatus.DONE, error = null) }, extract = TaskStatus.PENDING, error = null)
+        }
+        Processing.enqueue(app, id)
+    }
+
+    // ---- Search ----
+
+    /** Accent-insensitive search over items, quick captures, folder titles and transcripts. */
+    suspend fun search(query: String): SearchResults = withContext(Dispatchers.IO) {
+        val tokens = TextSearch.tokens(query)
+        if (tokens.isEmpty()) return@withContext SearchResults(query, emptyList(), emptyList(), emptyList())
+        val items = app.items.search(query)
+        val memos = mutableListOf<Pair<Session, String>>()
+        val clips = mutableListOf<ClipHit>()
+        for (s in store.list().filterNot { it.id in pendingDeletes.value }) {
+            if (s.isMemo) {
+                val text = store.memoText(s)
+                if (TextSearch.matches(TextSearch.fold(text), tokens)) memos += s to TextSearch.snippet(text, tokens)
+                continue
+            }
+            if (TextSearch.matches(TextSearch.fold(s.title), tokens)) {
+                clips += ClipHit(s, null, s.mode.label + " · " + formatDate(s.createdAt), s.title)
+            }
+            // A few passages per folder keep the list readable; the folder holds the rest.
+            var hits = 0
+            for (seg in s.segments.sortedBy { it.index }) {
+                if (hits >= 3) break
+                val text = store.readTranscript(s.id, seg.index) ?: continue
+                val haystack = TextSearch.fold((seg.title ?: "") + " " + text)
+                if (TextSearch.matches(haystack, tokens)) {
+                    clips += ClipHit(s, seg.index, "Đoạn ${seg.number}" + (seg.title?.let { " · $it" } ?: ""), TextSearch.snippet(text, tokens))
+                    hits++
+                }
+            }
+        }
+        SearchResults(query, items, memos, clips)
     }
 
     private suspend fun toast(text: String) = withContext(Dispatchers.Main) {

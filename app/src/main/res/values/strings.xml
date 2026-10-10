@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">My Recap</string>
+    <string name="quick_capture">Ghi nhanh</string>
+    <string name="widget_description">Một chạm để ghi nhanh việc, lịch hẹn, chi tiêu; xem việc hôm nay</string>
+    <string name="widget_loading">Đang tải…</string>
 </resources>

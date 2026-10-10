@@ -6,9 +6,14 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.vh.myrecap.core.ExpenseCsv
+import com.vh.myrecap.core.Item
 import com.vh.myrecap.data.Session
+import com.vh.myrecap.core.ExpenseCsv
+import com.vh.myrecap.core.Item
 import com.vh.myrecap.data.SessionStore
 import java.io.File
+import java.time.ZoneId
 
 object Sharing {
     /** Above this size the text goes as a file: Android intents fail on very large extras. */
@@ -37,6 +42,18 @@ object Sharing {
             .putExtra(Intent.EXTRA_SUBJECT, session.title)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(intent, "Chia sẻ file ghi âm"))
+    }
+
+    /** One month of expenses as a CSV file, through the share sheet (Drive, email, Zalo…). */
+    fun shareExpensesCsv(context: Context, month: String, expenses: List<Item>) {
+        val dir = File(context.cacheDir, "share").apply { mkdirs() }
+        val file = File(dir, "chi-tieu-$month.csv").apply { writeText(ExpenseCsv.build(expenses, ZoneId.systemDefault())) }
+        val intent = Intent(Intent.ACTION_SEND)
+            .setType("text/csv")
+            .putExtra(Intent.EXTRA_SUBJECT, "Chi tiêu $month")
+            .putExtra(Intent.EXTRA_STREAM, uri(context, file))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(Intent.createChooser(intent, "Xuất chi tiêu"))
     }
 
     fun copy(context: Context, label: String, text: String) {

@@ -16,8 +16,8 @@ import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.ui.MainActivity
-import java.time.Instant
-import java.time.LocalTime
+import com.vh.myrecap.core.ReminderPolicy
+import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 /**
@@ -25,22 +25,8 @@ import java.time.ZoneId
  * Exact when the user allowed "Alarms & reminders", otherwise inexact (Android may delay a few minutes).
  */
 object Reminders {
-    /** Appointments remind this long before they start. */
-    const val EVENT_LEAD_MS = 15 * 60_000L
-    /** All-day items remind in the morning of their day. */
-    private val ALL_DAY_AT: LocalTime = LocalTime.of(8, 0)
-
     /** When the reminder for [item] should fire, or null when it needs none. */
-    fun triggerAt(item: Item, zone: ZoneId = ZoneId.systemDefault()): Long? {
-        if (item.status != ItemStatus.OPEN) return null
-        if (item.type != ItemType.TASK && item.type != ItemType.EVENT) return null
-        val at = item.whenAt ?: return null
-        return when {
-            item.allDay -> Instant.ofEpochMilli(at).atZone(zone).toLocalDate().atTime(ALL_DAY_AT).atZone(zone).toInstant().toEpochMilli()
-            item.type == ItemType.EVENT -> at - EVENT_LEAD_MS
-            else -> at
-        }
-    }
+    fun triggerAt(item: Item, zone: ZoneId = ZoneId.systemDefault()): Long? = ReminderPolicy.triggerAt(item, zone)
 
     fun canExact(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
@@ -126,6 +112,19 @@ object Reminders {
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Database work must leave the main thread; goAsync keeps the process alive meanwhile.
+        val pending = goAsync()
+        val app = MyRecapApp.from(context)
+        app.appScope.launch {
+            try {
+                handle(context, intent)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun handle(context: Context, intent: Intent) {
         val items = MyRecapApp.from(context).items
         when (intent.action) {
             Reminders.ACTION_FIRE -> {

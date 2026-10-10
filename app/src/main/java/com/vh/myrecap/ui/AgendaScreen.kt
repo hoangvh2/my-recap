@@ -26,9 +26,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -41,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,6 +96,7 @@ fun AgendaTab(vm: AppViewModel) {
     var filterIndex by rememberSaveable { mutableStateOf(0) }
     var micDenied by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
+    val undo = rememberItemUndo(vm)
     val capture = rememberRecordAction(onDenied = { micDenied = true }) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         vm.startMemo()
@@ -117,6 +121,7 @@ fun AgendaTab(vm: AppViewModel) {
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(undo) },
         topBar = {
             TopAppBar(
                 title = {
@@ -126,6 +131,7 @@ fun AgendaTab(vm: AppViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = vm::openSearch) { Icon(Icons.Rounded.Search, contentDescription = "Tìm kiếm") }
                     IconButton(onClick = vm::openSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Cài đặt") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -480,6 +486,17 @@ private fun ExpenseView(expenses: List<Item>, vm: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
+                if (inMonth.isNotEmpty()) {
+                    val context = LocalContext.current
+                    TextButton(
+                        onClick = { Sharing.shareExpensesCsv(context, month.toString(), inMonth) },
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
+                        Icon(Icons.Rounded.FileDownload, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Xuất CSV")
+                    }
+                }
                 val byCategory = inMonth.groupBy { it.category ?: "Khác" }.mapValues { (_, l) -> l.sumOf { it.amount ?: 0 } }
                     .toList().sortedByDescending { it.second }
                 if (byCategory.isNotEmpty()) Spacer(Modifier.height(12.dp))

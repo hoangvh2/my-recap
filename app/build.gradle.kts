@@ -4,6 +4,7 @@ plugins {
     id("com.android.application") version "8.7.3"
     kotlin("android") version "2.0.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
 }
 
 // Release signing: CI passes a private keystore through env vars (GitHub secrets). Without them the
@@ -82,6 +83,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")

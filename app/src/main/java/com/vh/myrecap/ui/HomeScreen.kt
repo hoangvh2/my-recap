@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material3.Badge
@@ -191,6 +192,7 @@ private fun FoldersTab(vm: AppViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = vm::openSearch) { Icon(Icons.Rounded.Search, contentDescription = "Tìm kiếm") }
                     IconButton(onClick = vm::openSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Cài đặt") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

@@ -22,7 +22,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -159,4 +164,18 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, trailing: String? 
         Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         trailing?.let { Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
+}
+
+/** Snackbar host that offers "Hoàn tác" after an item is deleted or a proposal discarded. */
+@Composable
+fun rememberItemUndo(vm: AppViewModel): SnackbarHostState {
+    val host = remember { SnackbarHostState() }
+    val deleted = vm.lastDeletedItem
+    LaunchedEffect(deleted?.id) {
+        val item = deleted ?: return@LaunchedEffect
+        val label = if (item.status == ItemStatus.DRAFT) "Đã bỏ “${item.title}”" else "Đã xoá “${item.title}”"
+        val result = host.showSnackbar(label, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+        if (result == SnackbarResult.ActionPerformed) vm.undoDeleteItem(item) else vm.clearDeletedItem(item)
+    }
+    return host
 }
