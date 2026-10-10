@@ -491,10 +491,13 @@ private fun ShortcutRow() {
             if (canPinWidget) {
                 OutlinedButton(onClick = {
                     widgets?.requestPinAppWidget(ComponentName(context, CaptureWidget::class.java), null, null)
-                }) { Text("Thêm widget") }
+                }, modifier = Modifier.weight(1f)) { Text("Thêm widget", maxLines = 1) }
             }
             if (canAddTile) {
-                OutlinedButton(onClick = { if (Build.VERSION.SDK_INT >= 33) requestTile(context) }) { Text("Thêm vào cài đặt nhanh") }
+                OutlinedButton(
+                    onClick = { if (Build.VERSION.SDK_INT >= 33) requestTile(context) },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Nút cài đặt nhanh", maxLines = 1) }
             }
         }
     }
@@ -551,11 +554,16 @@ private fun BackupSection(vm: AppViewModel, s: AppSettings) {
     )
     SwitchRow("Kèm file ghi âm (tệp lớn hơn nhiều)", includeAudio) { includeAudio = it }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { createFile.launch(BackupManager.suggestedName()) }, enabled = busy == null) { Text("Sao lưu ngay") }
+        Button(
+            onClick = { createFile.launch(BackupManager.suggestedName()) },
+            enabled = busy == null,
+            modifier = Modifier.weight(1f),
+        ) { Text("Sao lưu ngay", maxLines = 1) }
         OutlinedButton(
             onClick = { openFile.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) },
             enabled = busy == null,
-        ) { Text("Khôi phục") }
+            modifier = Modifier.weight(1f),
+        ) { Text("Khôi phục", maxLines = 1) }
     }
     if (busy != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
