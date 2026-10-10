@@ -64,6 +64,21 @@ export function startFakeGemini(port = 8787) {
           licenses: [], updates: [],
         }));
       }
+      // A planned purchase filed only as an event, with no "licenses" (what the real model did): NEW declares the customer, KNOWN uses c1.
+      if (/FAKE_BUY_EVENT_NEW/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [{ key: "n1", name: "Chị Vân", contact: null, phone: null, email: null }],
+          items: [{ type: "event", title: "Mua license Windows Office", details: "", date: "2026-11-12", time: null, customer: "n1", license: null, quote: "Chị Vân muốn mua license Windows Office vào ngày 12 tháng 11 năm 2026." }],
+          licenses: [], updates: [],
+        }));
+      }
+      if (/FAKE_BUY_EVENT_KNOWN/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [],
+          items: [{ type: "event", title: "Mua license Windows Server", details: "", date: "2026-12-01", time: null, customer: "c1", license: null, quote: "Chị Vân muốn mua license Windows Server ngày 1/12/2026." }],
+          licenses: [], updates: [],
+        }));
+      }
       if (/FAKE_SALES_BAD/.test(text)) {
         return reply(JSON.stringify({
           customers: [],

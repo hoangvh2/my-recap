@@ -1,6 +1,6 @@
 import type { DateTime } from "luxon";
 import { formatDate, isIsoDate, isoDateIn, addDays, addMonths, parseDateLoose } from "../../shared/dates";
-import { STAGE_LABEL, STAGES, type Customer, type License, type LicenseKind, type Proposal, type Stage, type Item } from "../../shared/model";
+import { KIND_LABEL, STAGE_LABEL, STAGES, type Customer, type License, type LicenseKind, type Proposal, type Stage, type Item } from "../../shared/model";
 import { fold, matchByName } from "../../shared/text";
 import { LIMITS } from "./config";
 import { calendarLines, clean, cleanMultiline, itemFromRecord, str } from "./items";
@@ -114,7 +114,7 @@ export const SalesExtraction = {
       '- Mỗi mục có thể gắn "customer" (mã c1.. của khách đã có, hoặc "key" của khách mới khai báo trong "customers") và "license" (mã l1..).',
       "- Chỉ dùng mã có trong danh sách. Khách đã có trong danh sách thì dùng mã của họ, KHÔNG khai báo lại. Chỉ khai báo trong \"customers\" khi khách thật sự chưa có.",
       "- Tên khách là tên công ty hoặc đơn vị; \"contact\" là người liên hệ (anh Nam, chị Lan). Không bịa số điện thoại hay email.",
-      '- "licenses" chỉ dùng khi ghi chú nói khách MỚI MUA hoặc có license/bảo hành mới với ngày hết hạn (endDate dạng YYYY-MM-DD; nếu chỉ có thời hạn thì để endDate null và điền termMonths).',
+      '- "licenses" dùng khi khách ĐÃ MUA, SẼ MUA hoặc MUỐN MUA license/bảo hành/bảo trì/thuê bao (kể cả mua trong tương lai): product là tên sản phẩm (vd "Windows Office"), startDate là ngày mua/bắt đầu nếu có, endDate (YYYY-MM-DD) chỉ khi ghi chú nói ngày hết hạn, termMonths nếu nói thời hạn. Ngày mua KHÔNG phải ngày hết hạn. Đồng thời tạo task/event cho việc bán trong items, gắn cùng customer.',
       '- "updates" chỉ dùng khi ghi chú nói rõ tiến triển gia hạn của license ĐÃ CÓ: stage là asked (đã hỏi khách), quoted (đã gửi báo giá), contracting (đang làm/đã gửi hợp đồng), renewed (khách đồng ý/đã ký gia hạn), lost (khách không gia hạn; ghi lostReason nếu có). Có thể kèm value (giá gia hạn, số nguyên VND), endDate mới, note.',
       "- Việc theo dõi sau đó (gửi hợp đồng thứ 5, gọi lại thứ 2) thì tạo thêm một task trong items.",
       '- Khách có thể là cá nhân ("anh Khánh" → name "Khánh"). Ghi chú nhắc một khách chưa có trong danh sách thì PHẢI khai báo trong "customers" rồi gắn vào mục; đừng bỏ trống "customer".',
@@ -151,6 +151,9 @@ export const emptyBundle = (): ExtractionBundle => ({ items: [], customers: [], 
 export const bundleCount = (b: ExtractionBundle): number => b.items.length + b.customers.length + b.licenses.length + b.proposals.length;
 
 const MAX = { customers: 10, licenses: 10, updates: 10 } as const;
+/** Term assumed for a licence when only the purchase date is known; the owner sees it written on the draft. */
+const DEFAULT_TERM_MONTHS = 12;
+const ASSUMED_TERM_NOTE = "Chưa rõ thời hạn, tạm tính 12 tháng: kiểm tra lại ngày hết hạn";
 
 /** The JSON object in the model's reply, tolerating code fences and text around it. */
 export function jsonObject(raw: string): Record<string, unknown> | null {
@@ -247,7 +250,8 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     const m = /^c(\d+)$/.exec(r);
     if (m) return ctx.customers[Number(m[1]) - 1]?.id;
     if (keyToId.has(r)) return keyToId.get(r);
-    return matchByName(r, ctx.customers)?.id;
+    // The model sometimes names the customer instead of using its code: known ones first, then the ones it just declared.
+    return matchByName(r, ctx.customers)?.id ?? matchByName(r, out.customers)?.id;
   };
   type CtxLicense = CaptureContext["licenses"][number];
   const licenseRef = (ref: unknown): CtxLicense | undefined => {
@@ -258,7 +262,8 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
   const focusLicense = ctx.focus?.licenseId ? ctx.licenses.find((l) => l.id === ctx.focus!.licenseId) : undefined;
   const focusCustomerId = focusLicense?.customerId ?? ctx.focus?.customerId;
 
-  const renewals: Item[] = [];
+  // Items about selling or renewing a licence for a customer: each one must end up linked to a licence.
+  const licenceItems: { item: Item; intent: LicenceIntent }[] = [];
 
   // --- items, linked to a customer and licence when the note says which
   for (const rec of list(obj.items)) {
@@ -270,12 +275,14 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     const customerId = customerRef(rec.customer) ?? lic?.customerId ?? (named ? undefined : focusCustomerId);
     if (customerId) item.customerId = customerId;
     if (lic && (!customerId || lic.customerId === customerId)) item.licenseId = lic.id;
-    if (renewalNoteToTask(item, nameOf.get(item.customerId ?? ""))) renewals.push(item);
+    renewalNoteToTask(item, nameOf.get(item.customerId ?? ""));
+    const intent = item.type === "EXPENSE" || !item.customerId || item.licenseId ? null : licenceIntent(`${item.title} ${item.details} ${item.quote ?? ""}`);
+    if (intent) licenceItems.push({ item, intent });
     out.items.push(item);
   }
 
   // --- new licences
-  const noted: string[] = [];
+  const noted: { customerId: string; text: string }[] = [];
   for (const rec of list(obj.licenses).slice(0, MAX.licenses)) {
     const customerId = customerRef(rec.customer) ?? focusCustomerId;
     const product = clean(str(rec.product) ?? "", 120);
@@ -283,10 +290,15 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     const startDate = parseDateLoose(str(rec.startDate) ?? "") ?? undefined;
     const term = termOf(rec.termMonths);
     let endDate = parseDateLoose(str(rec.endDate) ?? "");
-    if (!endDate && startDate && term) endDate = addDays(addMonths(startDate, term), -1);
+    let assumed = false;
+    if (!endDate && startDate) {
+      // A purchase date with no term: software licences are sold by the year, so a year is assumed and said so.
+      assumed = !term;
+      endDate = addDays(addMonths(startDate, term ?? DEFAULT_TERM_MONTHS), -1);
+    }
     const who = nameOf.get(customerId) ?? "khách";
     if (!endDate) {
-      noted.push(`${product} của ${who}: chưa rõ ngày hết hạn, cần bổ sung`);
+      noted.push({ customerId, text: `${product} của ${who}: chưa rõ ngày hết hạn, cần bổ sung` });
       continue;
     }
     if (startDate && startDate > endDate) continue;
@@ -300,37 +312,15 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     };
     if (startDate) l.startDate = startDate;
     if (term) l.termMonths = term;
+    if (assumed) {
+      l.termMonths = DEFAULT_TERM_MONTHS;
+      l.note = ASSUMED_TERM_NOTE;
+    }
     const value = money(rec.value);
     if (value) l.value = value;
     const contractNo = clean(str(rec.contractNo) ?? "", 60);
     if (contractNo) l.contractNo = contractNo;
     out.licenses.push(l);
-  }
-  // An agreed renewal with a date but no licence on record: the licence is created too (as a draft), and the task points at it.
-  for (const task of renewals) {
-    const customerId = task.customerId!;
-    const have = out.licenses.find((l) => l.customerId === customerId);
-    if (have) {
-      task.licenseId = have.id;
-      continue;
-    }
-    const endDate = renewalEndDate(`${task.details} ${env.transcript ?? ""}`, nowMs, zone);
-    if (!endDate) continue;
-    const known = ctx.licenses.find((l) => l.customerId === customerId && l.endDate === endDate);
-    if (known) {
-      task.licenseId = known.id;
-      continue;
-    }
-    const l: License = {
-      id: newId(), customerId, status: "DRAFT", product: "License", kind: "LICENSE", endDate, stage: "ACTIVE",
-      stageAt: nowMs, sourceId: captureId, createdAt: nowMs, updatedAt: nowMs,
-    };
-    out.licenses.push(l);
-    task.licenseId = l.id;
-  }
-  for (const text of noted) {
-    if (out.items.length >= LIMITS.maxItems) break;
-    out.items.push({ id: newId(), type: "NOTE", status: "DRAFT", title: text.slice(0, 120), details: "", allDay: false, sourceId: captureId, createdAt: nowMs });
   }
 
   // --- changes to existing licences: proposals the owner applies with one tap
@@ -355,6 +345,65 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
       summary: summarize(patch, target, nameOf.get(target.customerId) ?? ""), createdAt: nowMs,
     });
   }
+
+  // A sale or renewal the model filed only as a task/event/note: the licence is drafted here, so it reaches "Gia hạn".
+  // The model is not trusted to fill "licenses"; the dates come from what was said.
+  for (const { item, intent } of licenceItems) {
+    const customerId = item.customerId!;
+    const have = out.licenses.find((l) => l.customerId === customerId);
+    if (have) {
+      item.licenseId = have.id;
+      continue;
+    }
+    const text = `${item.title} ${item.details} ${item.quote ?? ""}`;
+    const said = `${text} ${env.transcript ?? ""}`;
+    // Field by field, so a name never runs on into the next field.
+    const named = [item.title, item.details, item.quote ?? "", env.transcript ?? ""].map(productFrom).find((p) => p?.product) ??
+      productFrom(text);
+    const kind = named?.kind ?? "LICENSE";
+    const product = named?.product ?? KIND_LABEL[kind];
+    const sameProduct = (l: CtxLicense) => l.customerId === customerId && (!named?.product || fold(l.product) === fold(product));
+    let startDate: string | undefined;
+    let endDate = renewalEndDate(said, nowMs, zone, intent === "buy");
+    let assumed = false;
+    if (intent === "renew") {
+      // A renewal the model already turned into a proposal belongs to that licence, not to a new one.
+      const proposed = out.proposals.find((p) => p.customerId === customerId);
+      if (proposed) {
+        item.licenseId = proposed.licenseId;
+        continue;
+      }
+    } else if (!endDate) {
+      startDate = item.whenAt !== undefined ? isoDateIn(item.whenAt, zone) : startDateFrom(said, nowMs, zone) ?? undefined;
+      if (startDate) {
+        endDate = addDays(addMonths(startDate, DEFAULT_TERM_MONTHS), -1);
+        assumed = true;
+      }
+    }
+    if (!endDate) continue;
+    const known = ctx.licenses.find((l) => sameProduct(l) && l.endDate === endDate);
+    if (known) {
+      item.licenseId = known.id;
+      continue;
+    }
+    const l: License = {
+      id: newId(), customerId, status: "DRAFT", product, kind, endDate, stage: "ACTIVE",
+      stageAt: nowMs, sourceId: captureId, createdAt: nowMs, updatedAt: nowMs,
+    };
+    if (startDate) l.startDate = startDate;
+    if (assumed) {
+      l.termMonths = DEFAULT_TERM_MONTHS;
+      l.note = ASSUMED_TERM_NOTE;
+    }
+    out.licenses.push(l);
+    item.licenseId = l.id;
+  }
+  for (const { customerId, text } of noted) {
+    if (out.items.length >= LIMITS.maxItems) break;
+    if (out.licenses.some((l) => l.customerId === customerId)) continue;
+    out.items.push({ id: newId(), type: "NOTE", status: "DRAFT", title: text.slice(0, 120), details: "", allDay: false, sourceId: captureId, createdAt: nowMs });
+  }
+
   return out;
 }
 
@@ -374,24 +423,96 @@ function renewalNoteToTask(item: Item, customer: string | undefined): boolean {
   return true;
 }
 
+type LicenceIntent = "renew" | "buy";
+
+const LICENCE_WORDS = /\b(license|licence|lisence|ban quyen|phan mem|bao hanh|bao tri|thue bao|subscription)\b/;
+const BUY_WORDS = /\b(mua|dat mua|dat hang|dang ky|order|ky hop dong|chot don)\b/;
+
+/**
+ * Whether an item is about a customer renewing ("đồng ý gia hạn") or buying a licence ("muốn mua license
+ * Windows Office ngày 12/11"). Either way the owner expects a licence in "Gia hạn", whatever type the model chose.
+ */
+export function licenceIntent(text: string): LicenceIntent | null {
+  const f = fold(text);
+  if (RENEWAL_WORDS.test(f)) return "renew";
+  if (BUY_WORDS.test(f) && LICENCE_WORDS.test(f)) return "buy";
+  return null;
+}
+
+const PRODUCT_HEAD = /(license|licence|lisence|bản quyền|phần mềm|bảo hành|bảo trì|thuê bao|subscription)/iu;
+const PRODUCT_STOP = new Set([
+  "vao", "cho", "den", "toi", "tu", "ngay", "het", "trong", "cua", "voi", "khi", "thi", "de", "nhe", "nha", "a", "va",
+  "moi", "thang", "nam", "nua", "roi", "luon", "sau", "truoc", "nay", "do", "o", "tai", "la", "se", "da", "dang", "can",
+]);
+
+/** "mua license Windows Office vào ngày…" → { product: "Windows Office", kind: LICENSE }; no name after the word → product undefined. */
+export function productFrom(text: string): { product?: string; kind: LicenseKind } | null {
+  const t = text.normalize("NFC");
+  const m = PRODUCT_HEAD.exec(t);
+  if (!m) return null;
+  const words: string[] = [];
+  for (const raw of t.slice(m.index + m[0].length).split(/\s+/).filter(Boolean)) {
+    const word = raw.replace(/^["“'(]+/u, "").replace(/["”'),.;:!?]+$/u, "");
+    if (!word || PRODUCT_STOP.has(fold(word)) || /[/]/.test(word) || /^\d+$/.test(word) && words.length === 0) break;
+    words.push(word);
+    if (word !== raw.replace(/^["“'(]+/u, "") || words.length >= 6) break; // punctuation ends the name
+  }
+  const product = clean(words.join(" "), 120);
+  return { kind: kindFrom(m[1]), ...(product ? { product } : {}) };
+}
+
+const END_MARKER = /(?:^|\s)(?:den|toi|het han|han den|han toi|until)\s+/;
+
 /**
  * "đến 12/2027", "đến 31/12/2027", "đến tháng 12 năm 2027", "đến năm 2027": the day the renewed licence ends.
  * A month means its last day, a bare year means 31 December. Dates already in the past are ignored.
+ * With `explicitOnly` only a date after "đến / tới / hết hạn" counts (a purchase date is not an end date).
  */
-export function renewalEndDate(text: string, nowMs: number, zone: string): string | null {
-  const t = text.normalize("NFC");
+export function renewalEndDate(text: string, nowMs: number, zone: string, explicitOnly = false): string | null {
+  let t = fold(text);
+  if (explicitOnly) {
+    const m = END_MARKER.exec(t);
+    if (!m) return null;
+    t = t.slice(m.index + m[0].length);
+  }
   const today = isoDateIn(nowMs, zone);
-  const monthYear = /th(?:á|a)ng\s+(\d{1,2})\s+n(?:ă|a)m\s+(\d{4})/i.exec(t);
+  const dayMonthYear = /(\d{1,2})\s+thang\s+(\d{1,2})\s+nam\s+(\d{4})/.exec(t);
+  const monthYear = /thang\s+(\d{1,2})\s+nam\s+(\d{4})/.exec(t);
   const found =
+    (dayMonthYear ? `${dayMonthYear[1]}/${dayMonthYear[2]}/${dayMonthYear[3]}` : null) ??
     /(\d{1,2}[/.-]\d{1,2}[/.-]\d{4})/.exec(t)?.[1] ??
     /(\d{1,2}[/.-]\d{4})/.exec(t)?.[1] ??
     (monthYear ? `${monthYear[1]}/${monthYear[2]}` : null);
   let date = found ? parseDateLoose(found) : null;
   if (!date) {
-    const year = /n(?:ă|a)m\s+(20\d{2})/i.exec(t)?.[1];
+    const year = /nam\s+(20\d{2})/.exec(t)?.[1];
     if (year) date = `${year}-12-31`;
   }
   return date && date >= today ? date : null;
+}
+
+/**
+ * The day a purchase happens: "ngày 12 tháng 11 năm 2026", "12/11/2026", "ngày 12/11". Without a year it is
+ * the next such day from today.
+ */
+export function startDateFrom(text: string, nowMs: number, zone: string): string | null {
+  const t = fold(text);
+  const today = isoDateIn(nowMs, zone);
+  const spoken = /(\d{1,2})\s+thang\s+(\d{1,2})(?:\s+nam\s+(\d{4}))?/.exec(t);
+  const full = /(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/.exec(t);
+  const short = /ngay\s+(\d{1,2})[/.-](\d{1,2})(?![/.\-\d])/.exec(t);
+  const m = spoken ?? full ?? short;
+  if (!m) return null;
+  const [d, mo] = [Number(m[1]), Number(m[2])];
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (m[3]) {
+    const iso = `${m[3]}-${pad(mo)}-${pad(d)}`;
+    return isIsoDate(iso) ? iso : null;
+  }
+  const year = Number(today.slice(0, 4));
+  const iso = `${year}-${pad(mo)}-${pad(d)}`;
+  if (!isIsoDate(iso)) return null;
+  return iso >= today ? iso : `${year + 1}-${pad(mo)}-${pad(d)}`;
 }
 
 /** A plain sentence describing a proposal, written here so the model's own words never reach the screen as a claim. */

@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { CONTEXT_LIMITS, EMPTY_CONTEXT, parseContext, parseSalesExtraction, renewalEndDate, SalesExtraction, type CaptureContext } from "../src/sales";
+import { CONTEXT_LIMITS, EMPTY_CONTEXT, licenceIntent, parseContext, parseSalesExtraction, productFrom, renewalEndDate, SalesExtraction, startDateFrom, type CaptureContext } from "../src/sales";
 
 const zone = "Asia/Ho_Chi_Minh";
 const NOW = Date.UTC(2026, 9, 10, 7, 0, 0);
@@ -247,5 +247,108 @@ describe("renewalEndDate", () => {
   it("ignores nothing-dates and dates in the past", () => {
     expect(f("đồng ý gia hạn")).toBeNull();
     expect(f("gia hạn đến 12/2020")).toBeNull();
+  });
+});
+
+describe("a sale or renewal the model filed without a licence", () => {
+  const van: CaptureContext = { customers: [{ id: "cus_van", name: "Chị Vân" }], licenses: [] };
+  const said = "Chị Vân muốn mua license Windows Office vào ngày 12 tháng 11 năm 2026.";
+
+  it("drafts the licence for a purchase filed as an event (the reported case), dated from the purchase day", () => {
+    const b = parse({ items: [{ type: "event", title: "Mua license Windows Office", date: "2026-11-12", customer: "c1", quote: said }], licenses: [] }, van, said)!;
+    expect(b.licenses).toHaveLength(1);
+    expect(b.licenses[0]).toMatchObject({
+      customerId: "cus_van", status: "DRAFT", product: "Windows Office", kind: "LICENSE", startDate: "2026-11-12",
+      endDate: "2027-11-11", termMonths: 12, stage: "ACTIVE", sourceId: "cap",
+    });
+    expect(b.licenses[0].note).toContain("12 tháng");
+    expect(b.items).toHaveLength(1);
+    expect(b.items[0]).toMatchObject({ type: "EVENT", customerId: "cus_van", licenseId: b.licenses[0].id });
+  });
+
+  it("reads the purchase day from the words when the item has no date, and works for a new customer", () => {
+    const b = parse(
+      { customers: [{ key: "n1", name: "Vân" }], items: [{ type: "task", title: "Bán license Windows Office cho chị Vân", details: "chị Vân muốn mua", customer: "n1" }] },
+      EMPTY_CONTEXT, said,
+    )!;
+    expect(b.customers).toHaveLength(1);
+    expect(b.licenses[0]).toMatchObject({ customerId: b.customers[0].id, product: "Windows Office", startDate: "2026-11-12", endDate: "2027-11-11" });
+    expect(b.items[0].licenseId).toBe(b.licenses[0].id);
+  });
+
+  it("uses an end date when one is said, and never takes the purchase day for it", () => {
+    const t = "Chị Vân mua bảo hành server ngày 12/11/2026, hết hạn 31/12/2027";
+    const b = parse({ items: [{ type: "task", title: "Làm hợp đồng bảo hành server", details: t, customer: "c1" }] }, van, t)!;
+    expect(b.licenses[0]).toMatchObject({ product: "server", kind: "WARRANTY", endDate: "2027-12-31" });
+    expect(b.licenses[0].note).toBeUndefined();
+  });
+
+  it("keeps a licence the model drafted with only a purchase date (a year is assumed), instead of a 'chưa rõ' note", () => {
+    const b = parse({
+      items: [{ type: "event", title: "Mua license Windows Office", date: "2026-11-12", customer: "c1" }],
+      licenses: [{ customer: "Chị Vân", product: "Windows Office", startDate: "2026-11-12", endDate: null, termMonths: null }],
+    }, van, said)!;
+    expect(b.licenses).toHaveLength(1);
+    expect(b.licenses[0]).toMatchObject({ customerId: "cus_van", startDate: "2026-11-12", endDate: "2027-11-11", termMonths: 12 });
+    expect(b.items.filter((i) => i.type === "NOTE")).toHaveLength(0);
+    expect(b.items[0].licenseId).toBe(b.licenses[0].id);
+  });
+
+  it("finds a new customer the model referred to by name rather than by key", () => {
+    const b = parse({
+      customers: [{ key: "n1", name: "Công ty Delta" }],
+      licenses: [{ customer: "Delta", product: "ERP", endDate: "2027-06-30" }],
+    }, EMPTY_CONTEXT)!;
+    expect(b.licenses).toHaveLength(1);
+    expect(b.licenses[0].customerId).toBe(b.customers[0].id);
+  });
+
+  it("links to the licence already on record instead of drafting it twice", () => {
+    const known: CaptureContext = { customers: van.customers, licenses: [{ id: "lic_v", customerId: "cus_van", product: "Windows Office", endDate: "2027-11-11", stage: "ACTIVE" }] };
+    const b = parse({ items: [{ type: "event", title: "Mua license Windows Office", date: "2026-11-12", customer: "c1" }] }, known, said)!;
+    expect(b.licenses).toHaveLength(0);
+    expect(b.items[0].licenseId).toBe("lic_v");
+  });
+
+  it("drafts nothing when there is no date, no sale, no customer, or the item is an expense", () => {
+    const noDate = parse({ items: [{ type: "task", title: "Bán license Windows Office", details: "chị Vân muốn mua", customer: "c1" }] }, van, "Chị Vân muốn mua license Windows Office")!;
+    expect(noDate.licenses).toHaveLength(0);
+    const askOnly = parse({ items: [{ type: "task", title: "Hỏi chị Vân về license Windows", date: "2026-11-12", customer: "c1" }] }, van, "hỏi chị Vân về license")!;
+    expect(askOnly.licenses).toHaveLength(0);
+    const nobody = parse({ items: [{ type: "event", title: "Mua license Windows Office", date: "2026-11-12" }] }, van, said)!;
+    expect(nobody.licenses).toHaveLength(0);
+    const spent = parse({ items: [{ type: "expense", title: "Mua license Windows", amount: 2000000, date: "2026-10-10", customer: "c1" }] }, van, "mua license Windows 2 triệu")!;
+    expect(spent.licenses).toHaveLength(0);
+  });
+
+  it("does not draft a second licence for a renewal the model already proposed on the existing one", () => {
+    const t = "Anh Nam đồng ý gia hạn đến 12/2027";
+    const b = parse({ items: [{ type: "task", title: "Gửi hợp đồng gia hạn", details: t, customer: "c1" }], updates: [{ license: "l1", stage: "renewed" }] }, ctx, t)!;
+    expect(b.licenses).toHaveLength(0);
+    expect(b.proposals).toHaveLength(1);
+    expect(b.items[0].licenseId).toBe("lic_1");
+  });
+
+  it("tells the model a planned purchase is a licence and its date is not the end date", () => {
+    const p = SalesExtraction.userMessage("x", DateTime.fromMillis(NOW, { zone }), van);
+    expect(p).toContain("MUỐN MUA");
+    expect(p).toContain("Ngày mua KHÔNG phải ngày hết hạn");
+  });
+});
+
+describe("licence words", () => {
+  it("reads the product and the date of a purchase", () => {
+    expect(productFrom("Mua license Windows Office vào ngày 12/11")).toEqual({ product: "Windows Office", kind: "LICENSE" });
+    expect(productFrom("gia hạn license đến 12/2027")).toEqual({ kind: "LICENSE" });
+    expect(productFrom("mua Office 365, giao tuần sau")).toBeNull();
+    expect(productFrom("mua bản quyền Office 365, giao tuần sau")).toEqual({ product: "Office 365", kind: "LICENSE" });
+    expect(startDateFrom("ngày 12 tháng 11 năm 2026", NOW, zone)).toBe("2026-11-12");
+    expect(startDateFrom("mua ngày 5/3", NOW, zone)).toBe("2027-03-05");
+    expect(startDateFrom("mua sớm", NOW, zone)).toBeNull();
+    expect(renewalEndDate("mua ngày 12 tháng 11 năm 2026", NOW, zone, true)).toBeNull();
+    expect(renewalEndDate("gia hạn đến ngày 15 tháng 3 năm 2027", NOW, zone)).toBe("2027-03-15");
+    expect(licenceIntent("Chị Vân muốn mua license Windows Office")).toBe("buy");
+    expect(licenceIntent("Hỏi chị Vân về license")).toBeNull();
+    expect(licenceIntent("Anh Nam đồng ý gia hạn")).toBe("renew");
   });
 });
