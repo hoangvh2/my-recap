@@ -18,6 +18,14 @@ enum class ItemType(val label: String) {
     NOTE("Ghi chú"),
 }
 
+/** How a task or appointment repeats. */
+enum class Recurrence(val label: String) {
+    DAILY("Hằng ngày"),
+    WEEKDAYS("Ngày làm việc"),
+    WEEKLY("Hằng tuần"),
+    MONTHLY("Hằng tháng"),
+}
+
 /** DRAFT items were proposed by the AI and wait for the user's confirmation; nothing else counts them. */
 enum class ItemStatus { DRAFT, OPEN, DONE }
 
@@ -45,6 +53,8 @@ data class Item(
     val quote: String? = null,
     val createdAt: Long = 0,
     val doneAt: Long? = null,
+    /** Tasks and appointments only; needs [whenAt]. */
+    val recurrence: Recurrence? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -62,6 +72,7 @@ data class Item(
         .putOpt("quote", quote)
         .put("createdAt", createdAt)
         .putOpt("doneAt", doneAt)
+        .putOpt("recurrence", recurrence?.name)
 
     companion object {
         fun fromJson(o: JSONObject) = Item(
@@ -80,6 +91,7 @@ data class Item(
             quote = o.optStringOrNull("quote"),
             createdAt = o.optLong("createdAt", 0),
             doneAt = o.optLongOrNull("doneAt"),
+            recurrence = o.optStringOrNull("recurrence")?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
         )
     }
 }
@@ -115,13 +127,17 @@ object ItemExtraction {
         appendLine("  category là một trong: ${EXPENSE_CATEGORIES.joinToString(", ")}.")
         appendLine("- note: ý tưởng, thông tin cần nhớ, không thuộc 3 loại trên.")
         appendLine("Một ghi chú có thể chứa nhiều mục. Không tạo mục trùng nhau.")
+        appendLine(
+            "Việc/lịch lặp lại (\"mỗi sáng\", \"thứ 2 hằng tuần\", \"ngày 5 hằng tháng\"): repeat là daily, weekdays, " +
+                "weekly hoặc monthly, và date là lần gần nhất sắp tới; không lặp thì repeat null.",
+        )
         appendLine("Giờ nói kiểu Việt: \"3h chiều\" = 15:00, \"8 giờ tối\" = 20:00, \"sáng mai\" không rõ giờ thì để time null.")
         appendLine()
         appendLine("Định dạng:")
         appendLine(
             """{"items":[{"type":"task|event|expense|note","title":"ngắn gọn, ≤ 10 từ","details":"chi tiết thêm hoặc chuỗi rỗng",""" +
                 """"date":"YYYY-MM-DD hoặc null","time":"HH:mm hoặc null","amount":null,"category":null,"place":null,""" +
-                """"person":null,"quote":"câu gốc trong ghi chú"}]}""",
+                """"person":null,"repeat":null,"quote":"câu gốc trong ghi chú"}]}""",
         )
         appendLine("Nếu không có gì cần lưu, trả về {\"items\":[]}.")
         appendLine()
@@ -193,6 +209,7 @@ object ItemExtraction {
                 sourceId = sourceId,
                 quote = o.optStringOrNull("quote")?.trim()?.ifEmpty { null },
                 createdAt = now,
+                recurrence = if ((type == ItemType.TASK || type == ItemType.EVENT) && whenAt != null) parseRecurrence(o.optStringOrNull("repeat")) else null,
             )
         }
         return items
@@ -213,6 +230,14 @@ object ItemExtraction {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun parseRecurrence(s: String?): Recurrence? = when (s?.lowercase(Locale.ROOT)?.trim()) {
+        "daily", "everyday" -> Recurrence.DAILY
+        "weekdays", "workdays" -> Recurrence.WEEKDAYS
+        "weekly" -> Recurrence.WEEKLY
+        "monthly" -> Recurrence.MONTHLY
+        else -> null
     }
 
     private fun parseDate(s: String): LocalDate? = try {

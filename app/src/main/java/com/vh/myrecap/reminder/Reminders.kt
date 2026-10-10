@@ -56,7 +56,9 @@ object Reminders {
 
     /** After boot, a time change or an app update, alarms are gone: set them again. */
     fun syncAll(context: Context) {
-        MyRecapApp.from(context).items.list().forEach { sync(context, it) }
+        val items = MyRecapApp.from(context).items
+        items.rollRecurring()
+        items.list().forEach { sync(context, it) }
     }
 
     private fun alarmIntent(context: Context, itemId: String): PendingIntent = PendingIntent.getBroadcast(
@@ -78,7 +80,12 @@ object Reminders {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val text = listOfNotNull(ItemText.whenText(item, ZoneId.systemDefault()), item.place, item.details.ifBlank { null })
+        val text = listOfNotNull(
+            ItemText.whenText(item, ZoneId.systemDefault()),
+            item.recurrence?.label,
+            item.place,
+            item.details.ifBlank { null },
+        )
             .joinToString(" · ")
         val builder = NotificationCompat.Builder(context, MyRecapApp.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_mic)
@@ -129,12 +136,17 @@ class ReminderReceiver : BroadcastReceiver() {
         when (intent.action) {
             Reminders.ACTION_FIRE -> {
                 val item = intent.getStringExtra(Reminders.EXTRA_ITEM)?.let { items.get(it) } ?: return
-                if (item.status == ItemStatus.OPEN) Reminders.notify(context, item)
+                if (item.status == ItemStatus.OPEN) {
+                    Reminders.notify(context, item)
+                    // A repeating appointment chains to its next occurrence.
+                    if (item.recurrence != null) Reminders.sync(context, item)
+                }
             }
             Reminders.ACTION_DONE -> {
                 val id = intent.getStringExtra(Reminders.EXTRA_ITEM) ?: return
-                items.update(id) { it.copy(status = ItemStatus.DONE, doneAt = System.currentTimeMillis()) }
+                val next = items.complete(id)?.second
                 Reminders.cancel(context, id)
+                next?.let { Reminders.sync(context, it) } // a repeating task comes back for its next date
             }
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED, AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,

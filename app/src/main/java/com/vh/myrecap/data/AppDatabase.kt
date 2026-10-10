@@ -11,6 +11,9 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.Upsert
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.vh.myrecap.core.Recurrence
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
@@ -39,6 +42,8 @@ data class ItemEntity(
     val createdAt: Long,
     val doneAt: Long?,
     val search: String,
+    /** Added in schema 2. */
+    val recurrence: String? = null,
 ) {
     fun toItem() = Item(
         id = id,
@@ -56,6 +61,7 @@ data class ItemEntity(
         quote = quote,
         createdAt = createdAt,
         doneAt = doneAt,
+        recurrence = recurrence?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
     )
 
     companion object {
@@ -75,6 +81,7 @@ data class ItemEntity(
             quote = item.quote,
             createdAt = item.createdAt,
             doneAt = item.doneAt,
+            recurrence = item.recurrence?.name,
             search = TextSearch.fold(listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote).joinToString(" ")),
         )
     }
@@ -113,6 +120,9 @@ abstract class ItemDao {
     @Query("SELECT COUNT(*) FROM items")
     abstract fun count(): Int
 
+    @Query("SELECT * FROM items WHERE recurrence IS NOT NULL AND status = 'OPEN'")
+    abstract fun openRecurring(): List<ItemEntity>
+
     @Transaction
     open fun replaceDrafts(sourceId: String, drafts: List<ItemEntity>) {
         deleteDrafts(sourceId)
@@ -127,13 +137,20 @@ abstract class ItemDao {
  * Schema changes must add a [androidx.room.migration.Migration]; there is deliberately no
  * destructive fallback, so a missing migration fails loudly instead of wiping the user's data.
  */
-@Database(entities = [ItemEntity::class], version = 1, exportSchema = false)
+@Database(entities = [ItemEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun items(): ItemDao
 
     companion object {
+        /** v2: repeating tasks and appointments. */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN recurrence TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = "myrecap.db"): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
 
         /** For tests. */
         fun inMemory(context: Context): AppDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()

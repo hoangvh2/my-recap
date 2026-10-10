@@ -90,6 +90,7 @@ fun isOverdue(item: Item, now: Long = System.currentTimeMillis()): Boolean {
 /** Secondary line of an item row. */
 fun itemSubtitle(item: Item): String = listOfNotNull(
     if (item.type == ItemType.EXPENSE) item.category else whenLabel(item),
+    item.recurrence?.label?.lowercase()?.let { "lặp $it" },
     if (item.type == ItemType.EXPENSE) whenLabel(item)?.substringBefore(" · ") else null,
     item.place,
     item.person.takeIf { item.type == ItemType.EVENT },

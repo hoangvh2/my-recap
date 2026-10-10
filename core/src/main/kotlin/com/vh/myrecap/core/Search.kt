@@ -73,15 +73,26 @@ object ReminderPolicy {
     /** All-day items remind at this hour of their day. */
     const val ALL_DAY_HOUR = 8
 
-    fun triggerAt(item: Item, zone: java.time.ZoneId): Long? {
+    /**
+     * For a repeating appointment, the reminder of its next occurrence still ahead of [now], so the
+     * alarm chain continues even before the stored date is rolled forward.
+     */
+    fun triggerAt(item: Item, zone: java.time.ZoneId, now: Long = System.currentTimeMillis()): Long? {
         if (item.status != ItemStatus.OPEN) return null
         if (item.type != ItemType.TASK && item.type != ItemType.EVENT) return null
-        val at = item.whenAt ?: return null
-        return when {
-            item.allDay -> java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
-                .atTime(ALL_DAY_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
-            item.type == ItemType.EVENT -> at - EVENT_LEAD_MS
-            else -> at
+        var at = item.whenAt ?: return null
+        val rule = item.recurrence
+        if (rule != null && item.type == ItemType.EVENT) {
+            var steps = 0
+            while (trigger(item, at, zone) <= now && steps++ < 5_000) at = Schedule.next(at, rule, zone)
         }
+        return trigger(item, at, zone)
+    }
+
+    private fun trigger(item: Item, at: Long, zone: java.time.ZoneId): Long = when {
+        item.allDay -> java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
+            .atTime(ALL_DAY_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
+        item.type == ItemType.EVENT -> at - EVENT_LEAD_MS
+        else -> at
     }
 }

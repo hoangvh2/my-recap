@@ -24,7 +24,7 @@ import java.util.UUID
  */
 data class StorageStats(val audioBytes: Long, val otherBytes: Long)
 
-class SessionStore(private val root: File) {
+class SessionStore(val root: File) {
     private val lock = Any()
     private val _version = MutableStateFlow(0L)
 
@@ -36,6 +36,11 @@ class SessionStore(private val root: File) {
     }
 
     fun dir(id: String) = File(root, id)
+
+    /** Tells observers to reload after folders were added on disk (restore). */
+    fun refresh() {
+        _version.value++
+    }
 
     fun create(mode: SessionMode, title: String): Session {
         val now = System.currentTimeMillis()

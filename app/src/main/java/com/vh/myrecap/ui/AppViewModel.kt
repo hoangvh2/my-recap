@@ -8,6 +8,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vh.myrecap.MyRecapApp
 import androidx.compose.runtime.mutableStateListOf
+import com.vh.myrecap.backup.BackupManager
+import com.vh.myrecap.backup.BackupResult
+import com.vh.myrecap.backup.RestoreResult
+import com.vh.myrecap.core.BackupException
 import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
@@ -141,6 +145,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onResume() {
         _resumeTick.value++
+        // Repeating appointments that are over move to their next date (and keep reminding).
+        io { app.items.rollRecurring().forEach { Reminders.sync(app, it) } }
     }
 
     private fun push(target: Screen) {
@@ -316,11 +322,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         Reminders.sync(app, item)
     }
 
-    fun setDone(id: String, done: Boolean) = io {
-        app.items.update(id) {
-            if (done) it.copy(status = ItemStatus.DONE, doneAt = System.currentTimeMillis()) else it.copy(status = ItemStatus.OPEN, doneAt = null)
-        }?.let { Reminders.sync(app, it) }
-        if (done) Reminders.cancel(app, id)
+    fun setDone(id: String, done: Boolean) = io { applyDone(id, done) }
+
+    /** Saves edits and completes (or reopens) in order, so the next instance of a repeating task carries the edits. */
+    fun saveAndSetDone(item: Item, done: Boolean) = io {
+        app.items.upsert(item)
+        applyDone(item.id, done)
+    }
+
+    private fun applyDone(id: String, done: Boolean) {
+        if (done) {
+            val (_, next) = app.items.complete(id) ?: return
+            Reminders.cancel(app, id)
+            next?.let { Reminders.sync(app, it) }
+        } else {
+            app.items.update(id) { it.copy(status = ItemStatus.OPEN, doneAt = null) }?.let { Reminders.sync(app, it) }
+        }
     }
 
     /** Last item deleted from the UI; screens offer Undo for a few seconds. */
@@ -379,6 +396,57 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             m.copy(segments = m.segments.map { it.copy(stt = TaskStatus.DONE, error = null) }, extract = TaskStatus.PENDING, error = null)
         }
         Processing.enqueue(app, id)
+    }
+
+    // ---- Backup ----
+
+    /** What the backup screen is doing right now ("Đang sao lưu…"), or null when idle. */
+    var backupBusy by mutableStateOf<String?>(null)
+        private set
+
+    suspend fun backupTo(uri: android.net.Uri, includeAudio: Boolean): kotlin.Result<BackupResult> {
+        backupBusy = "Đang sao lưu…"
+        return try {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    app.contentResolver.openOutputStream(uri, "wt")?.use { BackupManager(app).export(it, includeAudio) }
+                        ?: throw BackupException("Không mở được tệp để ghi")
+                }
+            }
+        } finally {
+            backupBusy = null
+        }
+    }
+
+    suspend fun restoreFrom(uri: android.net.Uri): kotlin.Result<RestoreResult> {
+        backupBusy = "Đang khôi phục…"
+        return try {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    app.contentResolver.openInputStream(uri)?.use { BackupManager(app).restore(it) }
+                        ?: throw BackupException("Không mở được tệp sao lưu")
+                }
+            }
+        } finally {
+            backupBusy = null
+        }
+    }
+
+    fun enableAutoBackup(treeUri: android.net.Uri) = io { BackupManager.enableAuto(app, treeUri) }
+    fun disableAutoBackup() = io { BackupManager.disableAuto(app) }
+
+    /** Runs the weekly backup right away (to check the folder works). */
+    suspend fun autoBackupNow(): kotlin.Result<String> {
+        backupBusy = "Đang sao lưu…"
+        return try {
+            withContext(Dispatchers.IO) {
+                runCatching { BackupManager(app).autoBackup() }
+                    .onSuccess { app.settings.update { s -> s.copy(autoBackupError = "") } }
+                    .onFailure { e -> app.settings.update { s -> s.copy(autoBackupError = e.message ?: "Sao lưu thất bại") } }
+            }
+        } finally {
+            backupBusy = null
+        }
     }
 
     // ---- Search ----

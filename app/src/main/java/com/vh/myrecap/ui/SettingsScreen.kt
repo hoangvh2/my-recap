@@ -4,6 +4,14 @@ import android.app.StatusBarManager
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.width
+import androidx.documentfile.provider.DocumentFile
+import com.vh.myrecap.backup.BackupManager
 import android.graphics.drawable.Icon as SystemIcon
 import com.vh.myrecap.widget.CaptureWidget
 import com.vh.myrecap.widget.QuickCaptureTile
@@ -15,7 +23,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
@@ -190,6 +197,10 @@ fun SettingsScreen(vm: AppViewModel) {
                 StorageCard(vm)
                 ExactAlarmRow(vm)
                 ShortcutRow()
+            }
+
+            Section("6. Sao lưu & khôi phục") {
+                BackupSection(vm, s)
             }
 
             val usesGemini = s.sttProvider == ProviderKind.GEMINI || s.summaryProvider == ProviderKind.GEMINI
@@ -497,4 +508,116 @@ private fun requestTile(context: android.content.Context) {
         SystemIcon.createWithResource(context, com.vh.myrecap.R.drawable.ic_tile_mic),
         context.mainExecutor,
     ) { }
+}
+
+/**
+ * Manual backup to a file the user places anywhere (Drive, Downloads…), restore that merges, and a
+ * weekly automatic backup into a chosen folder.
+ */
+@Composable
+private fun BackupSection(vm: AppViewModel, s: AppSettings) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var includeAudio by remember { mutableStateOf(false) }
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    var message by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val busy = vm.backupBusy
+
+    val createFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                vm.backupTo(uri, includeAudio)
+                    .onSuccess { r ->
+                        message = "Đã sao lưu" to "${r.items} mục, ${r.sessions} folder/ghi nhanh · ${formatBytes(r.bytes)}." +
+                            if (includeAudio) "" else " Không kèm file ghi âm."
+                    }
+                    .onFailure { e -> message = "Sao lưu thất bại" to (e.message ?: e.javaClass.simpleName) }
+            }
+        }
+    }
+    val openFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> restoreUri = uri }
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) vm.enableAutoBackup(uri)
+    }
+
+    Hint(
+        "Gồm việc, lịch, chi tiêu, ghi chú, lời ghi nhanh, transcript và tóm tắt. Không gồm API key. " +
+            "Lưu tệp vào Google Drive để không mất dữ liệu khi đổi máy.",
+    )
+    Text(
+        if (s.lastBackupAt > 0) "Lần sao lưu gần nhất: ${formatDate(s.lastBackupAt)}" else "Chưa sao lưu lần nào",
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    SwitchRow("Kèm file ghi âm (tệp lớn hơn nhiều)", includeAudio) { includeAudio = it }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { createFile.launch(BackupManager.suggestedName()) }, enabled = busy == null) { Text("Sao lưu ngay") }
+        OutlinedButton(
+            onClick = { openFile.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) },
+            enabled = busy == null,
+        ) { Text("Khôi phục") }
+    }
+    if (busy != null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(10.dp))
+            Text(busy, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+
+    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+    val autoOn = s.autoBackupUri.isNotBlank()
+    SwitchRow("Tự động sao lưu hằng tuần", autoOn) { on -> if (on) pickFolder.launch(null) else vm.disableAutoBackup() }
+    if (autoOn) {
+        val folderName = remember(s.autoBackupUri) {
+            runCatching { DocumentFile.fromTreeUri(context, Uri.parse(s.autoBackupUri))?.name }.getOrNull() ?: "thư mục đã chọn"
+        }
+        Hint("Vào “$folderName”, không kèm ghi âm, giữ ${BackupManager.KEEP_AUTO} bản gần nhất.")
+        if (s.autoBackupError.isNotBlank()) {
+            Text("Lần trước lỗi: ${s.autoBackupError}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                scope.launch {
+                    vm.autoBackupNow()
+                        .onSuccess { name -> message = "Đã sao lưu" to "Đã tạo $name trong “$folderName”." }
+                        .onFailure { e -> message = "Sao lưu thất bại" to (e.message ?: e.javaClass.simpleName) }
+                }
+            }, enabled = busy == null) { Text("Chạy thử ngay") }
+            TextButton(onClick = { pickFolder.launch(null) }, enabled = busy == null) { Text("Đổi thư mục") }
+        }
+    }
+
+    restoreUri?.let { uri ->
+        ConfirmDialog(
+            title = "Khôi phục từ bản sao lưu?",
+            text = "Dữ liệu trong bản sao lưu được gộp vào app. Những gì đang có trên máy được giữ nguyên, không bị ghi đè.",
+            confirmLabel = "Khôi phục",
+            destructive = false,
+            onConfirm = {
+                scope.launch {
+                    vm.restoreFrom(uri)
+                        .onSuccess { r ->
+                            message = "Đã khôi phục" to buildString {
+                                append("Bản sao lưu ngày ${formatDate(r.createdAt)}.\n")
+                                append("Thêm ${r.itemsAdded} mục và ${r.sessionsAdded} folder/ghi nhanh.")
+                                if (r.itemsSkipped + r.sessionsSkipped > 0) {
+                                    append(" Bỏ qua ${r.itemsSkipped + r.sessionsSkipped} thứ đã có sẵn trên máy.")
+                                }
+                            }
+                        }
+                        .onFailure { e -> message = "Không khôi phục được" to (e.message ?: e.javaClass.simpleName) }
+                }
+            },
+            onDismiss = { restoreUri = null },
+        )
+    }
+    message?.let { (title, text) ->
+        AlertDialog(
+            onDismissRequest = { message = null },
+            title = { Text(title) },
+            text = { Text(text) },
+            confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } },
+        )
+    }
 }

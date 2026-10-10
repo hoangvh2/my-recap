@@ -1,6 +1,8 @@
 package com.vh.myrecap.data
 
 import com.vh.myrecap.core.Item
+import com.vh.myrecap.core.ItemStatus
+import com.vh.myrecap.core.Schedule
 import com.vh.myrecap.core.TextSearch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONObject
 import java.io.File
+import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -65,6 +68,26 @@ class ItemStore(
     }
 
     fun delete(id: String) = dao.delete(id)
+
+    /**
+     * Marks an item done; a repeating task gets its next instance in the same transaction.
+     * Returns the done item and the new one (if any), or null when the item does not exist.
+     */
+    fun complete(id: String, now: Long = System.currentTimeMillis()): Pair<Item, Item?>? = db.runInTransaction<Pair<Item, Item?>?> {
+        val current = dao.get(id)?.toItem() ?: return@runInTransaction null
+        if (current.status == ItemStatus.DONE) return@runInTransaction current to null
+        val done = current.copy(status = ItemStatus.DONE, doneAt = now)
+        dao.upsert(ItemEntity.of(done))
+        val next = Schedule.nextInstance(done, newId(), ZoneId.systemDefault(), now)
+        next?.let { dao.upsert(ItemEntity.of(it)) }
+        done to next
+    }
+
+    /** Moves repeating appointments whose occurrence is over to their next one. Returns the moved items. */
+    fun rollRecurring(now: Long = System.currentTimeMillis()): List<Item> = db.runInTransaction<List<Item>> {
+        dao.openRecurring().mapNotNull { Schedule.rollForward(it.toItem(), ZoneId.systemDefault(), now) }
+            .onEach { dao.upsert(ItemEntity.of(it)) }
+    }
 
     /** Replaces the AI proposals of one capture (a re-analysis must not stack duplicates). */
     fun replaceDrafts(sourceId: String, drafts: List<Item>) = dao.replaceDrafts(sourceId, drafts.map(ItemEntity::of))

@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -94,6 +95,7 @@ import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.Recurrence
 import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.reminder.Reminders
@@ -109,10 +111,12 @@ private val zone: ZoneId get() = ZoneId.systemDefault()
 private fun Item.withType(t: ItemType): Item = when (t) {
     ItemType.EXPENSE -> copy(
         type = t,
+        recurrence = null,
         whenAt = whenAt ?: LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli(),
         allDay = if (whenAt == null) true else allDay,
         category = category ?: "Khác",
     )
+    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null)
     else -> copy(type = t, amount = null, category = null)
 }
 
@@ -439,7 +443,8 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     val valid = current.title.isNotBlank() && (current.type != ItemType.EXPENSE || parsedAmount != null)
 
     fun save(status: ItemStatus = if (isDraft) ItemStatus.OPEN else current.status) {
-        vm.saveItem(current.copy(status = status))
+        // Completing goes through the store so a repeating task schedules its next instance.
+        if (status != current.status && !isDraft) vm.saveAndSetDone(current, status == ItemStatus.DONE) else vm.saveItem(current.copy(status = status))
         vm.back()
     }
     if (dirty) BackHandler { confirmLeave = true }
@@ -538,6 +543,9 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     onClear = { edit = edit.copy(whenAt = null, allDay = false) },
                 )
                 ReminderHint(current)
+                if ((edit.type == ItemType.TASK || edit.type == ItemType.EVENT) && edit.whenAt != null) {
+                    RepeatRow(edit.recurrence) { edit = edit.copy(recurrence = it) }
+                }
             }
             if (edit.type == ItemType.EVENT || edit.place != null) {
                 OutlinedTextField(
@@ -669,6 +677,24 @@ private fun WhenRow(item: Item, onPickDate: () -> Unit, onPickTime: () -> Unit, 
             }
             if (item.whenAt != null && item.type != ItemType.EXPENSE) {
                 IconButton(onClick = onClear) { Icon(Icons.Rounded.Close, contentDescription = "Bỏ thời gian") }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RepeatRow(selected: Recurrence?, onSelect: (Recurrence?) -> Unit) {
+    Column {
+        Text("Lặp lại", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("Không") })
+            Recurrence.entries.forEach { r ->
+                val icon: (@Composable () -> Unit)? = if (selected != r) null else {
+                    { Icon(Icons.Rounded.Repeat, null, Modifier.size(16.dp)) }
+                }
+                FilterChip(selected = selected == r, onClick = { onSelect(r) }, label = { Text(r.label) }, leadingIcon = icon)
             }
         }
     }
