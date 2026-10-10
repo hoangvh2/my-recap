@@ -48,6 +48,8 @@ node infra/deploy.mjs                                       # lần đầu: mở
 
 Script làm theo thứ tự: kiểm tra công cụ → đăng nhập ADC (nếu chưa) → build + test function → `terraform apply` → build web bằng giá trị Terraform trả ra → publish Firebase Hosting. Chạy lại bất cứ lúc nào để cập nhật (`--yes` bỏ hỏi, `--plan` chỉ xem thay đổi, `--skip-web` chỉ phần Terraform).
 
+**Hai lần đăng nhập khác nhau.** Terraform dùng đăng nhập của gcloud (`gcloud auth application-default login`), còn bước publish Hosting dùng Firebase CLI, có đăng nhập **riêng** (`npx firebase-tools@15.33.0 login`). Đăng nhập gcloud không dùng được cho Firebase CLI. Trên Windows, chạy lệnh `login` trong PowerShell hoặc CMD: Git Bash không phải terminal thật với Node nên Firebase CLI chuyển sang luồng dán mã thủ công, rất dễ sai. Kiểm tra bằng `npx firebase-tools@15.33.0 login:list`; tài khoản hiện ra phải là tài khoản sở hữu project. Nếu Terraform đã chạy xong và chỉ Hosting lỗi, chạy lại `node infra/deploy.mjs --skip-terraform` để bỏ qua phần Terraform.
+
 **Một bước thủ công duy nhất (≈ 1 phút, lần đầu):** Firebase Console → Authentication → *Get started* → **Google** → Enable → chọn email hỗ trợ → Save. Giữ mọi phương thức khác ở trạng thái tắt. (Terraform không tạo được OAuth client của Google Sign-In; làm bằng nút này thì Google tự đăng ký redirect URI đúng cho `https://<project>.firebaseapp.com`.)
 
 Rồi trên iPhone: Safari mở `https://<project>.firebaseapp.com` → Chia sẻ → *Thêm vào Màn hình chính* → đăng nhập. (Dùng đúng địa chỉ `.firebaseapp.com`; mở bằng `.web.app` sẽ tự chuyển sang địa chỉ này.)
