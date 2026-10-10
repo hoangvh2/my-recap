@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import androidx.work.ListenableWorker
@@ -202,8 +203,11 @@ class SecretaryFlowTest {
             assertTrue(device.wait(Until.hasObject(By.text("Gửi báo giá cho khách")), 5_000))
             device.findObject(By.text("Gửi báo giá cho khách")).click()
             assertTrue("item editor not shown", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000))
-            assertTrue("source link", device.wait(Until.hasObject(By.textStartsWith("Từ ghi nhanh")), 5_000))
             shot("20-item-editor")
+            // The link back to the capture sits at the end of the form.
+            device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, 1f)
+            assertTrue("source link", device.wait(Until.hasObject(By.textStartsWith("Từ ghi nhanh")), 5_000))
+            shot("20b-item-source")
             device.findObject(By.text("Xong")).click()
             val task = app.items.bySource(memo.id).single { it.type == ItemType.TASK }
             assertTrue("task completed", waitFor(5_000) { app.items.get(task.id)?.status == ItemStatus.DONE })
