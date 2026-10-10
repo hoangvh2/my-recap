@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { CONTEXT_LIMITS, EMPTY_CONTEXT, parseContext, parseSalesExtraction, SalesExtraction, type CaptureContext } from "../src/sales";
+import { CONTEXT_LIMITS, EMPTY_CONTEXT, parseContext, parseSalesExtraction, renewalEndDate, SalesExtraction, type CaptureContext } from "../src/sales";
 
 const zone = "Asia/Ho_Chi_Minh";
 const NOW = Date.UTC(2026, 9, 10, 7, 0, 0);
@@ -14,10 +14,10 @@ const ctx: CaptureContext = {
     { id: "lic_2", customerId: "cus_xyz", product: "Bảo hành server", endDate: "2027-03-01", stage: "ASKED" },
   ],
 };
-function parse(json: unknown, c: CaptureContext = ctx) {
+function parse(json: unknown, c: CaptureContext = ctx, transcript?: string) {
   let n = 0;
   const raw = typeof json === "string" ? json : JSON.stringify(json);
-  return parseSalesExtraction(raw, c, { zone, nowMs: NOW, captureId: "cap", newId: () => `n${n++}` });
+  return parseSalesExtraction(raw, c, { zone, nowMs: NOW, captureId: "cap", newId: () => `n${n++}`, transcript });
 }
 
 describe("parseContext", () => {
@@ -199,5 +199,53 @@ describe("parseSalesExtraction", () => {
     const p = SalesExtraction.userMessage("x", DateTime.fromMillis(NOW, { zone }), ctx);
     expect(p).toContain("Xử lý gia hạn license cho");
     expect(p).toContain("cuối tháng");
+  });
+
+  it("also drafts the licence when the customer agreed to renew until a date and none is on record", () => {
+    const said = "Anh Nam đồng ý gia hạn license đến 12/2027";
+    const b = parse({ items: [{ type: "note", title: said, customer: "c1" }] }, { customers: [ctx.customers[0]], licenses: [] }, said)!;
+    expect(b.licenses).toHaveLength(1);
+    expect(b.licenses[0]).toMatchObject({ customerId: "cus_abc", status: "DRAFT", product: "License", kind: "LICENSE", endDate: "2027-12-31", stage: "ACTIVE", sourceId: "cap" });
+    expect(b.items[0]).toMatchObject({ type: "TASK", licenseId: b.licenses[0].id });
+
+    const fresh = parse({ customers: [{ key: "n1", name: "Khánh" }], items: [{ type: "note", title: "đồng ý gia hạn", customer: "n1" }] }, EMPTY_CONTEXT, "Anh Khánh đồng ý gia hạn license đến 12/2027")!;
+    expect(fresh.customers).toHaveLength(1);
+    expect(fresh.licenses[0]).toMatchObject({ customerId: fresh.customers[0].id, endDate: "2027-12-31", status: "DRAFT" });
+  });
+
+  it("does not repeat a licence the model already drafted, nor invent one without a date", () => {
+    const said = "Anh Nam đồng ý gia hạn đến 12/2027";
+    const modelMade = parse({
+      items: [{ type: "note", title: said, customer: "c1" }],
+      licenses: [{ customer: "c1", product: "Phần mềm kế toán", endDate: "2027-12-31" }],
+    }, { customers: [ctx.customers[0]], licenses: [] }, said)!;
+    expect(modelMade.licenses).toHaveLength(1);
+    expect(modelMade.licenses[0].product).toBe("Phần mềm kế toán");
+    expect(modelMade.items[0].licenseId).toBe(modelMade.licenses[0].id);
+
+    const noDate = parse({ items: [{ type: "note", title: "Anh Nam đồng ý gia hạn", customer: "c1" }] }, { customers: [ctx.customers[0]], licenses: [] }, "Anh Nam đồng ý gia hạn")!;
+    expect(noDate.licenses).toHaveLength(0);
+    expect(noDate.items[0].type).toBe("TASK");
+  });
+
+  it("links to the licence the customer already has with that end date instead of drafting another", () => {
+    const said = "Anh Nam đồng ý gia hạn đến 31/12/2026";
+    const b = parse({ items: [{ type: "note", title: said, customer: "c1" }] }, ctx, said)!;
+    expect(b.licenses).toHaveLength(0);
+    expect(b.items[0]).toMatchObject({ type: "TASK", licenseId: "lic_1" });
+  });
+});
+
+describe("renewalEndDate", () => {
+  const f = (t: string) => renewalEndDate(t, NOW, zone);
+  it("reads the ways people say it", () => {
+    expect(f("gia hạn đến 12/2027")).toBe("2027-12-31");
+    expect(f("gia hạn đến 15/03/2027")).toBe("2027-03-15");
+    expect(f("gia hạn đến tháng 6 năm 2027")).toBe("2027-06-30");
+    expect(f("gia hạn đến năm 2027")).toBe("2027-12-31");
+  });
+  it("ignores nothing-dates and dates in the past", () => {
+    expect(f("đồng ý gia hạn")).toBeNull();
+    expect(f("gia hạn đến 12/2020")).toBeNull();
   });
 });

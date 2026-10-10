@@ -130,7 +130,7 @@ export async function runCapture(deps: CaptureDeps, uid: string, input: CaptureI
     throw upstream(e);
   }
 
-  let bundle = parseSalesExtraction(raw, input.context, { zone: input.zone, nowMs, captureId, newId: deps.newId });
+  let bundle = parseSalesExtraction(raw, input.context, { zone: input.zone, nowMs, captureId, newId: deps.newId, transcript });
   let outcome: CaptureResult["outcome"] = "saved";
   if (bundle === null) {
     // The model's answer was not JSON: keep the words as a note rather than lose them.

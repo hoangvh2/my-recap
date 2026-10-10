@@ -376,19 +376,25 @@ test("an agreed renewal with no licence yet becomes a task for that customer, wh
   const task = card.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" });
   await expect(task).toBeVisible();
   await expect(task.getByRole("link", { name: "Khánh" })).toBeVisible();
+  // … and the renewal itself: a draft licence for that customer, ending at the end of December 2027.
+  await expect(card.locator("h4", { hasText: "License / bảo hành mới" })).toBeVisible();
+  await expect(card.locator(".row-item", { hasText: "Khánh · License" })).toContainText("31/12/2027");
+  await expect(task.getByRole("link", { name: "License" })).toBeVisible();
   await card.getByRole("button", { name: "Lưu tất cả" }).click();
   await expect(page.locator(".draft-card")).toHaveCount(0);
 
-  // The customer exists, no licence: same task, linked to the existing customer (no duplicate customer).
+  // Said again: same customer and same end date, so no second licence; the task links to the one just saved.
   await textCapture(page, "FAKE_RENEW_NOTE_KNOWN anh Khánh đồng ý gia hạn license đến 12/2027");
   card = page.locator(".draft-card");
   await expect(card.locator("h4", { hasText: "Khách mới" })).toHaveCount(0);
+  await expect(card.locator("h4", { hasText: "License / bảo hành mới" })).toHaveCount(0);
   await expect(card.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" })).toBeVisible();
   await shot(page, "24-renewal-task");
   await card.getByRole("button", { name: "Lưu tất cả" }).click();
   await tab(page, "Khách");
   await expect(page.locator(".cust-row")).toHaveCount(1);
   await page.getByRole("link", { name: /Khánh/ }).click();
+  await expect(page.locator(".lic-row")).toHaveCount(1);
   await expect(page.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" })).toHaveCount(2);
   expectNoProblems(problems);
 });
