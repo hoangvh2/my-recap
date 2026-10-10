@@ -479,7 +479,7 @@ private fun ShortcutRow() {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (canPinWidget) {
                 OutlinedButton(onClick = {
-                    widgets.requestPinAppWidget(ComponentName(context, CaptureWidget::class.java), null, null)
+                    widgets?.requestPinAppWidget(ComponentName(context, CaptureWidget::class.java), null, null)
                 }) { Text("Thêm widget") }
             }
             if (canAddTile) {

@@ -47,7 +47,10 @@ fun TextEditorDialog(
     var text by remember { mutableStateOf(initial) }
     var confirmClose by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
-    val close = { if (text != initial) confirmClose = true else onDismiss() }
+    val close: () -> Unit = { if (text != initial) confirmClose = true else onDismiss() }
+    val supporting: (@Composable () -> Unit)? = if (hint == null) null else {
+        { Text(hint) }
+    }
 
     Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
@@ -72,7 +75,7 @@ fun TextEditorDialog(
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                supportingText = hint?.let { { Text(it) } },
+                supportingText = supporting,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier
                     .fillMaxSize()
