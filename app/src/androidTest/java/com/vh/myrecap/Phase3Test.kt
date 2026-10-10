@@ -8,7 +8,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
-import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -228,10 +227,20 @@ class Phase3Test {
             shot("30-repeat-agenda")
 
             device.findObject(By.desc("Cài đặt")).click()
-            assertTrue(device.wait(Until.hasObject(By.scrollable(true)), 5_000))
-            // Settings is one long page: scroll its container until the backup section shows.
-            val backup = device.findObject(By.scrollable(true))
-                .scrollUntil(Direction.DOWN, Until.findObject(By.text("Sao lưu ngay")))
+            assertTrue("settings opened", device.wait(Until.hasObject(By.text("1. Chuyển giọng nói → văn bản")), 5_000))
+            shot("31a-settings-top")
+            // Settings is one long page: swipe until the backup section shows.
+            var backup: UiObject2? = null
+            repeat(25) {
+                if (backup == null) {
+                    backup = device.findObject(By.text("Sao lưu ngay"))
+                    if (backup == null) {
+                        device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 30)
+                        Thread.sleep(300)
+                    }
+                }
+            }
+            if (backup == null) shot("31b-settings-not-found")
             assertNotNull("backup section", backup)
             Thread.sleep(400)
             shot("31-backup-settings")
