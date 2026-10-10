@@ -66,7 +66,7 @@ jobs:
           ! grep -rE "__e2eSignIn|127\.0\.0\.1|9099" web/dist/assets
       - name: Firestore rules tests (emulator)
         env:
-          ALLOWED_EMAILS: owner@example.com,wife@example.com
+          ALLOWED_EMAILS: owner@example.com,member@example.com
         run: |
           node scripts/configure.mjs
           cd tests && npx firebase emulators:exec --config ../firebase.json --only firestore --project demo-myrecap-rules "npx vitest run rules"

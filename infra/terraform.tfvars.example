@@ -5,7 +5,7 @@ project_id = "your-gcp-project-id" # existing project with billing enabled
 # Google accounts that may sign in and use the app. Change the list, run deploy again.
 allowed_emails = [
   "you@gmail.com",
-  "wife@gmail.com",
+  "second-person@gmail.com",
 ]
 
 # Leave unset: Terraform creates a Gemini key restricted to the Generative Language API and puts it in Secret Manager.

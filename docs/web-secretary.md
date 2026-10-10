@@ -1,6 +1,6 @@
 # Bản web "Thư ký" cho iPhone (PWA + Firebase)
 
-Mục đích: vợ dùng iPhone 12 chỉ cần chức năng **Thư ký** (ghi nhanh việc, lịch hẹn, chi tiêu, ghi chú), không cần ghi âm phỏng vấn/họp. Không cần tài khoản Apple Developer: cài bằng Safari → Chia sẻ → **Thêm vào Màn hình chính**.
+Mục đích: người dùng iPhone chỉ cần chức năng **Thư ký** (ghi nhanh việc, lịch hẹn, chi tiêu, ghi chú), không cần ghi âm phỏng vấn/họp. Không cần tài khoản Apple Developer: cài bằng Safari → Chia sẻ → **Thêm vào Màn hình chính**.
 
 Mức hoàn thành: **code, test tự động và Terraform đã xong; chưa deploy lần nào lên Google thật và chưa thử trên iPhone thật** (xem [Chưa kiểm chứng](#chưa-kiểm-chứng) và [Mức kiểm chứng của phần Terraform](#mức-kiểm-chứng-của-phần-terraform)).
 
@@ -18,7 +18,7 @@ iPhone (PWA, Preact)
 
 - Dữ liệu: `users/{uid}/items`, `users/{uid}/captures` trên Firestore. **Không có bản sao trong trình duyệt** (Firestore chạy cache bộ nhớ; E2E kiểm tra IndexedDB/localStorage chỉ còn token đăng nhập của Firebase).
 - Audio ghi ở máy, đổi sang WAV 16 kHz, gửi cho Function rồi bỏ; không lưu.
-- Dữ liệu của hai người hoàn toàn tách nhau, và **tách khỏi app Android** (Android vẫn lưu cục bộ).
+- Dữ liệu của các tài khoản hoàn toàn tách nhau, và **tách khỏi app Android** (Android vẫn lưu cục bộ).
 - Nhắc việc: web không hẹn giờ thông báo được như Android. Dùng **Menu → Xuất lịch (.ics)** hoặc nút "Thêm vào Lịch" trong từng mục; Lịch iPhone sẽ báo (15 phút trước lịch hẹn, đúng giờ với việc, 8:00 với mục cả ngày).
 
 ## Các lớp bảo mật
@@ -27,17 +27,17 @@ iPhone (PWA, Preact)
 |---|---|---|
 | Chỉ email được cấp quyền | Allowlist **cố định lúc deploy** (`allowed_emails` trong `infra/terraform.tfvars`, không commit), áp ở 2 chỗ: Security Rules và Function. Rỗng = không ai vào được | Rules test (emulator) + E2E: người lạ nhận 403 trước khi gọi Gemini |
 | Phải là Google đã xác minh | Rules/Function kiểm `email_verified` và `sign_in_provider == google.com`; so email không phân biệt hoa thường, không khớp một phần | Rules test |
-| Cô lập dữ liệu | Chỉ `users/{uid}` của chính mình; mọi đường dẫn khác bị chặn; bộ đếm quota chỉ Function được ghi | Rules + E2E (owner không đọc được dữ liệu của vợ) |
+| Cô lập dữ liệu | Chỉ `users/{uid}` của chính mình; mọi đường dẫn khác bị chặn; bộ đếm quota chỉ Function được ghi | Rules + E2E (tài khoản này không đọc được dữ liệu của tài khoản kia) |
 | Schema chặt | Rules kiểm field, kiểu, độ dài, enum, số tiền; `createdAt` không sửa được; list buộc có `limit` | Rules test (18 case + mutation test) |
 | Khoá Gemini | Terraform tạo khoá giới hạn riêng cho *Generative Language API* trong project có billing, ghi thẳng vào Secret Manager (không cần copy/dán); chỉ service account của Function đọc được; gửi bằng header; log không chứa transcript hay khoá | E2E: fake Gemini nhận khoá đúng 1 chỗ (header); bundle web không chứa khoá |
 | Chống lạm dụng | App Check bắt buộc + token dùng 1 lần; quota 60 lần/người/ngày; `maxInstances: 3`; audio ≤ 100 s / 3,6 MB; text ≤ 2.000 ký tự; chỉ 2 thao tác cố định (không phải proxy Gemini tuỳ ý) | Unit + E2E (quota 429, payload sai 400). **App Check chưa test được trên emulator** |
 | Prompt injection | Ghi chú được coi là dữ liệu; kết quả chỉ thành *bản nháp* để người dùng xác nhận; text từ model bị cắt độ dài, bỏ ký tự điều khiển, tối đa 20 mục; giao diện không dùng `innerHTML` | Unit test |
 | Trình duyệt | CSP chặt (`default-src 'none'`, không inline script), HSTS, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` chỉ cho micro | E2E chạy dưới đúng header production, 0 vi phạm CSP. **CSP với dịch vụ Google thật chưa thử** |
-| Supply chain & cấu hình | `npm ci` với lockfile; hạ tầng khai báo bằng Terraform chạy trên máy anh; `terraform.tfvars` (project, email) và `terraform.tfstate` (có khoá Gemini) bị `.gitignore`, không bao giờ lên repo | `git check-ignore` + CI `terraform validate` |
+| Supply chain & cấu hình | `npm ci` với lockfile; hạ tầng khai báo bằng Terraform chạy trên máy của người triển khai; `terraform.tfvars` (project, email) và `terraform.tfstate` (có khoá Gemini) bị `.gitignore`, không bao giờ lên repo | `git check-ignore` + CI `terraform validate` |
 
 ## Triển khai bằng Terraform (một lệnh)
 
-Terraform chạy **trên PC của anh**; cấu hình và state không commit (đã có trong `infra/.gitignore`).
+Terraform chạy **trên máy của bạn**; cấu hình và state không commit (đã có trong `infra/.gitignore`).
 
 **Cần cài:** [Terraform ≥ 1.10](https://developer.hashicorp.com/terraform/install), [gcloud CLI](https://cloud.google.com/sdk/docs/install), Node.js 22. Tài khoản Google đang chạy phải là Owner của project (project đã bật billing, chính là project đang tính tiền Gemini).
 
@@ -58,7 +58,7 @@ Rồi trên iPhone: Safari mở `https://<project>.firebaseapp.com` → Chia s�
 |---|---|
 | API | Bật các API cần dùng (Firebase, Firestore, Secret Manager, Cloud Run/Functions, Cloud Build, reCAPTCHA Enterprise, Generative Language…) |
 | Firebase | Firebase project, Web app (lấy `apiKey`, `appId` cho bản build) |
-| Dữ liệu | Firestore `(default)` ở `asia-southeast1`, **chống xoá**, point-in-time recovery 7 ngày; Security Rules sinh từ `firestore.rules.tmpl` với allowlist của anh |
+| Dữ liệu | Firestore `(default)` ở `asia-southeast1`, **chống xoá**, point-in-time recovery 7 ngày; Security Rules sinh từ `firestore.rules.tmpl` với allowlist của bạn |
 | Khoá Gemini | `google_apikeys_key` giới hạn *Generative Language API* → Secret Manager `GEMINI_API_KEY` (hoặc dùng khoá có sẵn qua `gemini_api_key`) |
 | Function | Service account riêng (chỉ Firestore + đọc 1 secret + verify App Check + ghi log), service account build riêng, bucket mã nguồn (không công khai), Cloud Function `capture` (tối đa 3 instance, 512 MiB) |
 | App Check | Khoá reCAPTCHA Enterprise cho 2 tên miền của app, cấu hình App Check, **enforce cho Firestore** (`enforce_app_check`) |
@@ -87,10 +87,10 @@ Hosting không có provider Terraform dùng được cho file tĩnh, nên bướ
 ```bash
 npm ci --prefix functions && npm ci --prefix web && npm ci --prefix tests
 npm test --prefix functions && npm test --prefix web          # unit
-echo "owner@example.com,wife@example.com" > config/allowed-emails.local   # email giả để test
+echo "owner@example.com,member@example.com" > config/allowed-emails.local   # email giả để test
 node scripts/configure.mjs
 cd tests && npx firebase emulators:exec --config ../firebase.json --only firestore --project demo-myrecap-rules "npx vitest run rules"
-./run-e2e.sh                                                  # Auth+Firestore+Functions emulator, Gemini giả, Chromium cỡ iPhone 12
+./run-e2e.sh                                                  # Auth+Firestore+Functions emulator, Gemini giả, Chromium cỡ màn hình iPhone
 ```
 Cần Java 21 (emulator Firestore) và Chromium (`CHROMIUM=/đường/dẫn/chrome` nếu dùng sẵn).
 

@@ -11,7 +11,7 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: "http://127.0.0.1:4173",
-    viewport: { width: 390, height: 844 }, // iPhone 12
+    viewport: { width: 390, height: 844 }, // iPhone-sized viewport
     deviceScaleFactor: 3,
     launchOptions: {
       executablePath: process.env.CHROMIUM || undefined,
