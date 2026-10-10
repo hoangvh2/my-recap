@@ -4,7 +4,7 @@ import { collection, deleteDoc, doc, getDoc, getDocs, limit, query, setDoc, upda
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // The rules are generated from firestore.rules.tmpl with the throwaway list in config/allowed-emails.local
-// (owner@example.com, wife@example.com): `node scripts/configure.mjs`.
+// (owner@example.com, member@example.com): `node scripts/configure.mjs`.
 let env: RulesTestEnvironment;
 
 const google = (email: string, extra: Record<string, unknown> = {}) => ({
@@ -15,7 +15,7 @@ const google = (email: string, extra: Record<string, unknown> = {}) => ({
 });
 
 const ownerCtx = () => env.authenticatedContext("uOwner", google("owner@example.com")).firestore();
-const wifeCtx = () => env.authenticatedContext("uWife", google("wife@example.com")).firestore();
+const memberCtx = () => env.authenticatedContext("uMember", google("member@example.com")).firestore();
 
 const item = (over: Record<string, unknown> = {}) => ({
   id: "a1",
@@ -48,11 +48,11 @@ describe("who may use the database", () => {
   });
 
   it("keeps the two people apart", async () => {
-    await assertSucceeds(setDoc(doc(wifeCtx(), "users/uWife/items/w1"), item({ id: "w1" })));
-    await assertFails(getDoc(doc(ownerCtx(), "users/uWife/items/w1")));
-    await assertFails(setDoc(doc(ownerCtx(), "users/uWife/items/x"), item({ id: "x" })));
-    await assertFails(deleteDoc(doc(ownerCtx(), "users/uWife/items/w1")));
-    await assertFails(getDocs(query(collection(ownerCtx(), "users/uWife/items"), limit(10))));
+    await assertSucceeds(setDoc(doc(memberCtx(), "users/uMember/items/w1"), item({ id: "w1" })));
+    await assertFails(getDoc(doc(ownerCtx(), "users/uMember/items/w1")));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uMember/items/x"), item({ id: "x" })));
+    await assertFails(deleteDoc(doc(ownerCtx(), "users/uMember/items/w1")));
+    await assertFails(getDocs(query(collection(ownerCtx(), "users/uMember/items"), limit(10))));
   });
 
   it("denies anonymous and signed-out access", async () => {
@@ -62,7 +62,7 @@ describe("who may use the database", () => {
   });
 
   it("denies a Google account that is not on the list, even under its own uid", async () => {
-    const stranger = env.authenticatedContext("uX", google("stranger@gmail.com")).firestore();
+    const stranger = env.authenticatedContext("uX", google("stranger@example.com")).firestore();
     await assertFails(setDoc(doc(stranger, "users/uX/items/a1"), item()));
     await assertFails(getDoc(doc(stranger, "users/uX/items/a1")));
   });

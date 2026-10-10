@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd .. && pwd)"
 
-export ALLOWED_EMAILS="owner@example.com,wife@example.com"
+export ALLOWED_EMAILS="owner@example.com,member@example.com"
 node "$ROOT/scripts/configure.mjs"
 (cd "$ROOT/functions" && npm run build >/dev/null)
 printf 'GEMINI_API_KEY=fake-e2e-key\n' > "$ROOT/functions/.secret.local"

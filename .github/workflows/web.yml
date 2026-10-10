@@ -9,6 +9,7 @@ on:
       - "scripts/**"
       - "firebase.json"
       - "firestore.rules.tmpl"
+      - "infra/**"
       - "firestore.indexes.json"
       - ".github/workflows/web.yml"
   pull_request:
@@ -65,7 +66,7 @@ jobs:
           ! grep -rE "__e2eSignIn|127\.0\.0\.1|9099" web/dist/assets
       - name: Firestore rules tests (emulator)
         env:
-          ALLOWED_EMAILS: owner@example.com,wife@example.com
+          ALLOWED_EMAILS: owner@example.com,member@example.com
         run: |
           node scripts/configure.mjs
           cd tests && npx firebase emulators:exec --config ../firebase.json --only firestore --project demo-myrecap-rules "npx vitest run rules"
@@ -85,48 +86,16 @@ jobs:
             tests/test-results
           if-no-files-found: ignore
 
-  deploy:
-    name: Deploy to Firebase
-    needs: test
-    # Runs only on main and only once the repository variable FIREBASE_PROJECT_ID is set (see docs/web-secretary.md).
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.FIREBASE_PROJECT_ID != ''
+  terraform:
+    name: Terraform (format and validate)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: production
-    permissions:
-      contents: read
-      id-token: write # keyless login to Google Cloud (Workload Identity Federation); no JSON key is stored
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            web/package-lock.json
-            functions/package-lock.json
-            tests/package-lock.json
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
-      - name: Install
-        run: |
-          npm ci --prefix web
-          npm ci --prefix functions
-          npm ci --prefix tests
-      - name: Generate rules and function config from the secret allowlist
-        env:
-          ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
-          BLOCK_UNLISTED_SIGNUPS: ${{ vars.BLOCK_UNLISTED_SIGNUPS }}
-        run: node scripts/configure.mjs
-      - name: Build web
-        env:
-          VITE_FIREBASE_API_KEY: ${{ vars.FIREBASE_WEB_API_KEY }}
-          VITE_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_APP_ID: ${{ vars.FIREBASE_WEB_APP_ID }}
-          VITE_APPCHECK_SITE_KEY: ${{ vars.APPCHECK_SITE_KEY }}
-        run: npm run build --prefix web
-      - name: Deploy
-        run: npx firebase deploy --project "${{ vars.FIREBASE_PROJECT_ID }}" --only hosting,functions,firestore --non-interactive
-        working-directory: tests
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+        working-directory: infra
+      - run: terraform init -backend=false -input=false
+        working-directory: infra
+      - run: terraform validate
+        working-directory: infra

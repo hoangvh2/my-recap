@@ -1,6 +1,6 @@
 # My Recap — Báo cáo nghiên cứu & đề xuất kỹ thuật
 
-_Ngày: 2026-10-08 · Trạng thái: chờ duyệt_
+_Ngày: 2026-10-08 · Tài liệu nghiên cứu ban đầu; hiện trạng của app xem README_
 
 ## 1. Executive Summary
 
@@ -81,11 +81,11 @@ _Ngày: 2026-10-08 · Trạng thái: chờ duyệt_
 | 2. Translate mode | 1–2 tuần | Màn hình song ngữ realtime | Độ trễ hiển thị bản dịch ≤ 3s |
 | 3. Mở rộng | Tùy chọn | Provider offline (sherpa-onnx), thêm template | Hoạt động được khi không có mạng |
 
-**Cần anh/chị quyết định:**
+**Câu hỏi mở khi bắt đầu dự án:**
 
-1. Duyệt Phương án 1?
-2. Có dùng máy Samsung không? Nếu có, nên thử Phương án 3 trong lúc chờ MVP.
-3. Cung cấp 3 file audio họp thật (đã ẩn danh) để chạy benchmark.
+1. Chọn Phương án 1 hay phương án khác?
+2. Nếu người dùng có máy Samsung, có thể dùng Phương án 3 trong lúc chờ MVP.
+3. Cần 3 file audio mẫu (đã ẩn danh) để chạy benchmark.
 
 ## Sources
 

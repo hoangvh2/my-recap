@@ -1,6 +1,8 @@
-# My Recap trên iPhone 12 Pro Max (iOS 17.6) — báo cáo phương án
+# My Recap trên iPhone (iOS 17) — báo cáo phương án
 
-_Ngày: 10/10/2026. Phạm vi: đưa các chức năng hiện có (ghi âm phỏng vấn tắt màn hình, Ghi nhanh + Thư ký, nhắc việc, sao lưu) lên iPhone cá nhân._
+_Ngày: 10/10/2026. Phạm vi: đưa các chức năng hiện có (ghi âm phỏng vấn tắt màn hình, Ghi nhanh + Thư ký, nhắc việc, sao lưu) lên iPhone._
+
+> **Cập nhật:** nếu chỉ cần chức năng Thư ký (không ghi âm nền), bản web PWA là đủ và không cần tài khoản Apple Developer. Xem [web-secretary.md](web-secretary.md). Báo cáo dưới đây vẫn đúng cho trường hợp cần đủ chức năng ghi âm nền trên iOS.
 
 ## Executive Summary
 - **Không thể cài APK lên iPhone**. Muốn chạy trên iOS phải có bản build iOS riêng, được ký bằng tài khoản Apple.
@@ -18,7 +20,7 @@ _Ngày: 10/10/2026. Phạm vi: đưa các chức năng hiện có (ghi âm phỏ
 | AltStore/SideStore (Apple ID miễn phí) | Vẫn hết hạn 7 ngày, tối đa 3 app; AltStore cần máy tính để làm mới định kỳ |
 | Ghi âm nền trên iOS | Được phép nếu bật `UIBackgroundModes = audio` và cấu hình AVAudioSession đúng. Có báo cáo lỗi ghi ra file rỗng khi khoá màn hình lâu nếu cấu hình sai → **phải test trên máy thật** |
 | Web app (PWA) | Theo các báo cáo lỗi WebKit, PWA đã "Thêm vào màn hình chính" **mất micro khi chuyển nền hoặc khoá màn hình** |
-| Nút trong Trung tâm điều khiển cho app bên thứ ba | Chỉ có từ **iOS 18** (Controls API); iOS 17.6 không dùng được |
+| Nút trong Trung tâm điều khiển cho app bên thứ ba | Chỉ có từ **iOS 18** (Controls API); iOS 17 không dùng được |
 | Build trên đám mây không cần Mac | GitHub Actions có máy macOS: repo public miễn phí; repo private khoảng 0,062 USD/phút (theo trang giá, cần xác nhận lại) |
 
 ## Analysis — Top 3 phương án
@@ -48,20 +50,20 @@ Chọn **phương án 1 (KMP)**, triển khai theo cổng quyết định để 
 | Bước | Nội dung | Điều kiện qua cổng |
 |---|---|---|
 | 0 (2–4 ngày, không tốn phí) | Chuyển `:core` sang KMP; Android vẫn chạy như cũ, CI vẫn xanh | Toàn bộ test hiện có pass |
-| 1 (1 tuần, mua tài khoản 99 USD) | PoC iOS: ghi âm có VAD, khoá màn hình 30 phút, gửi Gemini; build bằng GitHub Actions macOS → TestFlight | Ghi đủ 30 phút khoá màn hình trên iPhone 12 Pro Max, không mất đoạn |
+| 1 (1 tuần, mua tài khoản 99 USD) | PoC iOS: ghi âm có VAD, khoá màn hình 30 phút, gửi Gemini; build bằng GitHub Actions macOS → TestFlight | Ghi đủ 30 phút khoá màn hình trên iPhone, không mất đoạn |
 | 2 (3–5 tuần) | UI dùng chung, Thư ký, nhắc việc, sao lưu/khôi phục chung định dạng với Android | Bộ test luồng chính pass trên iOS Simulator |
 | 3 (1–2 tuần) | Widget, Shortcuts, Live Activity | Dùng thật 1 tuần |
 
 **Chi phí:** 99 USD/năm + phút build macOS (0 nếu repo public; vài USD/tháng nếu private). **Không cần mua Mac** nếu build hoàn toàn trên CI; nhưng một Mac (kể cả mượn) giúp debug ghi âm nhanh hơn nhiều.
 
 ## Unknown / Assumption
-- Chưa đo độ ổn định ghi âm nền dài trên iOS 17.6 → đó là lý do có Bước 1.
+- Chưa đo độ ổn định ghi âm nền dài trên iOS 17 → đó là lý do có Bước 1.
 - Ước lượng tuần công dựa trên kích thước code hiện tại (~12,8k dòng Kotlin), chưa có số liệu thực.
 - Giá runner macOS lấy từ trang tài liệu giá của GitHub; cần xác nhận trên trang billing của tài khoản.
 
 ## Next Actions
-1. Anh xác nhận: mua Apple Developer Program 99 USD/năm (Yes/No).
-2. Nếu Yes → làm Bước 0 ngay (không phụ thuộc Apple), song song anh đăng ký tài khoản.
+1. Quyết định: có mua Apple Developer Program 99 USD/năm không (Yes/No).
+2. Nếu Yes → làm Bước 0 ngay (không phụ thuộc Apple), song song đăng ký tài khoản.
 
 ## Sources
 - [JetBrains — Compose Multiplatform 1.8.0: iOS Stable](https://blog.jetbrains.com/kotlin/2025/05/compose-multiplatform-1-8-0-released-compose-multiplatform-for-ios-is-stable-and-production-ready/)

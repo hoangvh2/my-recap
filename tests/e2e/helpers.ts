@@ -1,8 +1,8 @@
 import { expect, type Page, type APIRequestContext } from "@playwright/test";
 
 export const OWNER = "owner@example.com";
-export const WIFE = "wife@example.com";
-export const STRANGER = "stranger@gmail.com";
+export const MEMBER = "member@example.com";
+export const STRANGER = "stranger@example.com";
 
 declare global {
   interface Window {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { geminiCalls, idTokenFor, OWNER, STRANGER, WIFE } from "./helpers";
+import { geminiCalls, idTokenFor, OWNER, STRANGER, MEMBER } from "./helpers";
 
 const FN = "http://127.0.0.1:5001/demo-myrecap/asia-southeast1/capture";
 const FS = "http://127.0.0.1:8080/v1/projects/demo-myrecap/databases/(default)/documents";
@@ -26,7 +26,7 @@ test.describe("capture function, over HTTP", () => {
 
   test("an allowlisted account gets drafts saved under its own uid, and Gemini sees the key only in a header", async ({ request }) => {
     await request.get("http://127.0.0.1:8788/reset");
-    const { idToken, uid } = await idTokenFor(request, WIFE);
+    const { idToken, uid } = await idTokenFor(request, MEMBER);
     const res = await call(request, { text: "mai 3 giờ chiều họp anh Nam, trưa nay ăn phở 65 nghìn", zone }, idToken);
     expect(res.status()).toBe(200);
     const body = (await res.json()).result;
@@ -46,13 +46,13 @@ test.describe("capture function, over HTTP", () => {
   });
 
   test("a signed-in stranger and another person's token cannot read someone else's data", async ({ request }) => {
-    const wife = await idTokenFor(request, WIFE);
+    const member = await idTokenFor(request, MEMBER);
     const owner = await idTokenFor(request, OWNER);
     const stranger = await idTokenFor(request, STRANGER);
-    expect((await request.get(`${FS}/users/${wife.uid}/items`, { headers: { authorization: `Bearer ${owner.idToken}` } })).status()).toBe(403);
-    expect((await request.get(`${FS}/users/${wife.uid}/items`, { headers: { authorization: `Bearer ${stranger.idToken}` } })).status()).toBe(403);
+    expect((await request.get(`${FS}/users/${member.uid}/items`, { headers: { authorization: `Bearer ${owner.idToken}` } })).status()).toBe(403);
+    expect((await request.get(`${FS}/users/${member.uid}/items`, { headers: { authorization: `Bearer ${stranger.idToken}` } })).status()).toBe(403);
     expect((await request.get(`${FS}/users/${stranger.uid}/items`, { headers: { authorization: `Bearer ${stranger.idToken}` } })).status()).toBe(403);
-    expect((await request.get(`${FS}/users/${wife.uid}/items`)).status()).toBe(403);
+    expect((await request.get(`${FS}/users/${member.uid}/items`)).status()).toBe(403);
   });
 
   test("validates the payload", async ({ request }) => {
@@ -75,8 +75,8 @@ test.describe("capture function, over HTTP", () => {
   });
 
   test("stops at the daily quota", async ({ request }) => {
-    const { idToken } = await idTokenFor(request, WIFE);
-    // WIFE already spent 1 in the test above; the allowance is 60.
+    const { idToken } = await idTokenFor(request, MEMBER);
+    // MEMBER already spent 1 in the test above; the allowance is 60.
     let ok = 0;
     let status = 0;
     for (let i = 0; i < 70; i++) {
