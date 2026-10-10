@@ -644,7 +644,7 @@ private fun WhenRow(item: Item, onPickDate: () -> Unit, onPickTime: () -> Unit, 
                     Icon(Icons.Rounded.AccessTime, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        item.whenAt?.takeIf { !item.allDay }?.let { clock(it) } ?: if (item.whenAt != null) "Cả ngày" else "Giờ",
+                        item.whenAt?.takeIf { !item.allDay }?.let { clock(it) } ?: "Giờ",
                         maxLines = 1,
                     )
                 }

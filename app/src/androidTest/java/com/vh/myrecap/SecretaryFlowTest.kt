@@ -215,7 +215,6 @@ class SecretaryFlowTest {
             device.wait(Until.hasObject(By.textStartsWith("Đã xong")), 5_000)
             device.executeShellCommand("cmd uimode night yes")
             Thread.sleep(2_500)
-            clickChip("Tổng quan")
             Thread.sleep(800)
             shot("21-dark-agenda")
             device.executeShellCommand("cmd uimode night no")
