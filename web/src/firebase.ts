@@ -16,8 +16,9 @@ const options: FirebaseOptions = {
   projectId: env.VITE_FIREBASE_PROJECT_ID,
   appId: env.VITE_FIREBASE_APP_ID,
   // Same origin as the app, so the sign-in redirect keeps working on Safari/iOS, which blocks the
-  // third-party storage a different authDomain would need.
-  authDomain: location.host,
+  // third-party storage a different authDomain would need. Set at build time to the canonical host
+  // (<project>.firebaseapp.com); falls back to the current host for dev and the emulators.
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || location.host,
 };
 
 export const region: string = env.VITE_FUNCTIONS_REGION || "asia-southeast1";

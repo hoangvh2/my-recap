@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Never commit terraform.tfvars or terraform.tfstate.
+
+project_id = "your-gcp-project-id" # existing project with billing enabled
+
+# Google accounts that may sign in and use the app. Change the list, run deploy again.
+allowed_emails = [
+  "you@gmail.com",
+  "wife@gmail.com",
+]
+
+# Leave unset: Terraform creates a Gemini key restricted to the Generative Language API and puts it in Secret Manager.
+# gemini_api_key = "AIza..."
+
+# Optional: monthly budget alert (emails the billing admins at 50/90/100% and on forecast).
+# billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
+# monthly_budget     = 5
+# budget_currency    = "USD" # must match the billing account's currency
