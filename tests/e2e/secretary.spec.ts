@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { expectNoProblems, geminiCalls, OWNER, signIn, STRANGER, textCapture, watchBrowser } from "./helpers";
+import { expectNoProblems, geminiCalls, OWNER, signIn, STRANGER, tab, textCapture, watchBrowser } from "./helpers";
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `e2e/.artifacts/${name}.png` });
 
@@ -23,8 +23,8 @@ test("login screen is the only thing a signed-out visitor sees", async ({ page }
 test("typed note → drafts to review → saved → shows in the agenda and in expenses", async ({ page }) => {
   const problems = watchBrowser(page);
   await signIn(page, OWNER);
-  await expect(page.getByRole("heading", { name: "Thư ký" })).toBeVisible();
-  await expect(page.getByText("Chưa có việc hay lịch hẹn nào")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hôm nay" })).toBeVisible();
+  await expect(page.getByText("Bắt đầu thế nào?")).toBeVisible();
 
   await textCapture(page, "mai 3 giờ chiều họp anh Nam, trưa nay ăn phở 65 nghìn");
   await expect(page.getByText("Chờ bạn xem lại")).toBeVisible();
@@ -34,15 +34,16 @@ test("typed note → drafts to review → saved → shows in the agenda and in e
   await expect(drafts.getByText("65.000 đ")).toBeVisible();
   await shot(page, "02-drafts");
 
-  await drafts.getByRole("button", { name: /Lưu tất cả \(2\)/ }).click();
+  await drafts.getByRole("button", { name: /Lưu tất cả/ }).click();
   await expect(page.getByText("Chờ bạn xem lại")).toHaveCount(0);
   // The appointment is tomorrow at 15:00 → "Sắp tới".
   const upcoming = page.locator(".block", { has: page.getByRole("heading", { name: /Sắp tới/ }) });
   await expect(upcoming.getByText("Họp anh Nam")).toBeVisible();
   await expect(upcoming.getByText(/Mai 15:00/)).toBeVisible();
-  await expect(page.getByText(/Chi tiêu tháng này/)).toContainText("65.000 đ");
   await shot(page, "03-agenda");
 
+  await tab(page, "Việc");
+  await expect(page.getByText(/Chi tiêu tháng này/)).toContainText("65.000 đ");
   await page.getByRole("button", { name: /^Chi tiêu/ }).click();
   await expect(page.locator(".month .big")).toHaveText("65.000 đ");
   await expect(page.locator(".bars")).toContainText("Ăn uống");
@@ -75,8 +76,9 @@ test("voice note: the recorder produces a WAV the server accepts and Gemini rece
 test("manual add, tick off a repeating task, undo, delete", async ({ page }) => {
   const problems = watchBrowser(page);
   await signIn(page, OWNER);
-  await page.getByRole("button", { name: "Thêm bằng tay" }).click();
-  await page.getByRole("menuitem", { name: "Việc" }).click();
+  await tab(page, "Việc");
+  await page.getByRole("button", { name: "Thêm", exact: true }).click();
+  await page.locator(".add-tile", { hasText: "Việc" }).click();
   await page.getByLabel("Tiêu đề").fill("Uống thuốc");
   const today = new Date();
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -108,7 +110,7 @@ test("a Google account that is not on the list is told so and sees nothing", asy
   await signIn(page, STRANGER);
   await expect(page.getByRole("heading", { name: "Chưa được cấp quyền" })).toBeVisible();
   await expect(page.getByText(STRANGER)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Thư ký" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Hôm nay" })).toHaveCount(0);
   await shot(page, "07-denied");
   await page.getByRole("button", { name: "Đăng xuất" }).click();
   await expect(page.getByRole("button", { name: "Đăng nhập bằng Google" })).toBeVisible();
@@ -120,21 +122,22 @@ test("exports: calendar file and JSON backup; sign out", async ({ page }) => {
   await page.locator(".draft-card").getByRole("button", { name: /Lưu tất cả/ }).click();
   await expect(page.getByText("Chờ bạn xem lại")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Menu" }).click();
-  await shot(page, "08-menu");
-  let [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Xuất lịch/ }).click()]);
-  expect(dl.suggestedFilename()).toBe("my-recap-lich.ics");
+  await page.getByRole("link", { name: "Cài đặt" }).click();
+  await expect(page.getByRole("heading", { name: "Cài đặt" })).toBeVisible();
+  await shot(page, "08-settings");
+  let [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Xuất một lần/ }).click()]);
+  expect(dl.suggestedFilename()).toBe("thu-ky-lich.ics");
   const ics = readFileSync((await dl.path())!, "utf8");
   expect(ics).toContain("BEGIN:VEVENT");
   expect(ics).toContain("SUMMARY:Họp anh Nam");
   expect(ics).toContain("TRIGGER:-PT15M");
 
-  await page.getByRole("button", { name: "Menu" }).click();
   [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Sao lưu dữ liệu/ }).click()]);
   const backup = JSON.parse(readFileSync((await dl.path())!, "utf8"));
   expect(backup.items.map((i: { title: string }) => i.title).sort()).toEqual(["Họp anh Nam", "Ăn phở"].sort());
+  expect(backup.customers).toEqual([]);
+  expect(backup.licenses).toEqual([]);
 
-  await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("button", { name: "Đăng xuất" }).click();
   await expect(page.getByRole("button", { name: "Đăng nhập bằng Google" })).toBeVisible();
   // Signed out: the previous person's data is gone from the screen.
@@ -145,6 +148,7 @@ test("personal data never lands in the browser: no localStorage/sessionStorage/I
   await signIn(page, OWNER);
   await textCapture(page, "mai 3 giờ chiều họp anh Nam, trưa nay ăn phở 65 nghìn");
   await page.locator(".draft-card").getByRole("button", { name: /Lưu tất cả/ }).click();
+  await tab(page, "Việc");
   await expect(page.getByText(/Chi tiêu tháng này/)).toBeVisible();
   await page.waitForTimeout(1_000);
 

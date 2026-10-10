@@ -109,3 +109,29 @@ describe("planImport", () => {
     expect(templateCsv().startsWith("﻿Khách hàng,")).toBe(true);
   });
 });
+
+describe("recordsFromPlan", () => {
+  const text = [
+    "Khách hàng\tNgười liên hệ\tSản phẩm\tNgày hết hạn\tGiá trị",
+    "Công ty ABC\tanh Nam\tKế toán\t31/12/2026\t50.000.000",
+    "công ty abc\t\tBảo hành server\t01/03/2027\t",
+    "Công ty Delta\tchị Lan\tERP\t15/05/2027\t",
+    "Công ty ABC\t\tKế toán\t31/12/2026\t",
+    "Lỗi\t\tSP\tabc\t",
+  ].join("\n");
+  it("creates each new customer once, reuses existing ones and skips duplicates and errors", async () => {
+    const { recordsFromPlan } = await import("../src/lib/importer");
+    const { DEFAULT_IMPORT_COLUMNS } = await import("../src/lib/model");
+    const existing = [{ id: "cDelta", name: "Công ty Delta" }];
+    const plan = planImport(text, DEFAULT_IMPORT_COLUMNS, { customers: existing, licenses: [] });
+    let n = 0;
+    const out = recordsFromPlan(plan, existing, 1000, () => `id${n++}`);
+    expect(out.customers.map((c) => c.name)).toEqual(["Công ty ABC"]);
+    expect(out.customers[0]).toMatchObject({ contact: "anh Nam", status: "OPEN" });
+    expect(out.licenses.map((l) => [l.product, l.customerId])).toEqual([
+      ["Kế toán", "id0"], ["Bảo hành server", "id0"], ["ERP", "cDelta"],
+    ]);
+    expect(out.licenses[0]).toMatchObject({ endDate: "2026-12-31", value: 50_000_000, stage: "ACTIVE", status: "OPEN" });
+    for (const r of [...out.customers, ...out.licenses]) expect(Object.values(r).every((v) => v !== undefined)).toBe(true);
+  });
+});

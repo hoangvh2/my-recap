@@ -14,9 +14,21 @@ export function productionHeaders(firebaseJsonPath, extraConnect = "http://127.0
   return { all, csp: csp.replace("connect-src 'self'", `connect-src 'self' ${extraConnect}`) };
 }
 
+/** Hosting forwards /calendar/** to the calendarfeed function (firebase.json "rewrites"); do the same against the emulator. */
+async function forwardCalendar(req, res, url) {
+  const target = `http://127.0.0.1:5001/demo-myrecap/asia-southeast1/calendarfeed${url.pathname}`;
+  const upstream = await fetch(target, { method: req.method });
+  res.writeHead(upstream.status, Object.fromEntries(upstream.headers));
+  res.end(Buffer.from(await upstream.arrayBuffer()));
+}
+
 export function startStatic(dir, port, headers) {
   const server = createServer((req, res) => {
     const url = new URL(req.url, "http://x");
+    if (url.pathname.startsWith("/calendar/")) {
+      forwardCalendar(req, res, url).catch(() => { res.writeHead(502); res.end(); });
+      return;
+    }
     let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
     let file = join(dir, path);
     if (!existsSync(file) || statSync(file).isDirectory()) file = join(dir, "index.html");

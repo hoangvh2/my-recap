@@ -37,6 +37,9 @@ export interface Capture {
   transcript: string;
   createdAt: number;
   itemCount: number;
+  customerCount?: number;
+  licenseCount?: number;
+  proposalCount?: number;
 }
 
 // ---------------------------------------------------------------- customers and licences

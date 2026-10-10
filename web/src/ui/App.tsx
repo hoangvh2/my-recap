@@ -2,7 +2,7 @@ import { useEffect } from "preact/hooks";
 import { startSync, syncState } from "../data";
 import { useStore } from "../lib/store";
 import { session, signInWithGoogle, signOut, startSession } from "../session";
-import { Home } from "./Home";
+import { Shell } from "./Shell";
 import { Icon } from "./icons";
 
 export function App() {
@@ -51,7 +51,7 @@ function Signed({ uid, email }: { uid: string; email: string }) {
     <>
       {sync === "error" && <div class="banner" role="alert">Không tải được dữ liệu, kiểm tra kết nối mạng.</div>}
       {sync === "connecting" && <div class="banner info" role="status">Đang đồng bộ…</div>}
-      <Home uid={uid} email={email} />
+      <Shell email={email} />
     </>
   );
 }
