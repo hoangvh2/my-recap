@@ -305,7 +305,7 @@ test("calendar subscription: a secret link serves reminders and tasks, can be re
   const text = (await feed.text()).replace(/\r\n /g, "");
   expect(text).toContain("BEGIN:VCALENDAR");
   expect(text).toContain("Việc: Gửi báo giá cho ABC · Công ty ABC");
-  expect(text).toContain("Gia hạn · Gửi báo giá gia hạn: Công ty ABC (Phần mềm kế toán)");
+  expect(text).toContain("Gia hạn · Chốt hợp đồng gia hạn: Công ty ABC (Phần mềm kế toán)");
   expect(text).toContain("UID:lacc-END@myrecap");
   expect(text).not.toContain("0901");
 
@@ -362,6 +362,6 @@ test("search finds customers, licences and work and jumps to them", async ({ pag
   await page.getByPlaceholder(/Tên khách, sản phẩm/).fill("ke toan");
   await expect(page.getByRole("dialog").getByText("Phần mềm kế toán")).toBeVisible();
   await page.getByPlaceholder(/Tên khách, sản phẩm/).fill("xyz");
-  await page.getByRole("dialog").getByRole("button", { name: /XYZ Logistics/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "XYZ Logistics", exact: true }).click();
   await expect(page.getByRole("heading", { name: "XYZ Logistics" })).toBeVisible();
 });

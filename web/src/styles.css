@@ -329,3 +329,4 @@ details summary { cursor: pointer; font-weight: 600; min-height: 36px; display: 
 .two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .sheet input, .sheet select, .sheet textarea { min-width: 0; max-width: 100%; }
 .terms button { padding: 0 12px; }
+.hero .hint { color: rgba(255, 255, 255, 0.88); }

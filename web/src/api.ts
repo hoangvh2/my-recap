@@ -46,7 +46,7 @@ export async function calendarToken(action: FeedAction): Promise<string | null> 
 }
 
 /** Address a phone calendar subscribes to. Same host as the app, which Hosting forwards to the feed function. */
-export const feedUrl = (token: string, scheme: "https" | "webcal" = "https"): string => `${scheme}://${location.host}/calendar/${token}.ics`;
+export const feedUrl = (token: string, scheme: "https" | "webcal" = "https"): string => `${scheme === "https" ? location.protocol.replace(":", "") : scheme}://${location.host}/calendar/${token}.ics`;
 
 export function toApiError(e: unknown): ApiError {
   const code = (e as { code?: string } | null)?.code ?? "";

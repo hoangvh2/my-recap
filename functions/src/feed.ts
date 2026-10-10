@@ -151,7 +151,7 @@ export interface FeedResponse {
   body: string;
 }
 
-/** Short-lived cache so a phone polling every hour (or a crawler) does not turn into many reads. */
+/** Checks the link on every request; caches the rendered calendar briefly so polling does not turn into many reads. */
 export class FeedHandler {
   private cache = new Map<string, { at: number; body: string }>();
   private misses = new Map<string, number>();
@@ -167,11 +167,11 @@ export class FeedHandler {
     if (!token) return { status: 404, body: "" };
     const hash = hashToken(token);
     const t = this.now();
-    const hit = this.cache.get(hash);
-    if (hit && t - hit.at < this.ttlMs) return { status: 200, body: hit.body };
     const missAt = this.misses.get(hash);
     if (missAt !== undefined && t - missAt < 60_000) return { status: 404, body: "" };
 
+    // One small read per request keeps a replaced or switched-off link dead immediately;
+    // only the expensive part (every item and licence) is cached.
     const owner = await this.store.uidForHash(hash);
     if (!owner) {
       if (this.misses.size > 1000) this.misses.clear();
@@ -179,6 +179,8 @@ export class FeedHandler {
       this.cache.delete(hash);
       return { status: 404, body: "" };
     }
+    const hit = this.cache.get(hash);
+    if (hit && t - hit.at < this.ttlMs) return { status: 200, body: hit.body };
     const body = await renderFeed(this.store, owner.uid, owner.zone, t);
     if (this.cache.size > 50) this.cache.clear();
     this.cache.set(hash, { at: t, body });

@@ -45,7 +45,7 @@ iPhone (PWA, Preact)
 
 **Nhập từ Excel:** dán các ô từ Excel hoặc chọn file CSV; app xem trước, nêu rõ dòng lỗi bằng tiếng Việt, bỏ dòng trùng, rồi mới nhập. Tên cột mặc định (Khách hàng, Người liên hệ, Số điện thoại, Email, Sản phẩm, Loại, Ngày bắt đầu, Ngày hết hạn, Thời hạn (tháng), Giá trị, Số hợp đồng, Ghi chú) **sửa được trong Cài đặt**; app cũng tự nhận các tên thông dụng. Chưa đọc trực tiếp `.xlsx` (cần thêm thư viện); dán hoặc lưu CSV UTF-8.
 
-**Lịch tự cập nhật:** địa chỉ `https://<host>/calendar/<token>.ics` (token ngẫu nhiên 256 bit; server chỉ lưu bản băm để tra cứu). Lịch gồm việc/lịch hẹn đang mở và mọi mốc gia hạn phía trước; **không có số điện thoại hay email**. Đổi liên kết thì liên kết cũ chết; tắt thì lịch ngừng cập nhật. Server cache 10 phút mỗi bản lịch (giới hạn số lần đọc Firestore), nên thu hồi có hiệu lực tối đa sau ~10 phút.
+**Lịch tự cập nhật:** địa chỉ `https://<host>/calendar/<token>.ics` (token ngẫu nhiên 256 bit; server chỉ lưu bản băm để tra cứu). Lịch gồm việc/lịch hẹn đang mở và mọi mốc gia hạn phía trước; **không có số điện thoại hay email**. Đổi liên kết thì liên kết cũ chết; tắt thì lịch ngừng cập nhật. Mỗi lần có người gọi, server kiểm tra liên kết (1 lần đọc nhỏ) nên đổi/tắt liên kết có hiệu lực **ngay**; chỉ phần dựng lịch (đọc toàn bộ việc/license) được cache 10 phút để giới hạn số lần đọc Firestore.
 
 ## Các lớp bảo mật
 

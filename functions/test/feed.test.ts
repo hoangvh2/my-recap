@@ -132,11 +132,10 @@ describe("FeedHandler", () => {
     expect(m.loads()).toBe(2);
   });
 
-  it("stops serving a link replaced within the cache window only after the cache expires (documented bound)", async () => {
-    const { handler, token, m, advance } = await setup();
+  it("stops serving a replaced link at once, even while its calendar is cached", async () => {
+    const { handler, token, m } = await setup();
     await handler.handle("GET", `/calendar/${token}.ics`);
     await manageFeed(m.store, "u1", { action: "rotate", zone });
-    advance(11 * 60_000);
     expect((await handler.handle("GET", `/calendar/${token}.ics`)).status).toBe(404);
   });
 });
