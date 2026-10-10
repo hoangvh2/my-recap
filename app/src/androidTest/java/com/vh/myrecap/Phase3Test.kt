@@ -233,7 +233,7 @@ class Phase3Test {
             var backup: UiObject2? = null
             repeat(40) { step ->
                 if (backup == null) {
-                    if (step % 2 == 0) shot("31-scroll-${'$'}step")
+                    if (step % 2 == 0) shot("31-scroll-$step")
                     backup = device.findObject(By.text("Sao lưu ngay"))
                     if (backup == null) {
                         // Slow, short drag (many steps): a fast swipe flings past the section between checks.
