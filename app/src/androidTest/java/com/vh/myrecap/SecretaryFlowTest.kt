@@ -119,13 +119,13 @@ class SecretaryFlowTest {
         assertNotNull("filter chips not on screen", row)
         val y = row!!.visibleBounds.centerY()
         val w = device.displayWidth
-        repeat(4) { attempt ->
+        repeat(8) { attempt ->
             device.findObject(By.textStartsWith(label))?.let {
                 it.click()
                 return
             }
-            // First look to the right, then back to the left.
-            if (attempt < 2) device.swipe(w * 3 / 4, y, w / 4, y, 20) else device.swipe(w / 4, y, w * 3 / 4, y, 20)
+            // Scroll back to the start first, then towards the end.
+            if (attempt < 3) device.swipe(w / 4, y, w * 3 / 4, y, 20) else device.swipe(w * 3 / 4, y, w / 4, y, 20)
             Thread.sleep(400)
         }
         throw AssertionError("chip $label not found")
