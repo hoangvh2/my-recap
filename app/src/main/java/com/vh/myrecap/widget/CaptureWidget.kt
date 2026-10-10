@@ -1,5 +1,6 @@
 package com.vh.myrecap.widget
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -101,14 +102,20 @@ class QuickCaptureTile : TileService() {
             if (android.os.Build.VERSION.SDK_INT >= 34) {
                 startActivityAndCollapse(CaptureWidget.captureIntent(this, 12))
             } else {
-                @Suppress("DEPRECATION")
-                startActivityAndCollapse(
-                    Intent(this, MainActivity::class.java)
-                        .setAction(MainActivity.ACTION_QUICK_CAPTURE)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+                launchBeforeApi34()
             }
         }
         if (isLocked) unlockAndRun(launch) else launch.run()
+    }
+
+    /** Android 13 and older only accept an Intent here; the PendingIntent variant exists from 34. */
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun launchBeforeApi34() {
+        startActivityAndCollapse(
+            Intent(this, MainActivity::class.java)
+                .setAction(MainActivity.ACTION_QUICK_CAPTURE)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
