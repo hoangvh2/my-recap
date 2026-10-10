@@ -660,13 +660,13 @@ private fun WhenRow(item: Item, onPickDate: () -> Unit, onPickTime: () -> Unit, 
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = onPickDate, modifier = Modifier.weight(1.3f)) {
+            OutlinedButton(onClick = onPickDate, modifier = Modifier.weight(1.3f), contentPadding = PaddingValues(horizontal = 12.dp)) {
                 Icon(Icons.Rounded.Event, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(item.whenAt?.let { dayLabel(localDate(it)) } ?: "Chọn ngày", maxLines = 1)
             }
             if (item.type != ItemType.EXPENSE) {
-                OutlinedButton(onClick = onPickTime, modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onPickTime, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
                     Icon(Icons.Rounded.AccessTime, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(

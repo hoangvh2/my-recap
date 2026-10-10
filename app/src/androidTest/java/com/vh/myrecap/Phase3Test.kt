@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -227,7 +228,10 @@ class Phase3Test {
             shot("30-repeat-agenda")
 
             device.findObject(By.desc("Cài đặt")).click()
-            val backup = scrollTo(By.text("Sao lưu ngay"))
+            assertTrue(device.wait(Until.hasObject(By.scrollable(true)), 5_000))
+            // Settings is one long page: scroll its container until the backup section shows.
+            val backup = device.findObject(By.scrollable(true))
+                .scrollUntil(Direction.DOWN, Until.findObject(By.text("Sao lưu ngay")))
             assertNotNull("backup section", backup)
             Thread.sleep(400)
             shot("31-backup-settings")
