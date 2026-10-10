@@ -365,3 +365,30 @@ test("search finds customers, licences and work and jumps to them", async ({ pag
   await page.getByRole("dialog").getByRole("button", { name: "XYZ Logistics", exact: true }).click();
   await expect(page.getByRole("heading", { name: "XYZ Logistics" })).toBeVisible();
 });
+
+test("an agreed renewal with no licence yet becomes a task for that customer, whether or not the customer exists", async ({ page, request }) => {
+  const problems = watchBrowser(page);
+  await signIn(page, OWNER);
+  // No customer yet: the AI proposes one, and the task hangs on it.
+  await textCapture(page, "FAKE_RENEW_NOTE_NEW anh Khánh đồng ý gia hạn license đến 12/2027");
+  let card = page.locator(".draft-card");
+  await expect(card.locator("h4", { hasText: "Khách mới" })).toBeVisible();
+  const task = card.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" });
+  await expect(task).toBeVisible();
+  await expect(task.getByRole("link", { name: "Khánh" })).toBeVisible();
+  await card.getByRole("button", { name: "Lưu tất cả" }).click();
+  await expect(page.locator(".draft-card")).toHaveCount(0);
+
+  // The customer exists, no licence: same task, linked to the existing customer (no duplicate customer).
+  await textCapture(page, "FAKE_RENEW_NOTE_KNOWN anh Khánh đồng ý gia hạn license đến 12/2027");
+  card = page.locator(".draft-card");
+  await expect(card.locator("h4", { hasText: "Khách mới" })).toHaveCount(0);
+  await expect(card.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" })).toBeVisible();
+  await shot(page, "24-renewal-task");
+  await card.getByRole("button", { name: "Lưu tất cả" }).click();
+  await tab(page, "Khách");
+  await expect(page.locator(".cust-row")).toHaveCount(1);
+  await page.getByRole("link", { name: /Khánh/ }).click();
+  await expect(page.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" })).toHaveCount(2);
+  expectNoProblems(problems);
+});

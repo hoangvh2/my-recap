@@ -117,6 +117,10 @@ export const SalesExtraction = {
       '- "licenses" chỉ dùng khi ghi chú nói khách MỚI MUA hoặc có license/bảo hành mới với ngày hết hạn (endDate dạng YYYY-MM-DD; nếu chỉ có thời hạn thì để endDate null và điền termMonths).',
       '- "updates" chỉ dùng khi ghi chú nói rõ tiến triển gia hạn của license ĐÃ CÓ: stage là asked (đã hỏi khách), quoted (đã gửi báo giá), contracting (đang làm/đã gửi hợp đồng), renewed (khách đồng ý/đã ký gia hạn), lost (khách không gia hạn; ghi lostReason nếu có). Có thể kèm value (giá gia hạn, số nguyên VND), endDate mới, note.',
       "- Việc theo dõi sau đó (gửi hợp đồng thứ 5, gọi lại thứ 2) thì tạo thêm một task trong items.",
+      '- Khách có thể là cá nhân ("anh Khánh" → name "Khánh"). Ghi chú nhắc một khách chưa có trong danh sách thì PHẢI khai báo trong "customers" rồi gắn vào mục; đừng bỏ trống "customer".',
+      '- Khách đồng ý / muốn / từ chối gia hạn mà danh sách KHÔNG có license nào của khách đó thì không có gì để cập nhật: hãy tạo MỘT task (type "task", không phải "note") tiêu đề "Xử lý gia hạn license cho <tên khách>", gắn customer, ghi vào details điều khách nói (ví dụ "đồng ý gia hạn đến 12/2027").',
+      '- Ngày chỉ có tháng và năm ("12/2027", "hết tháng 12 năm 2027") thì endDate là ngày cuối tháng đó (2027-12-31).',
+      '- "note" chỉ dùng cho thông tin cần nhớ KHÔNG cần ai làm gì (sở thích khách, địa chỉ, ghi chú chung).',
       "",
       "Định dạng:",
       '{"customers":[{"key":"n1","name":"...","contact":null,"phone":null,"email":null}],' +
@@ -262,6 +266,7 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     const customerId = customerRef(rec.customer) ?? lic?.customerId ?? (named ? undefined : focusCustomerId);
     if (customerId) item.customerId = customerId;
     if (lic && (!customerId || lic.customerId === customerId)) item.licenseId = lic.id;
+    renewalNoteToTask(item, nameOf.get(item.customerId ?? ""));
     out.items.push(item);
   }
 
@@ -325,6 +330,21 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     });
   }
   return out;
+}
+
+const RENEWAL_WORDS = /\b(gia han|tiep tuc (su dung|dung)|renew)/;
+
+/**
+ * "Khách đồng ý gia hạn" with no licence on record is something to do (record the licence, make the
+ * contract), not a fact to remember. Models often file it as a note, so it becomes a task here.
+ */
+function renewalNoteToTask(item: Item, customer: string | undefined): void {
+  if (item.type !== "NOTE" || !item.customerId || item.licenseId || !customer) return;
+  if (!RENEWAL_WORDS.test(fold(`${item.title} ${item.details}`))) return;
+  const said = [item.title, item.details].filter(Boolean).join(". ").slice(0, 400);
+  item.type = "TASK";
+  item.details = said;
+  item.title = `Xử lý gia hạn license cho ${customer}`.slice(0, 120);
 }
 
 /** A plain sentence describing a proposal, written here so the model's own words never reach the screen as a claim. */

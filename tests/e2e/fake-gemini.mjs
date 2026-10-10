@@ -49,6 +49,21 @@ export function startFakeGemini(port = 8787) {
           updates: [{ license: "l1", stage: "quoted", value: 50000000, endDate: null, note: "Đã gửi báo giá qua email", lostReason: null }],
         }));
       }
+      // The usual mistake of a model: an agreed renewal filed as a note. NEW declares the customer, KNOWN uses c1.
+      if (/FAKE_RENEW_NOTE_NEW/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [{ key: "n1", name: "Khánh", contact: null, phone: null, email: null }],
+          items: [{ type: "note", title: "Anh Khánh đồng ý gia hạn license đến 12/2027", details: "", customer: "n1", license: null, quote: "đồng ý gia hạn" }],
+          licenses: [], updates: [],
+        }));
+      }
+      if (/FAKE_RENEW_NOTE_KNOWN/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [],
+          items: [{ type: "note", title: "Khánh đồng ý gia hạn license đến 2027", details: "", customer: "c1", license: null, quote: "đồng ý gia hạn" }],
+          licenses: [], updates: [],
+        }));
+      }
       if (/FAKE_SALES_BAD/.test(text)) {
         return reply(JSON.stringify({
           customers: [],

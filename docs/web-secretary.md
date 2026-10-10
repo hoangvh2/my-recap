@@ -65,6 +65,8 @@ iPhone (PWA, Preact)
 
 ## Triển khai bằng Terraform (một lệnh)
 
+> **Sổ tay đầy đủ từ máy trắng đến chạy được (cài công cụ, đăng nhập, bước làm tay, tên miền CNAME/TXT/A, lỗi thường gặp): [`infra/README.md`](../infra/README.md).** Phần dưới là bản tóm tắt.
+
 Terraform chạy **trên máy của bạn**; cấu hình và state không commit (đã có trong `infra/.gitignore`).
 
 **Cần cài:** [Terraform ≥ 1.10](https://developer.hashicorp.com/terraform/install), [gcloud CLI](https://cloud.google.com/sdk/docs/install), Node.js 22. Tài khoản Google đang chạy phải là Owner của project (project đã bật billing, chính là project đang tính tiền Gemini).

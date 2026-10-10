@@ -85,6 +85,14 @@ export function formatDateShort(d: ISODate, today: ISODate): string {
 export function parseDateLoose(text: string): ISODate | null {
   const s = text.trim();
   if (!s) return null;
+  // "12/2027" or "tháng 12/2027": a licence "until December 2027" runs to the last day of that month.
+  const month = /^(?:th(?:á|a)ng\s+)?(\d{1,2})[-/.](\d{4})$/i.exec(s) ?? /^(\d{4})-(\d{1,2})$/.exec(s);
+  if (month) {
+    const [y0, m0] = month[0].includes("-") && month[1].length === 4 ? [Number(month[1]), Number(month[2])] : [Number(month[2]), Number(month[1])];
+    if (m0 < 1 || m0 > 12) return null;
+    const first = `${String(y0).padStart(4, "0")}-${String(m0).padStart(2, "0")}-01`;
+    return isIsoDate(first) ? addDays(addMonths(first, 1), -1) : null;
+  }
   let y: number, m: number, d: number;
   let r = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s].*)?$/.exec(s);
   if (r) {

@@ -173,4 +173,5 @@ One-time manual step (about a minute), only the first time:
   2. "Get started" > Google > Enable > pick a support email > Save.
      (Keep every other sign-in method disabled.)
 Then on the iPhone: open ${url} in Safari > Share > Add to Home Screen > sign in.
+Custom domain, DNS records and common errors: infra/README.md
 `);

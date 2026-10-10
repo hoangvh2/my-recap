@@ -79,3 +79,13 @@ describe("customer name matching", () => {
     expect(matchByName("hoàn toàn khác", list)).toBeNull();
   });
 });
+
+describe("parseDateLoose: month and year only", () => {
+  it("means the last day of that month", () => {
+    expect(parseDateLoose("12/2027")).toBe("2027-12-31");
+    expect(parseDateLoose("tháng 2/2028")).toBe("2028-02-29");
+    expect(parseDateLoose("2027-06")).toBe("2027-06-30");
+    expect(parseDateLoose("13/2027")).toBeNull();
+    expect(parseDateLoose("00/2027")).toBeNull();
+  });
+});

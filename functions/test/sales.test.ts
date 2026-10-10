@@ -166,4 +166,38 @@ describe("parseSalesExtraction", () => {
     walk(b);
     expect(b.proposals[0].patch).toMatchObject({ stage: "LOST", lostReason: "Giá cao" });
   });
+
+  it("files 'khách đồng ý gia hạn' as a task when there is no licence to update (new or existing customer)", () => {
+    const existing = parse({ items: [{ type: "note", title: "Anh Nam đồng ý gia hạn license đến 12/2027", customer: "c1" }] })!;
+    expect(existing.items).toHaveLength(1);
+    expect(existing.items[0]).toMatchObject({ type: "TASK", title: "Xử lý gia hạn license cho Công ty ABC", customerId: "cus_abc", status: "DRAFT" });
+    expect(existing.items[0].details).toContain("12/2027");
+
+    const fresh = parse({
+      customers: [{ key: "n1", name: "Khánh" }],
+      items: [{ type: "note", title: "Anh Khánh đồng ý tiếp tục gia hạn license đến năm 2027", customer: "n1" }],
+    })!;
+    expect(fresh.customers.map((c) => c.name)).toEqual(["Khánh"]);
+    expect(fresh.items[0]).toMatchObject({ type: "TASK", title: "Xử lý gia hạn license cho Khánh", customerId: fresh.customers[0].id });
+  });
+
+  it("leaves other notes alone, and notes about a licence the app knows", () => {
+    const plain = parse({ items: [{ type: "note", title: "Anh Nam thích cà phê", customer: "c1" }] })!;
+    expect(plain.items[0].type).toBe("NOTE");
+    const known = parse({ items: [{ type: "note", title: "Đồng ý gia hạn", customer: "c1", license: "l1" }] })!;
+    expect(known.items[0].type).toBe("NOTE");
+    const nobody = parse({ items: [{ type: "note", title: "Đồng ý gia hạn" }] })!;
+    expect(nobody.items[0].type).toBe("NOTE");
+  });
+
+  it("reads 'đến 12/2027' as the last day of the month", () => {
+    const b = parse({ updates: [{ license: "l1", endDate: "12/2027" }] })!;
+    expect(b.proposals[0].patch.endDate).toBe("2027-12-31");
+  });
+
+  it("tells the model what to do with an agreed renewal that has no licence", () => {
+    const p = SalesExtraction.userMessage("x", DateTime.fromMillis(NOW, { zone }), ctx);
+    expect(p).toContain("Xử lý gia hạn license cho");
+    expect(p).toContain("cuối tháng");
+  });
 });
