@@ -36,6 +36,10 @@ class SearchTest {
         val s = TextSearch.snippet(text, TextSearch.tokens("kotlin"), radius = 20)
         assertTrue(s, s.contains("Kotlin"))
         assertTrue(s.startsWith("…") && s.endsWith("…"))
+        val words = text.split(' ').toSet()
+        val inner = s.removePrefix("…").removeSuffix("…").split(' ')
+        assertTrue("first word whole: $s", inner.first() in words)
+        assertTrue("last word whole: $s", inner.last() in words)
         assertEquals("Ngắn gọn", TextSearch.snippet("Ngắn gọn", TextSearch.tokens("gon")))
     }
 

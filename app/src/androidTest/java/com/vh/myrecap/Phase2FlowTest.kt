@@ -104,11 +104,12 @@ class Phase2FlowTest {
 
     /** Swipes the list up until [selector] is on screen. */
     private fun scrollTo(selector: androidx.test.uiautomator.BySelector): androidx.test.uiautomator.UiObject2? {
-        repeat(6) {
+        // Down first, then back up: after a filter change the list may sit below its target.
+        repeat(10) { attempt ->
             device.findObject(selector)?.let { return it }
             val w = device.displayWidth
             val h = device.displayHeight
-            device.swipe(w / 2, h * 3 / 4, w / 2, h / 3, 25)
+            if (attempt < 4) device.swipe(w / 2, h * 3 / 4, w / 2, h / 3, 25) else device.swipe(w / 2, h / 3, w / 2, h * 3 / 4, 25)
             Thread.sleep(400)
         }
         return device.findObject(selector)
@@ -173,9 +174,11 @@ class Phase2FlowTest {
             val card = scrollTo(By.textStartsWith("Chi tiêu tháng"))
             assertNotNull("month spending card", card)
             card!!.click()
-            assertTrue(device.wait(Until.hasObject(By.text("Xuất CSV")), 5_000))
+            Thread.sleep(500)
+            val export = scrollTo(By.text("Xuất CSV"))
+            assertNotNull("CSV export button", export)
             shot("28-expenses-export")
-            device.findObject(By.text("Xuất CSV")).click()
+            export!!.click()
             assertTrue(
                 "share sheet for the CSV",
                 device.wait(Until.hasObject(By.pkg(Pattern.compile("com\\.android\\.intentresolver|android"))), 5_000),

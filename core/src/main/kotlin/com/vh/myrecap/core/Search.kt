@@ -32,15 +32,18 @@ object TextSearch {
         val folded = fold(flat)
         val at = queryTokens.map { folded.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: 0
         if (folded.length != flat.length) return flat.take(radius * 2)
-        val start = (at - radius).coerceAtLeast(0)
-        val end = (at + radius).coerceAtMost(flat.length)
+        var start = (at - radius).coerceAtLeast(0)
+        var end = (at + radius).coerceAtMost(flat.length)
+        // Never cut a word in half.
+        if (start > 0) flat.indexOf(' ', start).takeIf { it in start until at }?.let { start = it + 1 }
+        if (end < flat.length) flat.lastIndexOf(' ', end).takeIf { it > at }?.let { end = it }
         return (if (start > 0) "…" else "") + flat.substring(start, end).trim() + (if (end < flat.length) "…" else "")
     }
 }
 
 /** Expenses as CSV for a spreadsheet; UTF-8 with BOM so Excel shows Vietnamese correctly. */
 object ExpenseCsv {
-    const val BOM = "﻿"
+    const val BOM = "\uFEFF"
 
     fun build(expenses: List<Item>, zone: java.time.ZoneId): String = buildString {
         append(BOM)

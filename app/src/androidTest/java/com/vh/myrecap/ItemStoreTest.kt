@@ -101,12 +101,14 @@ class ItemStoreTest {
     }
 
     @Test
-    fun observedListFollowsWrites() = runBlocking {
-        val store = ItemStore(db, scope)
-        store.upsert(item("x", "Một"))
-        withTimeout(5_000) { store.items.first { list -> list.any { it.id == "x" } } }
-        assertTrue(store.ready.value)
-        store.delete("x")
-        withTimeout(5_000) { store.items.first { list -> list.none { it.id == "x" } } }
+    fun observedListFollowsWrites() {
+        runBlocking {
+            val store = ItemStore(db, scope)
+            store.upsert(item("x", "Một"))
+            withTimeout(5_000) { store.items.first { list -> list.any { it.id == "x" } } }
+            assertTrue(store.ready.value)
+            store.delete("x")
+            withTimeout(5_000) { store.items.first { list -> list.none { it.id == "x" } } }
+        }
     }
 }
