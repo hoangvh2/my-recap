@@ -5,7 +5,7 @@ resource "google_recaptcha_enterprise_key" "web" {
   web_settings {
     integration_type  = "SCORE"
     allow_all_domains = false
-    allowed_domains   = [local.host, "${var.project_id}.web.app"]
+    allowed_domains   = distinct([local.host, local.default_host, "${var.project_id}.web.app"])
   }
 
   depends_on = [google_project_service.api]

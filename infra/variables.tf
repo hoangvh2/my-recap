@@ -70,3 +70,13 @@ variable "budget_currency" {
   type        = string
   default     = "USD"
 }
+
+variable "custom_domain" {
+  description = "Optional. A hostname you connected to Firebase Hosting, e.g. recap.example.com. The app then signs in and serves from it (see docs/web-secretary.md)."
+  type        = string
+  default     = null
+  validation {
+    condition     = var.custom_domain == null ? true : can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$", var.custom_domain))
+    error_message = "custom_domain must be a plain lowercase hostname such as recap.example.com (no https://, no path)."
+  }
+}

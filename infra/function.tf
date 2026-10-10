@@ -109,12 +109,16 @@ resource "google_cloudfunctions2_function" "capture" {
     ingress_settings                 = "ALLOW_ALL"
     all_traffic_on_latest_revision   = true
 
-    environment_variables = {
-      ALLOWED_EMAILS  = join(",", local.emails)
-      GEMINI_MODEL    = var.gemini_model
-      GCLOUD_PROJECT  = var.project_id
-      FIREBASE_CONFIG = jsonencode({ projectId = var.project_id })
-    }
+    environment_variables = merge(
+      {
+        ALLOWED_EMAILS  = join(",", local.emails)
+        GEMINI_MODEL    = var.gemini_model
+        GCLOUD_PROJECT  = var.project_id
+        FIREBASE_CONFIG = jsonencode({ projectId = var.project_id })
+      },
+      # Browsers on the custom domain may call the function (CORS).
+      var.custom_domain == null ? {} : { EXTRA_ORIGINS = "https://${var.custom_domain}" },
+    )
 
     secret_environment_variables {
       key        = "GEMINI_API_KEY"

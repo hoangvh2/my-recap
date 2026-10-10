@@ -21,6 +21,8 @@ data "google_firebase_web_app_config" "web" {
 }
 
 locals {
-  # The app is served from, and signs in against, this one host (see web/src/main.tsx).
-  host = "${var.project_id}.firebaseapp.com"
+  # The app is served from, and signs in against, this one host (see web/src/main.tsx): the custom
+  # domain when there is one, otherwise the default Firebase Hosting host.
+  default_host = "${var.project_id}.firebaseapp.com"
+  host         = coalesce(var.custom_domain, local.default_host)
 }

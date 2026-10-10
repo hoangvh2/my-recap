@@ -78,6 +78,19 @@ Hosting không có provider Terraform dùng được cho file tĩnh, nên bướ
 | Cập nhật code | `git pull` → `node infra/deploy.mjs --yes` |
 | Gỡ cài đặt | Firestore bị khoá xoá có chủ đích; muốn xoá dữ liệu phải tắt delete protection trước rồi mới `terraform destroy` |
 
+### Dùng tên miền riêng (tuỳ chọn)
+
+App đăng nhập theo **một host duy nhất** (trên Safari/iOS, host đăng nhập phải trùng host của app). Vì vậy khi thêm tên miền riêng, phải đổi host này, không chỉ trỏ DNS. Giả sử bạn có `recap.example.com`:
+
+1. **Kết nối với Hosting.** Firebase Console → Hosting → *Add custom domain* → nhập `recap.example.com`. Console hiện bản ghi **TXT** (xác minh, phải giữ vĩnh viễn) và bản ghi **A** (trỏ về Firebase). Thêm hai bản ghi đó ở nơi quản lý DNS của tên miền (host là `recap`), chờ trạng thái *Connected* (từ vài phút tới vài giờ, SSL tự cấp).
+2. **Cho phép đăng nhập từ host mới (làm tay, Terraform không làm được).**
+   - Firebase Console → Authentication → Settings → *Authorized domains* → thêm `recap.example.com`.
+   - Google Cloud Console → APIs & Services → Credentials → OAuth client *Web client (auto created by Google Service)*: thêm `https://recap.example.com` vào *Authorized JavaScript origins* và `https://recap.example.com/__/auth/handler` vào *Authorized redirect URIs*.
+3. **Cập nhật app.** Trong `infra/terraform.tfvars` thêm `custom_domain = "recap.example.com"`, rồi chạy `node infra/deploy.mjs --yes`. Terraform đổi host đăng nhập của app, thêm tên miền vào danh sách CORS của Function và vào khoá reCAPTCHA.
+4. **Cài lại trên iPhone.** App đã thêm vào Màn hình chính từ địa chỉ cũ nên xoá đi và thêm lại từ `https://recap.example.com`. Địa chỉ cũ (`*.firebaseapp.com`) vẫn mở được và tự chuyển sang tên miền mới.
+
+Dùng được thêm nhiều subdomain cho các web khác (`blog.example.com`...) miễn mỗi cái có bản ghi DNS riêng; chỉ `recap` gắn với app này.
+
 ### Giữ an toàn file Terraform trên PC
 
 - `terraform.tfstate` chứa **khoá Gemini dạng chữ thường** (và email). Đừng commit, đừng để trong thư mục đồng bộ Dropbox/Drive không mã hoá; nên bật mã hoá ổ đĩa. Nếu mất file này Terraform sẽ không còn biết tài nguyên đã tạo (phải `terraform import` lại), nên hãy sao lưu nó ở nơi riêng tư.

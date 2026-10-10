@@ -6,7 +6,7 @@ import { defineSecret, defineString } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { isAllowedToken, parseAllowedEmails } from "./auth";
 import { CaptureError, parseCaptureInput, runCapture, type CaptureDeps } from "./capture";
-import { DEFAULT_GEMINI_MODEL, GEMINI_BASE_URL, REGION } from "./config";
+import { allowedOrigins, DEFAULT_GEMINI_MODEL, GEMINI_BASE_URL, REGION } from "./config";
 import { GeminiClient } from "./gemini";
 import { FirestoreQuota } from "./usage";
 
@@ -36,7 +36,8 @@ export const capture = onCall(
     // single-use tokens so a captured token cannot be replayed.
     enforceAppCheck: !inEmulator,
     consumeAppCheckToken: !inEmulator,
-    cors: inEmulator ? true : [`https://${project}.web.app`, `https://${project}.firebaseapp.com`],
+    // Default Hosting hosts plus the optional custom domain (EXTRA_ORIGINS, set by Terraform).
+    cors: inEmulator ? true : allowedOrigins(project, process.env.EXTRA_ORIGINS),
     maxInstances: 3,
     concurrency: 4,
     timeoutSeconds: 180,
