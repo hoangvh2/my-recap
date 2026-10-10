@@ -37,6 +37,9 @@ object Prompts {
                     )
                 }
             }
+            SessionMode.MEMO -> appendLine(
+                "This is a short personal voice note, usually one speaker. Do not add speaker labels.",
+            )
             SessionMode.MEETING, SessionMode.CUSTOM -> appendLine(
                 "This is a meeting. Start each speaker turn on a new line with a label 'Người nói 1:', " +
                     "'Người nói 2:' and so on. If a speaker's name is clearly stated, use 'Name:' instead.",
@@ -81,86 +84,6 @@ object Prompts {
 
     /** Whisper's `prompt` only conditions vocabulary/style; keep it short (Whisper uses ~224 tokens). */
     fun whisperPrompt(previousTail: String): String = tail(previousTail, 300)
-
-    fun summarySystem(language: OutputLanguage): String =
-        "Bạn là trợ lý ghi chép chuyên nghiệp. Chỉ dựa trên transcript được cung cấp; không bịa thông tin. " +
-            "Nếu transcript không đủ để kết luận, ghi rõ 'Chưa đủ thông tin'. Transcript do máy nhận dạng giọng nói " +
-            "tạo ra nên có thể sai chính tả hoặc gán nhầm người nói — hãy suy luận hợp lý theo ngữ cảnh. " +
-            "Trình bày bằng Markdown gọn gàng, dễ đọc trên điện thoại. ${language.instruction}"
-
-    fun summaryTemplate(mode: SessionMode, customPrompt: String): String = when (mode) {
-        SessionMode.INTERVIEW -> """
-            Viết biên bản phỏng vấn với các mục:
-            ## Tổng quan
-            Vị trí ứng tuyển, người tham gia, nhận định chung trong 2–3 câu.
-            ## Câu hỏi & trả lời chính
-            Mỗi ý: **Câu hỏi** → tóm tắt câu trả lời của ứng viên.
-            ## Điểm mạnh
-            ## Điểm cần lưu ý / rủi ro
-            ## Đánh giá kỹ năng
-            Chuyên môn, giao tiếp, ngoại ngữ (nếu thể hiện trong buổi), thái độ. Có dẫn chứng ngắn.
-            ## Câu hỏi của ứng viên
-            ## Đề xuất bước tiếp theo
-        """.trimIndent()
-        SessionMode.MEETING -> """
-            Viết biên bản cuộc họp với các mục:
-            ## Tóm tắt
-            3–5 gạch đầu dòng quan trọng nhất.
-            ## Quyết định đã chốt
-            ## Việc cần làm
-            Dạng bảng: | Việc | Người phụ trách | Hạn |  (ghi "?" nếu không rõ).
-            ## Vấn đề còn mở
-            ## Chi tiết theo chủ đề
-        """.trimIndent()
-        SessionMode.CUSTOM -> customPrompt.ifBlank { "Tóm tắt nội dung chính, các quyết định và việc cần làm." }
-    }
-
-    fun summaryUserMessage(
-        mode: SessionMode,
-        customPrompt: String,
-        title: String,
-        durationMs: Long,
-        bookmarksMs: List<Long>,
-        transcript: String,
-        clipCount: Int = 1,
-        interviewer: InterviewerSpeech = InterviewerSpeech.KEEP,
-    ): String = buildString {
-        appendLine(summaryTemplate(mode, customPrompt))
-        appendLine()
-        if (clipCount > 1) {
-            appendLine(
-                "Transcript gồm $clipCount đoạn hội thoại người dùng đã chọn (có thể không liền nhau). " +
-                    "Mỗi đoạn bắt đầu bằng dòng [Đoạn N · thời gian] và tiêu đề chủ đề.",
-            )
-        }
-        if (mode == SessionMode.INTERVIEW && interviewer != InterviewerSpeech.KEEP) {
-            appendLine(
-                if (interviewer == InterviewerSpeech.DROP) {
-                    "Lời người phỏng vấn đã được lược bỏ; hãy suy ra câu hỏi từ tiêu đề đoạn và câu trả lời."
-                } else {
-                    "Lời người phỏng vấn đã được rút gọn thành câu hỏi ngắn."
-                },
-            )
-        }
-        if (clipCount > 1 || (mode == SessionMode.INTERVIEW && interviewer != InterviewerSpeech.KEEP)) appendLine()
-        if (bookmarksMs.isNotEmpty()) {
-            appendLine(
-                "Người dùng đã đánh dấu các thời điểm quan trọng: " +
-                    bookmarksMs.joinToString(", ") { TimeFormat.clock(it) } +
-                    ". Thêm mục '## Điểm được đánh dấu' nêu nội dung chính quanh các mốc này " +
-                    "(transcript ghi mốc ở đầu mỗi đoạn).",
-            )
-            appendLine()
-        }
-        appendLine("Tiêu đề: $title")
-        appendLine("Loại: ${mode.label}")
-        appendLine("Thời lượng ghi: ${TimeFormat.clock(durationMs)}")
-        appendLine()
-        appendLine("TRANSCRIPT:")
-        appendLine("<<<")
-        appendLine(transcript.trim())
-        appendLine(">>>")
-    }.trim()
 
     private fun tail(text: String, max: Int = TAIL_CHARS): String {
         val t = text.trim()

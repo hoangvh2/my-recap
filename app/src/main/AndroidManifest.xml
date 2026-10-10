@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Reminders for tasks and appointments: re-armed after reboot; exact timing if the user allows it. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Sideloaded personal app: lets the user exempt recording from battery optimisation in one tap. -->
     <uses-permission
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
@@ -42,6 +45,44 @@
             android:name=".recorder.RecordingService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <receiver
+            android:name=".reminder.ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".widget.CaptureWidget"
+            android:exported="true"
+            android:label="@string/quick_capture">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_capture_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.QuickCaptureTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_mic"
+            android:label="@string/quick_capture"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

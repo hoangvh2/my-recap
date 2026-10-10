@@ -49,7 +49,27 @@ data class AppSettings(
     val interviewerSpeech: InterviewerSpeech = InterviewerSpeech.KEEP,
     /** User confirmed they followed the vendor (Tecno/HiOS) background-run guide. */
     val vendorGuideDone: Boolean = false,
+
+    /** Keep the audio of quick captures after they were analysed (off: deleted right away). */
+    val keepMemoAudio: Boolean = false,
+    /** Delete folder audio this many days after its clip was transcribed; 0 = never. */
+    val audioRetentionDays: Int = 30,
+    /** Last home tab (0 = Thư ký, 1 = Ghi âm). */
+    val homeTab: Int = 0,
+
+    /** Folder (SAF tree URI) for the weekly automatic backup; blank = off. */
+    val autoBackupUri: String = "",
+    val autoBackupError: String = "",
+    val lastBackupAt: Long = 0,
 ) {
+    /** Quick captures: one clip unless very long, short phrases kept ("mua sữa" is under a second). */
+    fun memoSegmenterConfig(): SegmenterConfig = SegmenterConfig(
+        splitPauseMs = Int.MAX_VALUE,
+        trimSilence = true,
+        maxClipMs = 10 * 60_000,
+        minSpeechMs = 300,
+    )
+
     fun sttConfig(): ProviderConfig = when (sttProvider) {
         ProviderKind.GEMINI -> ProviderConfig(ProviderKind.GEMINI, geminiBaseUrl.trimEnd('/'), geminiKey.trim(), geminiSttModel.trim())
         ProviderKind.OPENAI_COMPATIBLE ->
@@ -116,6 +136,12 @@ class SettingsRepository(context: Context) {
             trimSilence = prefs.getBoolean("trimSilence", d.trimSilence),
             vadSensitivity = enumPref("vadSensitivity", d.vadSensitivity),
             interviewerSpeech = enumPref("interviewerSpeech", d.interviewerSpeech),
+            keepMemoAudio = prefs.getBoolean("keepMemoAudio", d.keepMemoAudio),
+            audioRetentionDays = prefs.getInt("audioRetentionDays", d.audioRetentionDays),
+            homeTab = prefs.getInt("homeTab", d.homeTab),
+            autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
+            autoBackupError = prefs.getString("autoBackupError", null) ?: d.autoBackupError,
+            lastBackupAt = prefs.getLong("lastBackupAt", d.lastBackupAt),
         )
     }
 
@@ -145,6 +171,12 @@ class SettingsRepository(context: Context) {
             .putBoolean("trimSilence", s.trimSilence)
             .putString("vadSensitivity", s.vadSensitivity.name)
             .putString("interviewerSpeech", s.interviewerSpeech.name)
+            .putBoolean("keepMemoAudio", s.keepMemoAudio)
+            .putInt("audioRetentionDays", s.audioRetentionDays)
+            .putInt("homeTab", s.homeTab)
+            .putString("autoBackupUri", s.autoBackupUri)
+            .putString("autoBackupError", s.autoBackupError)
+            .putLong("lastBackupAt", s.lastBackupAt)
             .apply()
     }
 

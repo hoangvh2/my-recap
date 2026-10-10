@@ -1,48 +1,65 @@
 package com.vh.myrecap.ui
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Summarize
+import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,11 +71,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.core.Prompts
@@ -69,14 +88,15 @@ import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.SummaryJob
 import com.vh.myrecap.data.TaskStatus
+import com.vh.myrecap.ui.theme.Brand
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /** Clips that can go into a summary: transcribed and containing speech. */
-private fun selectable(seg: Segment, text: String?): Boolean =
+fun selectable(seg: Segment, text: String?): Boolean =
     seg.stt == TaskStatus.DONE && !text.isNullOrBlank() && text != Prompts.NO_SPEECH && text != Prompts.INTERVIEWER_ONLY
+
+/** Clock time a clip started, or its position in the recording for old data without one. */
+fun clipTime(seg: Segment): String = if (seg.recordedAt > 0) clock(seg.recordedAt) else TimeFormat.clock(seg.startMs)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,13 +107,13 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     val detail by detailFlow.collectAsState(initial = null)
     val settings by vm.settings.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var selected by rememberSaveable(id) { mutableStateOf(listOf<Int>()) }
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var summarizing by remember { mutableStateOf(false) }
-    var deleting by remember { mutableStateOf(false) }
     var micDenied by remember { mutableStateOf(false) }
+    var confirmAudio by remember { mutableStateOf(false) }
     val recordMore = rememberRecordAction(onDenied = { micDenied = true }) { vm.recordMore(id) }
+    val scroll = TopAppBarDefaults.pinnedScrollBehavior()
 
     suspend fun shareFolder() {
         val title = detail?.session?.title ?: return
@@ -106,180 +126,151 @@ fun SessionScreen(vm: AppViewModel, id: String) {
     }
 
     val d = detail
-    // Drop selections of clips that were deleted or are no longer selectable.
-    val selectableIndexes = d?.session?.segments?.filter { selectable(it, d.clipText[it.index]) }?.map { it.index }.orEmpty()
-    val chosen = selected.filter { it in selectableIndexes }
-
     Scaffold(
+        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        d?.session?.title ?: "",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { renaming = true },
-                    )
-                },
+                title = {},
                 navigationIcon = {
-                    IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại") }
+                    IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Quay lại") }
                 },
                 actions = {
                     IconButton(onClick = { scope.launch { shareFolder() } }) {
-                        Icon(Icons.Filled.Share, contentDescription = "Chia sẻ cả folder")
+                        Icon(Icons.Rounded.Share, contentDescription = "Chia sẻ cả folder")
                     }
-                    IconButton(onClick = { renaming = true }) { Icon(Icons.Filled.Edit, contentDescription = "Đổi tên folder") }
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Thêm") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Chia sẻ cả folder (tóm tắt + transcript)") },
-                            onClick = {
-                                menu = false
-                                scope.launch { shareFolder() }
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Chia sẻ file ghi âm") },
-                            onClick = {
-                                menu = false
-                                d?.let { Sharing.shareAudio(context, MyRecapApp.from(context).store, it.session) }
-                            },
-                        )
-                        DropdownMenuItem(text = { Text("Xoá folder") }, onClick = { menu = false; deleting = true })
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            if (d != null && tab == 0 && d.session.segments.isNotEmpty()) {
-                Surface(tonalElevation = 3.dp) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        val pad = PaddingValues(horizontal = 8.dp)
-                        Button(
-                            onClick = { summarizing = true },
-                            enabled = chosen.isNotEmpty(),
-                            modifier = Modifier.weight(1.4f).height(56.dp),
-                            contentPadding = pad,
-                        ) { Text("Tóm tắt (${chosen.size})", fontSize = 16.sp, maxLines = 1) }
-                        FilledTonalButton(
-                            onClick = {
-                                scope.launch {
-                                    Sharing.shareText(context, d.session.title, d.session.title + "\n\n" + vm.clipsText(id, chosen))
-                                }
-                            },
-                            enabled = chosen.isNotEmpty(),
-                            modifier = Modifier.weight(1f).height(56.dp),
-                            contentPadding = pad,
-                        ) { Text("Chia sẻ", fontSize = 16.sp, maxLines = 1) }
-                        FilledTonalButton(
-                            onClick = { scope.launch { Sharing.copy(context, d.session.title, vm.clipsText(id, chosen)) } },
-                            enabled = chosen.isNotEmpty(),
-                            modifier = Modifier.weight(0.8f).height(56.dp),
-                            contentPadding = pad,
-                        ) { Text("Chép", fontSize = 16.sp, maxLines = 1) }
-                    }
-                }
-            }
-        },
-    ) { padding ->
-        if (d == null) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text("Không tìm thấy folder") }
-            return@Scaffold
-        }
-        val s = d.session
-        LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item {
-                Text(
-                    "${formatDate(s.createdAt)} · ${s.mode.label} · ${s.segments.size} đoạn · ${TimeFormat.clock(s.audioMs)}" +
-                        if (s.bookmarksMs.isNotEmpty()) " · ⭐ ${s.bookmarksMs.size}" else "",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            item { StatusCard(vm, s, settings.sttConfig().isComplete, statusText(s, settings)) }
-            if (micDenied) {
-                item { MessageCard("Cần quyền micro để ghi âm.", isError = true) }
-            }
-            if (!s.isRecording) {
-                item {
-                    OutlinedButton(
-                        onClick = recordMore,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) { Text("●  Ghi tiếp vào folder này", fontSize = 16.sp) }
-                }
-            }
-            item {
-                TabRow(selectedTabIndex = tab) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Đoạn (${s.segments.size})", maxLines = 1) })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Tóm tắt (${s.summaries.size})", maxLines = 1) })
-                }
-            }
-            if (tab == 0) {
-                if (s.segments.isEmpty()) {
-                    item { Text("Chưa có đoạn nào.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                } else {
-                    item {
-                        val allChosen = selectableIndexes.isNotEmpty() && chosen.size == selectableIndexes.size
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = selectableIndexes.isNotEmpty()) {
-                                    selected = if (allChosen) emptyList() else selectableIndexes
-                                },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = allChosen,
-                                onCheckedChange = { all -> selected = if (all) selectableIndexes else emptyList() },
-                                enabled = selectableIndexes.isNotEmpty(),
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Tuỳ chọn folder") }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Đổi tên") },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                                onClick = { menu = false; renaming = true },
                             )
-                            Text(
-                                if (chosen.isEmpty()) "Chọn tất cả · chọn đoạn để tóm tắt/chia sẻ" else "Đã chọn ${chosen.size}/${selectableIndexes.size}",
-                                style = MaterialTheme.typography.bodyMedium,
+                            val hasAudio = d != null && d.session.audioClips.isNotEmpty()
+                            DropdownMenuItem(
+                                text = { Text("Chia sẻ file ghi âm") },
+                                leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
+                                enabled = hasAudio,
+                                onClick = {
+                                    menu = false
+                                    d?.let { Sharing.shareAudio(context, MyRecapApp.from(context).store, it.session) }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Xoá file ghi âm (giữ văn bản)") },
+                                leadingIcon = { Icon(Icons.Rounded.DeleteSweep, null) },
+                                enabled = hasAudio && d?.session?.isRecording == false,
+                                onClick = { menu = false; confirmAudio = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Xoá folder", color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                                onClick = { menu = false; vm.requestDelete(id) },
                             )
                         }
                     }
-                    items(s.segments.sortedBy { it.index }, key = { "clip-${it.index}" }) { seg ->
-                        val text = d.clipText[seg.index]
-                        ClipCard(
-                            seg = seg,
-                            text = text,
-                            bookmarks = s.bookmarksMs.count { it >= seg.startMs && it <= seg.endMs },
-                            checked = seg.index in chosen,
-                            selectable = selectable(seg, text),
-                            onCheck = { on -> selected = if (on) chosen + seg.index else chosen - seg.index },
-                            onRetranscribe = { vm.retranscribe(id, seg.index) },
-                            onDelete = { vm.deleteClip(id, seg.index) },
-                        )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+                scrollBehavior = scroll,
+            )
+        },
+    ) { padding ->
+        if (d == null) return@Scaffold
+        val s = d.session
+        val status = folderStatus(s, settings)
+        val selectableClips = s.segments.filter { selectable(it, d.clipText[it.index]) }
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 32.dp,
+            ),
+        ) {
+            item {
+                FolderHeader(s, d.audioBytes, onRename = { renaming = true })
+            }
+            if (status.kind in setOf(StatusKind.WARNING, StatusKind.ERROR, StatusKind.WORKING, StatusKind.IDLE) && s.segments.isNotEmpty()) {
+                item {
+                    val transcribe: () -> Unit = { vm.transcribeAll(id) }
+                    val openSettings: () -> Unit = { vm.openSettings() }
+                    val (label, action) = when {
+                        status.kind == StatusKind.WARNING -> Pair<String?, (() -> Unit)?>("Cài đặt", openSettings)
+                        s.segments.any { it.stt == TaskStatus.ERROR } -> Pair("Thử lại", transcribe)
+                        status.kind == StatusKind.IDLE && s.sttBusy -> Pair("Chuyển ngay", transcribe)
+                        else -> Pair(null, null)
                     }
+                    Banner(status, label, action, Modifier.padding(top = 14.dp))
+                }
+            }
+            if (micDenied) {
+                item { Banner(StatusInfo(StatusKind.WARNING, "Cần quyền micro để ghi âm"), "Mở cài đặt", { openAppSettings(context) }, Modifier.padding(top = 10.dp)) }
+            }
+            item {
+                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { summarizing = true },
+                        enabled = selectableClips.isNotEmpty() && !s.isRecording,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                    ) {
+                        Icon(Icons.Rounded.Summarize, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Tóm tắt")
+                    }
+                    if (!s.isRecording) {
+                        OutlinedButton(onClick = recordMore, modifier = Modifier.weight(1f).height(50.dp)) {
+                            Icon(Icons.Rounded.Mic, null, Modifier.size(20.dp), tint = Brand.Record)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Ghi tiếp")
+                        }
+                    }
+                }
+            }
+            item {
+                SegmentedTabs(
+                    listOf("Đoạn hội thoại · ${s.segments.size}", "Tóm tắt · ${s.summaries.size}"),
+                    tab,
+                    onSelect = { tab = it },
+                    modifier = Modifier.padding(top = 20.dp, bottom = 14.dp),
+                )
+            }
+            if (tab == 0) {
+                if (s.segments.isEmpty()) {
+                    item { EmptyState(Icons.Rounded.ViewAgenda, "Chưa có đoạn nào", "Các lượt hội thoại sẽ xuất hiện ở đây khi ghi âm.") }
+                }
+                val ordered = s.segments.sortedBy { it.index }
+                items(ordered, key = { "clip-${it.index}" }) { seg ->
+                    ClipRow(
+                        seg = seg,
+                        text = d.clipText[seg.index],
+                        bookmarks = s.bookmarksMs.count { it >= seg.startMs && it <= seg.endMs },
+                        isLast = seg == ordered.last(),
+                        onOpen = { vm.openClip(id, seg.index) },
+                        onRetranscribe = { vm.retranscribe(id, seg.index) },
+                        onDelete = { vm.deleteClip(id, seg.index) },
+                    )
                 }
             } else {
                 val jobs = s.summaries.sortedByDescending { it.createdAt }
                 if (jobs.isEmpty()) {
                     item {
-                        Text(
-                            "Chưa có tóm tắt. Ở tab \"Đoạn\", chọn các đoạn cần thiết rồi bấm Tóm tắt.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        EmptyState(
+                            Icons.Rounded.Summarize,
+                            "Chưa có tóm tắt",
+                            "Bấm Tóm tắt, chọn mẫu và các đoạn cần thiết. AI chỉ đọc transcript, không gửi lại âm thanh.",
                         )
                     }
                 }
                 items(jobs, key = { "sum-${it.id}" }) { job ->
-                    SummaryCard(
+                    SummaryRow(
                         job = job,
                         text = d.summaryText[job.id],
-                        initiallyExpanded = job == jobs.firstOrNull(),
+                        onOpen = { vm.openSummary(id, job.id) },
                         onShare = { t -> Sharing.shareText(context, s.title, s.title + "\n\n" + ShareText.plain(t)) },
                         onCopy = { t -> Sharing.copy(context, s.title, ShareText.plain(t)) },
                         onRetry = { vm.retrySummary(id, job.id) },
@@ -288,221 +279,391 @@ fun SessionScreen(vm: AppViewModel, id: String) {
                 }
             }
         }
+
+        if (summarizing) {
+            SummarizeSheet(
+                session = s,
+                clips = selectableClips,
+                onDismiss = { summarizing = false },
+                onConfirm = { indexes, mode ->
+                    summarizing = false
+                    vm.summarize(id, indexes, mode)
+                    tab = 1
+                },
+            )
+        }
     }
 
-    val current = detail ?: return
+    if (confirmAudio) {
+        val d2 = detail
+        val pending = d2?.session?.audioClips?.count { it.stt != TaskStatus.DONE } ?: 0
+        ConfirmDialog(
+            title = "Xoá file ghi âm của folder?",
+            text = "Giải phóng khoảng ${formatBytes(d2?.audioBytes ?: 0)}. Transcript và tóm tắt vẫn giữ nguyên; " +
+                "sau khi xoá sẽ không nghe lại được." + if (pending > 0) " $pending đoạn chưa có transcript sẽ được giữ lại." else "",
+            confirmLabel = "Xoá ghi âm",
+            destructive = true,
+            onConfirm = { vm.deleteAudio(id) },
+            onDismiss = { confirmAudio = false },
+        )
+    }
     if (renaming) {
-        var title by remember { mutableStateOf(current.session.title) }
-        AlertDialog(
-            onDismissRequest = { renaming = false },
-            title = { Text("Đổi tên folder") },
-            text = { OutlinedTextField(value = title, onValueChange = { title = it }, singleLine = true) },
-            confirmButton = { Button(onClick = { vm.rename(id, title); renaming = false }) { Text("Lưu") } },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Huỷ") } },
-        )
-    }
-    if (summarizing) {
-        var mode by remember { mutableStateOf(current.session.mode) }
-        val clips = current.session.segments.filter { it.index in chosen }
-        AlertDialog(
-            onDismissRequest = { summarizing = false },
-            title = { Text("Tóm tắt ${clips.size} đoạn") },
-            text = {
-                Column {
-                    Text(
-                        "Âm thanh: ${TimeFormat.clock(clips.sumOf { it.durationMs })} · chỉ gửi văn bản (đã có), không gửi lại âm thanh.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    SessionMode.entries.forEach { m ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { mode = m }.padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = mode == m, onClick = { mode = m })
-                            Text("Mẫu: ${m.label}")
-                        }
-                    }
-                    if (mode == SessionMode.CUSTOM) {
-                        Text(
-                            "Mẫu 'Tự do' dùng yêu cầu bạn viết trong Cài đặt → AI tóm tắt.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    vm.summarize(id, chosen, mode)
-                    summarizing = false
-                    tab = 1
-                }) { Text("Tóm tắt") }
-            },
-            dismissButton = { TextButton(onClick = { summarizing = false }) { Text("Huỷ") } },
-        )
-    }
-    if (deleting) {
-        AlertDialog(
-            onDismissRequest = { deleting = false },
-            title = { Text("Xoá folder?") },
-            text = { Text("Xoá toàn bộ ghi âm, transcript và tóm tắt trong folder. Không thể hoàn tác.") },
-            confirmButton = { Button(onClick = { deleting = false; vm.delete(id) }) { Text("Xoá") } },
-            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Huỷ") } },
-        )
+        detail?.let { RenameDialog(it.session.title, onRename = { t -> vm.rename(id, t) }, onDismiss = { renaming = false }) }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatusCard(vm: AppViewModel, s: Session, sttReady: Boolean, status: Pair<String, Boolean>) {
-    val (text, isError) = status
-    val canTranscribe = !s.isRecording && s.sttBusy && s.segments.none { it.stt == TaskStatus.RUNNING }
-    MessageCard(text, isError) {
-        when {
-            !sttReady && s.sttBusy -> Button(onClick = vm::openSettings, modifier = Modifier.padding(top = 8.dp)) { Text("Mở Cài đặt") }
-            s.segments.any { it.stt == TaskStatus.ERROR } ->
-                Button(onClick = { vm.transcribeAll(s.id) }, modifier = Modifier.padding(top = 8.dp)) { Text("Thử lại các đoạn lỗi") }
-            canTranscribe -> Button(onClick = { vm.transcribeAll(s.id) }, modifier = Modifier.padding(top = 8.dp)) {
-                Text("Chuyển văn bản ngay")
-            }
+private fun FolderHeader(s: Session, audioBytes: Long, onRename: () -> Unit) {
+    val style = modeStyle(s.mode)
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconTile(style.icon, style.container, style.content, size = 52.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                s.title,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable(onClickLabel = "Đổi tên", onClick = onRename),
+            )
+            Text(
+                "${s.mode.label}  ·  ${formatDate(s.createdAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    FlowRow(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MetaChip(Icons.Rounded.ViewAgenda, "${s.segments.size} đoạn")
+        MetaChip(Icons.Rounded.Schedule, TimeFormat.clock(s.audioMs))
+        if (s.bookmarksMs.isNotEmpty()) MetaChip(Icons.Rounded.Bookmark, "${s.bookmarksMs.size}", Brand.Bookmark)
+        if (s.segments.isNotEmpty()) {
+            MetaChip(Icons.Rounded.GraphicEq, if (audioBytes == 0L) "Đã xoá ghi âm" else formatBytes(audioBytes))
         }
     }
 }
 
 @Composable
-private fun ClipCard(
+fun MetaChip(icon: ImageVector, text: String, tint: androidx.compose.ui.graphics.Color? = null) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(14.dp), tint = tint ?: MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(5.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun SegmentedTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val c = MaterialTheme.colorScheme
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(c.surfaceContainerHigh)
+            .padding(4.dp),
+    ) {
+        labels.forEachIndexed { i, label ->
+            val on = i == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (on) c.surfaceContainerLowest else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable(role = Role.Tab) { onSelect(i) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (on) c.onSurface else c.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ClipRow(
     seg: Segment,
     text: String?,
     bookmarks: Int,
-    checked: Boolean,
-    selectable: Boolean,
-    onCheck: (Boolean) -> Unit,
+    isLast: Boolean,
+    onOpen: () -> Unit,
     onRetranscribe: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var expanded by rememberSaveable(seg.index) { mutableStateOf(false) }
+    val c = MaterialTheme.colorScheme
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = if (checked) {
-            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        } else {
-            CardDefaults.cardColors()
-        },
-    ) {
-        Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
-            Checkbox(checked = checked, onCheckedChange = onCheck, enabled = selectable)
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clickable { expanded = !expanded }
-                    .padding(top = 12.dp, end = 4.dp),
-            ) {
-                val time = if (seg.recordedAt > 0) clockOf(seg.recordedAt) + " · " else ""
-                Text(
-                    "Đoạn ${seg.number} · $time${TimeFormat.clock(seg.durationMs)}" + if (bookmarks > 0) " · ⭐ $bookmarks" else "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                seg.title?.let { Text(it, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall) }
-                when (seg.stt) {
-                    TaskStatus.DONE -> {
-                        val body = text.orEmpty()
-                        if (expanded) {
-                            SelectionContainer { Text(body, style = MaterialTheme.typography.bodyMedium) }
-                        } else {
-                            Text(body, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        // Timeline: clock time and a rail connecting the turns of the conversation.
+        Column(Modifier.width(52.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(clipTime(seg), style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
+            Spacer(Modifier.height(6.dp))
+            if (!isLast) Box(Modifier.width(2.dp).weight(1f).clip(RoundedCornerShape(1.dp)).background(c.outlineVariant))
+        }
+        Surface(
+            onClick = onOpen,
+            shape = RoundedCornerShape(18.dp),
+            color = c.surfaceContainerLow,
+            modifier = Modifier.weight(1f).padding(bottom = 10.dp),
+        ) {
+            Column(Modifier.padding(start = 14.dp, top = 6.dp, bottom = 14.dp, end = 2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Đoạn ${seg.number}", style = MaterialTheme.typography.labelMedium, color = c.primary)
+                    Text("  ·  ${TimeFormat.clock(seg.durationMs)}", style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
+                    if (bookmarks > 0) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Rounded.Bookmark, "Có đánh dấu", Modifier.size(14.dp), tint = Brand.Bookmark)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { menu = true }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = "Tuỳ chọn đoạn", tint = c.onSurfaceVariant)
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Chuyển văn bản lại") },
+                                leadingIcon = { Icon(Icons.Rounded.Refresh, null) },
+                                onClick = { menu = false; onRetranscribe() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Xoá đoạn", color = c.error) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = c.error) },
+                                onClick = { menu = false; confirmDelete = true },
+                            )
                         }
                     }
-                    TaskStatus.PENDING -> Text("⏳ Chờ chuyển văn bản", style = MaterialTheme.typography.bodyMedium)
-                    TaskStatus.RUNNING -> Text("⏳ Đang chuyển văn bản…", style = MaterialTheme.typography.bodyMedium)
-                    TaskStatus.ERROR -> Text(
-                        "⚠️ ${seg.error ?: "Lỗi"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
                 }
-            }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Tuỳ chọn đoạn") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Chuyển văn bản lại") }, onClick = { menu = false; onRetranscribe() })
-                    DropdownMenuItem(text = { Text("Xoá đoạn") }, onClick = { menu = false; confirmDelete = true })
+                seg.title?.let {
+                    Text(it, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 12.dp))
+                    Spacer(Modifier.height(4.dp))
+                }
+                val body = Modifier.padding(end = 12.dp)
+                when (seg.stt) {
+                    TaskStatus.DONE -> Text(
+                        when (text?.trim()) {
+                            Prompts.NO_SPEECH -> "Không có lời nói"
+                            Prompts.INTERVIEWER_ONLY -> "Chỉ có lời người phỏng vấn"
+                            else -> text.orEmpty().lineSequence().joinToString(" ")
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = body,
+                    )
+                    TaskStatus.PENDING, TaskStatus.RUNNING -> Column(body) {
+                        Text(
+                            if (seg.stt == TaskStatus.RUNNING) "Đang chuyển thành văn bản" else "Chờ chuyển thành văn bản",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = c.onSurfaceVariant,
+                        )
+                        if (seg.stt == TaskStatus.RUNNING) {
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)))
+                        }
+                    }
+                    TaskStatus.ERROR -> Text(seg.error ?: "Không chuyển được văn bản", style = MaterialTheme.typography.bodyMedium, color = c.error, modifier = body)
                 }
             }
         }
     }
     if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Xoá đoạn ${seg.number}?") },
-            text = { Text("Xoá âm thanh và transcript của đoạn này.") },
-            confirmButton = { Button(onClick = { confirmDelete = false; onDelete() }) { Text("Xoá") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Huỷ") } },
+        ConfirmDialog(
+            "Xoá đoạn ${seg.number}?",
+            "Âm thanh và transcript của đoạn này sẽ bị xoá.",
+            "Xoá",
+            destructive = true,
+            onConfirm = onDelete,
+            onDismiss = { confirmDelete = false },
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SummaryCard(
+private fun SummaryRow(
     job: SummaryJob,
     text: String?,
-    initiallyExpanded: Boolean,
+    onOpen: () -> Unit,
     onShare: (String) -> Unit,
     onCopy: (String) -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var expanded by rememberSaveable(job.id) { mutableStateOf(initiallyExpanded) }
+    val c = MaterialTheme.colorScheme
     var confirmDelete by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.fillMaxWidth().clickable { expanded = !expanded }) {
-                Text(
-                    "Tóm tắt · ${job.mode.label} · ${job.clipIndexes.size} đoạn",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    formatDate(job.createdAt) + " · đoạn " + job.clipIndexes.joinToString(", ") { (it + 1).toString() },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    val style = modeStyle(job.mode)
+    Surface(
+        onClick = onOpen,
+        enabled = job.status == TaskStatus.DONE,
+        shape = RoundedCornerShape(20.dp),
+        color = c.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(style.icon, style.container, style.content, size = 38.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Tóm tắt ${job.mode.label.lowercase()}", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${job.clipIndexes.size} đoạn  ·  ${formatDate(job.createdAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.onSurfaceVariant,
+                    )
+                }
             }
+            Spacer(Modifier.height(12.dp))
             when (job.status) {
-                TaskStatus.PENDING, TaskStatus.RUNNING -> Text("⏳ Đang tóm tắt…")
+                TaskStatus.PENDING, TaskStatus.RUNNING -> {
+                    Text(job.progress ?: "Đang chuẩn bị…", style = MaterialTheme.typography.bodyMedium, color = c.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)))
+                }
                 TaskStatus.ERROR -> {
-                    Text("⚠️ ${job.error ?: "Lỗi"}", color = MaterialTheme.colorScheme.error)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onRetry) { Text("Thử lại") }
+                    Text(job.error ?: "Tóm tắt chưa thành công", style = MaterialTheme.typography.bodyMedium, color = c.error)
+                    Row(Modifier.padding(top = 6.dp)) {
+                        TextButton(onClick = onRetry) { Text("Thử lại") }
                         TextButton(onClick = { confirmDelete = true }) { Text("Xoá") }
                     }
                 }
                 TaskStatus.DONE -> {
                     val body = text.orEmpty()
-                    if (expanded) {
-                        SelectionContainer { MarkdownText(body) }
-                    } else {
-                        Text(body, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { onShare(body) }) { Text("Chia sẻ") }
-                        FilledTonalButton(onClick = { onCopy(body) }) { Text("Chép") }
-                        TextButton(onClick = { confirmDelete = true }) { Text("Xoá") }
+                    Text(
+                        ShareText.plain(body).lineSequence().filter { it.isNotBlank() }.joinToString("  ·  "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onOpen, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Xem chi tiết") }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { onCopy(body) }) { Icon(Icons.Rounded.ContentCopy, "Sao chép tóm tắt", tint = c.onSurfaceVariant) }
+                        IconButton(onClick = { onShare(body) }) { Icon(Icons.Rounded.Share, "Chia sẻ tóm tắt", tint = c.onSurfaceVariant) }
+                        IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, "Xoá tóm tắt", tint = c.onSurfaceVariant) }
                     }
                 }
             }
         }
     }
     if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Xoá bản tóm tắt này?") },
-            confirmButton = { Button(onClick = { confirmDelete = false; onDelete() }) { Text("Xoá") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Huỷ") } },
-        )
+        ConfirmDialog("Xoá bản tóm tắt này?", null, "Xoá", destructive = true, onConfirm = onDelete, onDismiss = { confirmDelete = false })
     }
 }
 
-private fun clockOf(ms: Long): String = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date(ms))
+private fun templateHint(mode: SessionMode) = when (mode) {
+    SessionMode.INTERVIEW -> "Đánh giá ứng viên + chi tiết từng câu hỏi"
+    SessionMode.MEETING -> "Quyết định, việc cần làm, vấn đề mở"
+    SessionMode.CUSTOM, SessionMode.MEMO -> "Theo yêu cầu bạn viết trong Cài đặt"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SummarizeSheet(
+    session: Session,
+    clips: List<Segment>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<Int>, SessionMode) -> Unit,
+) {
+    val c = MaterialTheme.colorScheme
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var mode by remember { mutableStateOf(session.mode) }
+    var chosen by remember { mutableStateOf(clips.map { it.index }.toSet()) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = c.surfaceContainerLow) {
+        // The confirm button stays pinned at the bottom; everything above scrolls, so it is always
+        // reachable on small screens and with many clips.
+        Column(Modifier.navigationBarsPadding()) {
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+            ) {
+                Text("Tạo tóm tắt", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "AI chỉ đọc transcript đã có, không gửi lại âm thanh.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Mẫu", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SessionMode.entries.filter { it.isFolderMode }.forEach { m ->
+                        val style = modeStyle(m)
+                        val on = m == mode
+                        Surface(
+                            onClick = { mode = m },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (on) c.primaryContainer.copy(alpha = 0.55f) else c.surfaceContainer,
+                            border = if (on) BorderStroke(1.5.dp, c.primary) else null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                IconTile(style.icon, style.container, style.content, size = 34.dp)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(m.label, style = MaterialTheme.typography.titleSmall)
+                                    Text(templateHint(m), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Đoạn hội thoại", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    val all = chosen.size == clips.size
+                    TextButton(onClick = { chosen = if (all) emptySet() else clips.map { it.index }.toSet() }) {
+                        Text(if (all) "Bỏ chọn tất cả" else "Chọn tất cả")
+                    }
+                }
+                clips.forEach { seg ->
+                    val on = seg.index in chosen
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(role = Role.Checkbox) { chosen = if (on) chosen - seg.index else chosen + seg.index }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = on, onCheckedChange = null, modifier = Modifier.padding(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(seg.title ?: "Đoạn ${seg.number}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                "Đoạn ${seg.number}  ·  ${clipTime(seg)}  ·  ${TimeFormat.clock(seg.durationMs)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = c.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            Surface(color = c.surfaceContainerLow) {
+                Button(
+                    onClick = { onConfirm(chosen.toList(), mode) },
+                    enabled = chosen.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .height(52.dp),
+                ) { Text("Tóm tắt ${chosen.size} đoạn") }
+            }
+        }
+    }
+}

@@ -19,6 +19,8 @@ class ApiException(
     val httpCode: Int? = null,
     val retryable: Boolean,
     cause: Throwable? = null,
+    /** The service answered but with no text (model returned nothing); not a transport failure. */
+    val emptyResult: Boolean = false,
 ) : IOException(message, cause)
 
 class HttpResponse(val code: Int, val body: String)

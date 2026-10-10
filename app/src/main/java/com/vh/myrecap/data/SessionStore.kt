@@ -1,6 +1,8 @@
 package com.vh.myrecap.data
 
 import com.vh.myrecap.core.ClipText
+import com.vh.myrecap.core.OutputLanguage
+import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.TranscriptAssembler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +22,9 @@ import java.util.UUID
  * All metadata writes go through [update] under one lock: the recording service, the background
  * worker and the UI all modify folders.
  */
-class SessionStore(private val root: File) {
+data class StorageStats(val audioBytes: Long, val otherBytes: Long)
+
+class SessionStore(val root: File) {
     private val lock = Any()
     private val _version = MutableStateFlow(0L)
 
@@ -33,6 +37,11 @@ class SessionStore(private val root: File) {
 
     fun dir(id: String) = File(root, id)
 
+    /** Tells observers to reload after folders were added on disk (restore). */
+    fun refresh() {
+        _version.value++
+    }
+
     fun create(mode: SessionMode, title: String): Session {
         val now = System.currentTimeMillis()
         val id = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(now)) + "-" +
@@ -43,6 +52,7 @@ class SessionStore(private val root: File) {
             mode = mode,
             createdAt = now,
             state = RecState.RECORDING,
+            extract = if (mode == SessionMode.MEMO) TaskStatus.PENDING else null,
         )
         synchronized(lock) {
             dir(id).mkdirs()
@@ -76,10 +86,50 @@ class SessionStore(private val root: File) {
             write(session.copy(segments = session.segments - clip))
             audioFile(id, clip).delete()
             transcriptFile(id, index).delete()
+            deleteNotes(id, index)
         }
     }
 
     fun audioFile(id: String, segment: Segment) = File(dir(id), segment.fileName)
+
+    /**
+     * Deletes the audio of transcribed clips (all of them when [indexes] is null) and keeps their
+     * text. Clips still waiting for speech-to-text keep their audio. Returns the bytes freed.
+     */
+    fun deleteAudio(id: String, indexes: Collection<Int>? = null): Long = synchronized(lock) {
+        val session = read(id) ?: return 0
+        var freed = 0L
+        val targets = session.segments
+            .filter { it.hasAudio && it.stt == TaskStatus.DONE && (indexes == null || it.index in indexes) }
+            .map { it.index }.toSet()
+        if (targets.isEmpty()) return 0
+        for (seg in session.segments.filter { it.index in targets }) {
+            val f = audioFile(id, seg)
+            freed += f.length()
+            f.delete()
+        }
+        write(session.copy(segments = session.segments.map { if (it.index in targets) it.copy(hasAudio = false) else it }))
+        freed
+    }
+
+    /** Bytes of audio still stored for this folder. */
+    fun audioBytes(session: Session): Long = session.audioClips.sumOf { audioFile(session.id, it).length() }
+
+    /** Disk use of all folders and captures, split into audio and everything else (text, metadata). */
+    fun storageStats(): StorageStats = synchronized(lock) {
+        var audio = 0L
+        var other = 0L
+        root.walkTopDown().filter { it.isFile }.forEach { f ->
+            if (f.name.endsWith(".aac")) audio += f.length() else other += f.length()
+        }
+        StorageStats(audio, other)
+    }
+
+    /** Plain text of a quick capture (all its clips, without headers). */
+    fun memoText(session: Session): String = session.segments.sortedBy { it.index }
+        .mapNotNull { readTranscript(session.id, it.index)?.trim() }
+        .filter { it.isNotEmpty() && it != Prompts.NO_SPEECH }
+        .joinToString("\n")
 
     fun transcriptFile(id: String, index: Int) = File(dir(id), String.format(Locale.ROOT, "seg_%03d.txt", index))
 
@@ -89,8 +139,24 @@ class SessionStore(private val root: File) {
     fun readTranscript(id: String, index: Int): String? = transcriptFile(id, index).takeIf { it.exists() }?.readText()
 
     fun writeTranscript(id: String, index: Int, text: String) {
+        deleteNotes(id, index) // notes were made from the old text
         writeAtomic(transcriptFile(id, index), text)
         _version.value++
+    }
+
+    /** Cached per-clip summary notes; they depend on the template and the output language. */
+    private fun notesFile(id: String, index: Int, mode: SessionMode, language: OutputLanguage) =
+        File(dir(id), String.format(Locale.ROOT, "seg_%03d.notes.%s.%s.md", index, mode.name, language.name))
+
+    fun readNotes(id: String, index: Int, mode: SessionMode, language: OutputLanguage): String? =
+        notesFile(id, index, mode, language).takeIf { it.exists() }?.readText()
+
+    fun writeNotes(id: String, index: Int, mode: SessionMode, language: OutputLanguage, text: String) =
+        writeAtomic(notesFile(id, index, mode, language), text)
+
+    private fun deleteNotes(id: String, index: Int) {
+        val prefix = String.format(Locale.ROOT, "seg_%03d.notes.", index)
+        dir(id).listFiles { f -> f.name.startsWith(prefix) }?.forEach { it.delete() }
     }
 
     fun readSummary(id: String, jobId: String): String? = summaryFile(id, jobId).takeIf { it.exists() }?.readText()

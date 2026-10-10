@@ -5,6 +5,12 @@ enum class SessionMode(val label: String) {
     INTERVIEW("Phỏng vấn"),
     MEETING("Cuộc họp"),
     CUSTOM("Tự do"),
+    /** Quick personal voice note, analysed into tasks, appointments, expenses and notes. */
+    MEMO("Ghi nhanh"),
+    ;
+
+    /** Modes offered when starting a folder recording; memos have their own button. */
+    val isFolderMode: Boolean get() = this != MEMO
 }
 
 enum class OutputLanguage(val label: String, val instruction: String) {
