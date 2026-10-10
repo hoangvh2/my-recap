@@ -227,7 +227,7 @@ class Phase3Test {
             shot("30-repeat-agenda")
 
             device.findObject(By.desc("Cài đặt")).click()
-            assertTrue("settings opened", device.wait(Until.hasObject(By.text("1. Chuyển giọng nói → văn bản")), 5_000))
+            assertTrue("settings opened", device.wait(Until.hasObject(By.text("Chuyển giọng nói → văn bản")), 5_000))
             shot("31a-settings-top")
             // Settings is one long page: swipe until the backup section shows.
             var backup: UiObject2? = null
