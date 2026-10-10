@@ -171,7 +171,7 @@ class Phase2FlowTest {
             assertTrue("restored", waitFor(5_000) { app.items.get("p2-task") != null })
 
             // Expenses: the overview card leads to the month view, which exports CSV.
-            val card = scrollTo(By.textStartsWith("Chi tiêu tháng"))
+            val card = scrollTo(By.textContains("chạm để xem chi tiết"))
             assertNotNull("month spending card", card)
             shot("28a-before-expenses")
             card!!.click()
