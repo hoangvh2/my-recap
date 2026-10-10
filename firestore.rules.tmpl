@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// GENERATED into firestore.rules by scripts/configure.mjs. The allowlist is substituted at deploy
+// time from the ALLOWED_EMAILS secret, so addresses never live in the (public) repository.
+//
+// Model: every document belongs to exactly one person under /users/{uid}. Only a verified Google
+// account on the allowlist, signed in as that uid, can touch it. Everything else is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function allowedUser() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email.lower() in [__ALLOWED_EMAILS__];
+    }
+
+    function owner(uid) {
+      return allowedUser() && request.auth.uid == uid;
+    }
+
+    function optString(d, k, max) {
+      return !(k in d) || d[k] == null || (d[k] is string && d[k].size() <= max);
+    }
+
+    function optInt(d, k) {
+      return !(k in d) || d[k] == null || d[k] is int;
+    }
+
+    function validItem(d, id) {
+      return d.keys().hasAll(['id', 'type', 'status', 'title', 'details', 'allDay', 'createdAt'])
+        && d.keys().hasOnly(['id', 'type', 'status', 'title', 'details', 'whenAt', 'allDay', 'amount',
+                             'category', 'place', 'person', 'sourceId', 'quote', 'createdAt', 'doneAt', 'recurrence'])
+        && id.matches('^[A-Za-z0-9_-]{1,64}$')
+        && d.id == id
+        && d.type in ['TASK', 'EVENT', 'EXPENSE', 'NOTE']
+        && d.status in ['DRAFT', 'OPEN', 'DONE']
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+        && d.details is string && d.details.size() <= 2000
+        && d.allDay is bool
+        && d.createdAt is int
+        && optInt(d, 'whenAt')
+        && optInt(d, 'doneAt')
+        && (!('amount' in d) || d.amount == null
+            || (d.amount is int && d.amount > 0 && d.amount <= 1000000000000 && d.type == 'EXPENSE'))
+        && optString(d, 'category', 40)
+        && optString(d, 'place', 120)
+        && optString(d, 'person', 120)
+        && optString(d, 'sourceId', 64)
+        && optString(d, 'quote', 400)
+        && (!('recurrence' in d) || d.recurrence == null
+            || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY']);
+    }
+
+    match /users/{uid}/items/{id} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 2000;
+      allow create: if owner(uid) && validItem(request.resource.data, id);
+      allow update: if owner(uid) && validItem(request.resource.data, id)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if owner(uid);
+    }
+
+    // Written only by the capture function (admin SDK, which bypasses rules).
+    match /users/{uid}/captures/{id} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 500;
+      allow delete: if owner(uid);
+    }
+
+    // Quota counters (users/{uid}/meta/usage) and anything unknown: no client access at all.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

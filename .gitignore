@@ -6,3 +6,23 @@ local.properties
 .DS_Store
 captures/
 .kotlin/
+
+# Web secretary (Firebase)
+node_modules/
+web/dist/
+functions/lib/
+functions/.env
+functions/.env.*
+functions/.secret.local
+firestore.rules
+config/allowed-emails.local
+.firebase/
+*-debug.log
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebaserc
+tests/e2e/.artifacts/
+tests/test-results/
+web/dist-e2e/
+tests/e2e/.artifacts/
