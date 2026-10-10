@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -487,18 +488,17 @@ private fun ShortcutRow() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Lối tắt Ghi nhanh", fontWeight = FontWeight.SemiBold)
         Hint("Ghi nhanh không cần mở app: widget ngoài màn hình chính, nút trong thanh cài đặt nhanh, hoặc giữ icon app.")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (canPinWidget) {
-                OutlinedButton(onClick = {
-                    widgets?.requestPinAppWidget(ComponentName(context, CaptureWidget::class.java), null, null)
-                }, modifier = Modifier.weight(1f)) { Text("Thêm widget", maxLines = 1) }
-            }
-            if (canAddTile) {
-                OutlinedButton(
-                    onClick = { if (Build.VERSION.SDK_INT >= 33) requestTile(context) },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Nút cài đặt nhanh", maxLines = 1) }
-            }
+        // Stacked full width: the labels stay whole on narrow phones.
+        if (canPinWidget) {
+            OutlinedButton(onClick = {
+                widgets?.requestPinAppWidget(ComponentName(context, CaptureWidget::class.java), null, null)
+            }, modifier = Modifier.fillMaxWidth()) { Text("Thêm widget ra màn hình chính") }
+        }
+        if (canAddTile) {
+            OutlinedButton(
+                onClick = { if (Build.VERSION.SDK_INT >= 33) requestTile(context) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Thêm nút vào cài đặt nhanh") }
         }
     }
 }
@@ -558,11 +558,13 @@ private fun BackupSection(vm: AppViewModel, s: AppSettings) {
             onClick = { createFile.launch(BackupManager.suggestedName()) },
             enabled = busy == null,
             modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 8.dp),
         ) { Text("Sao lưu ngay", maxLines = 1) }
         OutlinedButton(
             onClick = { openFile.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) },
             enabled = busy == null,
             modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 8.dp),
         ) { Text("Khôi phục", maxLines = 1) }
     }
     if (busy != null) {
