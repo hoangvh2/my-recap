@@ -10,7 +10,8 @@ import com.vh.myrecap.data.ItemStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -43,7 +44,8 @@ class ItemStoreTest {
 
     @After
     fun tearDown() {
-        scope.cancel()
+        // Stop the observer before closing, or its next query hits a closed database.
+        runBlocking { scope.coroutineContext[Job]!!.cancelAndJoin() }
         db.close()
         legacy.parentFile!!.deleteRecursively()
     }

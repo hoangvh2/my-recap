@@ -15,6 +15,8 @@ import com.vh.myrecap.core.TimeFormat
 import com.vh.myrecap.data.AppDatabase
 import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.widget.CaptureWidget
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -41,7 +43,12 @@ class MyRecapApp : Application() {
         private set
 
     /** Background work that outlives screens (database observation, start-up housekeeping). */
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
+            // Housekeeping must never take the app down; the failed step simply runs again next start.
+            Log.e("MyRecap", "Background task failed", e)
+        },
+    )
 
     @OptIn(FlowPreview::class)
     override fun onCreate() {
