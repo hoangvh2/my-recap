@@ -106,7 +106,7 @@ class Phase2FlowTest {
     private fun scrollTo(selector: androidx.test.uiautomator.BySelector): androidx.test.uiautomator.UiObject2? {
         // Down first, then back up: after a filter change the list may sit below its target.
         repeat(10) { attempt ->
-            device.findObject(selector)?.let { return it }
+            if (device.wait(Until.hasObject(selector), 1_000)) device.findObject(selector)?.let { return it }
             val w = device.displayWidth
             val h = device.displayHeight
             if (attempt < 4) device.swipe(w / 2, h * 3 / 4, w / 2, h / 3, 25) else device.swipe(w / 2, h / 3, w / 2, h * 3 / 4, 25)

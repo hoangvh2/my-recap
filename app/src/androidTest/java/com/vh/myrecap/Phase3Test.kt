@@ -91,7 +91,7 @@ class Phase3Test {
 
     private fun scrollTo(selector: BySelector): UiObject2? {
         repeat(10) { attempt ->
-            device.findObject(selector)?.let { return it }
+            if (device.wait(Until.hasObject(selector), 1_000)) device.findObject(selector)?.let { return it }
             val w = device.displayWidth
             val h = device.displayHeight
             if (attempt < 6) device.swipe(w / 2, h * 3 / 4, w / 2, h / 3, 25) else device.swipe(w / 2, h / 3, w / 2, h * 3 / 4, 25)

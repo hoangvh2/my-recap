@@ -121,9 +121,12 @@ class SecretaryFlowTest {
         val y = row!!.visibleBounds.centerY()
         val w = device.displayWidth
         repeat(8) { attempt ->
-            device.findObject(By.textStartsWith(label))?.let {
-                it.click()
-                return
+            // Wait briefly: Compose updates the accessibility tree a moment after a swipe.
+            if (device.wait(Until.hasObject(By.textStartsWith(label)), 1_000)) {
+                device.findObject(By.textStartsWith(label))?.let {
+                    it.click()
+                    return
+                }
             }
             // Scroll back to the start first, then towards the end.
             if (attempt < 3) device.swipe(w / 4, y, w * 3 / 4, y, 20) else device.swipe(w * 3 / 4, y, w / 4, y, 20)
