@@ -1,9 +1,12 @@
 import { render } from "preact";
 import "./styles.css";
 import { blockZoom } from "./lib/nozoom";
+import { applyTheme, themeMode } from "./lib/theme";
 import { App } from "./ui/App";
 
 blockZoom();
+// Before the first paint, so a chosen theme never flashes the other one.
+applyTheme(themeMode.get());
 
 if (import.meta.env.VITE_USE_EMULATORS === "true") await import("./e2e");
 

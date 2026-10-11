@@ -9,6 +9,7 @@ import { back, go, to } from "../lib/router";
 import { createStore, useStore } from "../lib/store";
 import { Icon, type IconName } from "./icons";
 import { useGraph } from "./hooks";
+import { BRAND, copyright } from "../brand";
 
 /** An anchor that moves inside the app without reloading, and still works with "open in new tab". */
 export function Link(props: { to: string; class?: string; children: ComponentChildren; label?: string }) {
@@ -174,5 +175,16 @@ export function ConfirmHost() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** The small VHub signature: app name, version, copyright. Quiet, at the end of a screen, never in the way. */
+export function Signature() {
+  return (
+    <footer class="signature" aria-label="Thông tin ứng dụng">
+      <span class="mark" aria-hidden="true">V</span>
+      <span><strong>{BRAND.app}</strong> · phiên bản {BRAND.version}</span>
+      <span>{copyright()} · {BRAND.domain}</span>
+    </footer>
   );
 }

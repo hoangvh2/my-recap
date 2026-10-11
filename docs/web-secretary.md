@@ -1,4 +1,6 @@
-# Bản web "Thư ký" cho iPhone (PWA + Firebase)
+# VHub Thư ký: bản web cho iPhone (PWA + Firebase)
+
+> Tên app: **VHub Thư ký** (trước đây "My Recap · Thư ký"), thuộc hệ sinh thái VHub (`vhub.id.vn`).
 
 Mục đích: người dùng iPhone chỉ cần chức năng **Thư ký** (ghi nhanh việc, lịch hẹn, chi tiêu, ghi chú), không cần ghi âm phỏng vấn/họp. Bản này có thêm bộ công cụ cho người **làm kinh doanh**: quản lý **khách**, **license/bảo hành** và nhắc **gia hạn trước khi hết hạn** (xem [Bán hàng](#bán-hàng-khách-licensebảo-hành-và-gia-hạn)). Không cần tài khoản Apple Developer: cài bằng Safari → Chia sẻ → **Thêm vào Màn hình chính**.
 
@@ -90,6 +92,21 @@ iPhone (PWA, Preact)
 
 - Bố cục chạy hết chiều ngang (E2E kiểm ở 428 × 926, iPhone 12 Pro Max): không màn nào cuộn ngang hay có phần tử tràn ra ngoài.
 - **Không phóng to/thu nhỏ được**: viewport `maximum-scale=1, user-scalable=no`, CSS `touch-action: pan-x pan-y` (chặn chụm 2 ngón và chạm đúp), chặn sự kiện `gesturestart` của Safari, và mọi ô nhập ≥ 16px (iOS tự phóng to khi chạm vào ô chữ nhỏ hơn). Đánh đổi: người cần phóng chữ để đọc không phóng được; nếu cần, nên thêm nút cỡ chữ trong Cài đặt thay vì mở lại zoom.
+
+## Giao diện và thương hiệu VHub
+
+- **Chế độ màu**: Cài đặt → Giao diện → Tự động (theo điện thoại) / Sáng / Tối. Nhớ trên từng máy (localStorage, chỉ là tuỳ chọn hiển thị, không phải dữ liệu cá nhân); áp dụng trước khi vẽ giao diện nên không nháy màu.
+- **Bảng màu VHub**: nền graphite trung tính (không ánh xanh dương), một màu nhấn teal dùng tiết chế (nút chính, micro, liên kết), màu đỏ/vàng/xanh lá chỉ cho trạng thái. Mọi màu chữ đạt tương phản ≥ 4.5:1 (WCAG AA) trên nền của nó, ở cả hai chế độ.
+
+| Token | Sáng | Tối |
+|---|---|---|
+| Nền / bề mặt | `#f6f7f9` / `#ffffff` | `#0b0d10` / `#14171c` |
+| Chữ / chữ phụ | `#111418` / `#5b6472` | `#e8eaed` / `#9aa3ae` |
+| Nhấn (teal) | `#0f766e` | `#2dd4bf` |
+| Thẻ Ghi nhanh | graphite `#161b22 → #262d37` | `#1b2028 → #232a33` |
+
+- **Chữ ký thương hiệu**: dòng nhỏ "VHub Thư ký · phiên bản x.y.z · © năm VHub · vhub.id.vn" ở cuối màn Cài đặt và màn đăng nhập; không chiếm chỗ trên các màn làm việc. Tên, phiên bản, năm nằm ở `web/src/brand.ts` (phiên bản lấy từ `web/package.json`).
+- Tên hiển thị trên Màn hình chính iPhone: **VHub Thư ký**. Muốn đổi tên trên iPhone đã cài: xoá biểu tượng cũ rồi Thêm vào Màn hình chính lại.
 
 ## Các lớp bảo mật
 

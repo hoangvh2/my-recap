@@ -95,3 +95,44 @@ test("'cần 2 license SIM và CheckPoint' arrives as two draft licences and lan
   await expect(page.locator(".lic-row", { hasText: "CheckPoint" })).toBeVisible();
   expectNoProblems(problems);
 });
+
+test("Light/Dark/Auto theme from Settings, remembered on this device; the VHub signature is there but small", async ({ page, request }) => {
+  const problems = watchBrowser(page);
+  const who = await idTokenFor(request, OWNER);
+  const now = Date.now();
+  await seed(request, who, "items", "a", { type: "EVENT", status: "OPEN", title: "Họp với khách", details: "", place: "VP ABC", allDay: false, whenAt: now + 3_600_000, createdAt: now });
+  await seed(request, who, "items", "b", { type: "TASK", status: "OPEN", title: "Gửi báo giá", details: "", allDay: true, whenAt: now, important: true, createdAt: now });
+  await page.emulateMedia({ colorScheme: "light" });
+  await signIn(page, OWNER);
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(await bg()).toBe("rgb(246, 247, 249)");
+  await shot(page, "60-today-light");
+
+  await page.getByRole("link", { name: "Cài đặt" }).click();
+  await page.getByRole("radio", { name: "Tối" }).click();
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+  expect(await bg()).toBe("rgb(11, 13, 16)");
+  expect(await page.locator('meta[name="theme-color"]').first().getAttribute("content")).toBe("#0b0d10");
+  // The signature: app name, version, copyright, at the bottom of Settings.
+  const sig = page.locator(".signature");
+  await expect(sig).toContainText("VHub Thư ký");
+  await expect(sig).toContainText(/© 20\d\d VHub/);
+  expect((await sig.boundingBox())!.height).toBeLessThan(90);
+  await shot(page, "61-settings-dark");
+
+  // Remembered after a reload, before anything is drawn.
+  await page.reload();
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+  await page.locator(".tabbar").getByText("Hôm nay", { exact: true }).click();
+  await shot(page, "62-today-dark");
+
+  // "Tự động" follows the phone.
+  await page.goto("/#/cai-dat");
+  await page.getByRole("radio", { name: "Tự động" }).click();
+  expect(await page.evaluate(() => document.documentElement.hasAttribute("data-theme"))).toBe(false);
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await bg()).toBe("rgb(11, 13, 16)");
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await bg()).toBe("rgb(246, 247, 249)");
+  expectNoProblems(problems);
+});

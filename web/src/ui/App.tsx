@@ -4,6 +4,8 @@ import { useStore } from "../lib/store";
 import { session, signInWithGoogle, signOut, startSession } from "../session";
 import { Shell } from "./Shell";
 import { Icon } from "./icons";
+import { BRAND } from "../brand";
+import { Signature } from "./common";
 
 export function App() {
   const s = useStore(session);
@@ -22,12 +24,13 @@ function Login({ error }: { error?: string }) {
     <div class="center">
       <div class="card login">
         <img src="/icons/icon-192.png" width="72" height="72" alt="" />
-        <h1>My Recap · Thư ký</h1>
-        <p class="muted">Ghi nhanh việc, lịch hẹn và chi tiêu bằng giọng nói.</p>
+        <h1>{BRAND.app}</h1>
+        <p class="muted">{BRAND.tagline}. Nói một câu, app tự sắp xếp và nhắc đúng lúc.</p>
         <button class="btn solid wide" onClick={() => void signInWithGoogle()}>Đăng nhập bằng Google</button>
         {error && <p class="alert" role="alert">{error}</p>}
         <p class="note"><Icon name="lock" size={14} /> Chỉ các tài khoản được cấp quyền mới dùng được.</p>
       </div>
+      <Signature />
     </div>
   );
 }

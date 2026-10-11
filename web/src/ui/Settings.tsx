@@ -9,8 +9,9 @@ import {
 import { templateCsv } from "../lib/table";
 import { to } from "../lib/router";
 import { useStore } from "../lib/store";
+import { setTheme, THEME_LABEL, THEME_MODES, themeMode } from "../lib/theme";
 import { signOut } from "../session";
-import { confirmDialog, Link, Section, TopBar } from "./common";
+import { confirmDialog, Link, Section, Signature, TopBar } from "./common";
 import { saveFile } from "./download";
 import { useCtx, useGraph, useUid } from "./hooks";
 import { Icon } from "./icons";
@@ -106,6 +107,7 @@ function CalendarLink() {
 export function Settings({ email }: { email: string }) {
   const uid = useUid();
   const saved = useStore(prefsStore);
+  const theme = useStore(themeMode);
   const g = useGraph();
   const ctx = useCtx();
   const [draft, setDraft] = useState<Prefs>(saved);
@@ -144,6 +146,17 @@ export function Settings({ email }: { email: string }) {
   return (
     <>
       <TopBar title="Cài đặt" backTo={to.today} />
+
+      <Section title="Giao diện">
+        <div class="card-block">
+          <div class="seg seg3" role="radiogroup" aria-label="Chế độ màu">
+            {THEME_MODES.map((m) => (
+              <button type="button" key={m} role="radio" aria-checked={theme === m} class={theme === m ? "on" : ""} onClick={() => setTheme(m)}>{THEME_LABEL[m]}</button>
+            ))}
+          </div>
+          <p class="hint">“Tự động” đổi theo cài đặt Sáng/Tối của điện thoại. Lựa chọn được nhớ trên máy này.</p>
+        </div>
+      </Section>
 
       <Section title="Thông báo trên điện thoại">
         <div class="card-block"><NotifySettingsCard /></div>
@@ -200,6 +213,7 @@ export function Settings({ email }: { email: string }) {
           <button class="btn danger wide" onClick={() => void signOut()}><Icon name="logout" size={18} /> Đăng xuất</button>
         </div>
       </Section>
+      <Signature />
     </>
   );
 }

@@ -232,7 +232,7 @@ function reminderMessage(d: Due, input: PlanInput): Message {
   return msg;
 }
 
-const link = (appUrl: string | undefined, hash: string) => (appUrl ? { url: `${appUrl.replace(/\/$/, "")}/${hash}`, urlTitle: "Mở Thư ký" } : {});
+const link = (appUrl: string | undefined, hash: string) => (appUrl ? { url: `${appUrl.replace(/\/$/, "")}/${hash}`, urlTitle: "Mở VHub Thư ký" } : {});
 
 /** Keeps a body under Pushover's limit by dropping whole lines from the end. */
 function fit(lines: string[]): string {
@@ -407,7 +407,7 @@ export function sampleMessage(s: NotifySettings, nowMs: number, appUrl?: string)
       `<b>${clock(nowMs + s.lead * 60_000, s.zone)} – ${clock(nowMs + s.lead * 60_000 + HOUR_MS, s.zone)} · ${escapeHtml(dayText(nowMs, nowMs, s.zone))}</b>`,
       "📍 Văn phòng",
       "👤 anh Nam · Công ty ABC",
-      "<i>Đây là tin thử từ Thư ký. Nhận được tin này là thông báo đã chạy.</i>",
+      "<i>Đây là tin thử từ VHub Thư ký. Nhận được tin này là thông báo đã chạy.</i>",
     ]),
     at: nowMs,
     ...link(appUrl, "#/cai-dat"),
