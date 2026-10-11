@@ -215,9 +215,9 @@ class SecretaryFlowTest {
             shot("19-expenses")
 
             clickChip("Việc")
-            val task = scrollTo(By.text("Gửi báo giá cho khách"))
-            assertNotNull("task not on screen", task)
-            task!!.click()
+            val taskRow = scrollTo(By.text("Gửi báo giá cho khách"))
+            assertNotNull("task not on screen", taskRow)
+            taskRow!!.click()
             assertTrue("item editor not shown", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000))
             shot("20-item-editor")
             // The link back to the capture sits at the end of the form.
