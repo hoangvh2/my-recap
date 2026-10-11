@@ -128,7 +128,7 @@ export const calendarfeed = onRequest(
         res.status(r.status).end();
         return;
       }
-      res.status(200).type("text/calendar; charset=utf-8").set("Content-Disposition", 'inline; filename="thu-ky.ics"');
+      res.status(200).type("text/calendar; charset=utf-8").set("Content-Disposition", 'inline; filename="vhub-desk.ics"');
       res.send(req.method === "HEAD" ? undefined : r.body);
     } catch (e) {
       logger.error("calendarfeed crashed", { error: e instanceof Error ? e.name : "unknown" });

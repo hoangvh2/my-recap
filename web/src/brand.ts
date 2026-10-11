@@ -1,12 +1,12 @@
 /**
- * The VHub signature, kept in one place. VHub is the family of personal apps under vhub.id.vn; this one
- * is the household secretary: tasks, appointments, reminders, customers and licence renewals.
+ * The VHub signature, kept in one place. VHub is the family of personal apps under vhub.id.vn; VHub Desk
+ * (desk.vhub.id.vn) is the work desk: tasks, appointments, reminders, customers and licence renewals.
  */
 declare const __APP_VERSION__: string;
 
 export const BRAND = {
   family: "VHub",
-  app: "VHub Thư ký",
+  app: "VHub Desk",
   tagline: "Việc, lịch hẹn, nhắc việc và gia hạn license",
   domain: "vhub.id.vn",
   version: typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev",

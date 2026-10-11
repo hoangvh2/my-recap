@@ -115,7 +115,7 @@ test("Light/Dark/Auto theme from Settings, remembered on this device; the VHub s
   expect(await page.locator('meta[name="theme-color"]').first().getAttribute("content")).toBe("#0b0d10");
   // The signature: app name, version, copyright, at the bottom of Settings.
   const sig = page.locator(".signature");
-  await expect(sig).toContainText("VHub Thư ký");
+  await expect(sig).toContainText("VHub Desk");
   await expect(sig).toContainText(/© 20\d\d VHub/);
   expect((await sig.boundingBox())!.height).toBeLessThan(90);
   await shot(page, "61-settings-dark");

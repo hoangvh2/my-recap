@@ -139,7 +139,7 @@ resource "google_cloudfunctions2_function" "notifytick" {
 resource "google_service_account" "scheduler" {
   project      = var.project_id
   account_id   = "myrecap-scheduler"
-  display_name = "My Recap reminder schedule"
+  display_name = "VHub Desk reminder schedule"
 
   depends_on = [google_project_service.api]
 }

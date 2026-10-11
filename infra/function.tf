@@ -2,7 +2,7 @@
 resource "google_service_account" "runtime" {
   project      = var.project_id
   account_id   = "myrecap-capture"
-  display_name = "My Recap capture function"
+  display_name = "VHub Desk capture function"
 
   depends_on = [google_project_service.api]
 }
@@ -22,7 +22,7 @@ resource "google_project_iam_member" "runtime" {
 resource "google_service_account" "build" {
   project      = var.project_id
   account_id   = "myrecap-build"
-  display_name = "My Recap function builds"
+  display_name = "VHub Desk function builds"
 
   depends_on = [google_project_service.api]
 }

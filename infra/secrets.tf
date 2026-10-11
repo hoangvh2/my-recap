@@ -4,7 +4,7 @@ resource "google_apikeys_key" "gemini" {
   count        = var.gemini_api_key == null ? 1 : 0
   project      = var.project_id
   name         = "my-recap-gemini"
-  display_name = "My Recap - Gemini (server side)"
+  display_name = "VHub Desk - Gemini (server side)"
 
   restrictions {
     api_targets {

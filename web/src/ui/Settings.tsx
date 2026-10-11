@@ -134,11 +134,11 @@ export function Settings({ email }: { email: string }) {
   const exportCalendar = async () => {
     const text = buildEverythingCalendar(g, ctx);
     if (!text) return showToast("Chưa có việc hay mốc gia hạn nào phía trước");
-    await saveFile("thu-ky-lich.ics", "text/calendar", text);
+    await saveFile("vhub-desk-lich.ics", "text/calendar", text);
   };
   const backup = async () => {
     const day = new Date().toISOString().slice(0, 10);
-    await saveFile(`thu-ky-sao-luu-${day}.json`, "application/json", JSON.stringify({
+    await saveFile(`vhub-desk-sao-luu-${day}.json`, "application/json", JSON.stringify({
       app: "my-recap-web", exportedAt: Date.now(), customers: customers.get(), licenses: licenses.get(), items: itemsStore.get().filter((i) => i.status !== "DRAFT"),
     }, null, 2));
   };

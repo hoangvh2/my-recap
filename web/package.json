@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "My Recap web secretary (iPhone / any browser): installable PWA backed by Firebase.",
+  "description": "VHub Desk (desk.vhub.id.vn): tasks, appointments, reminders and licence renewals. Installable PWA backed by Firebase.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

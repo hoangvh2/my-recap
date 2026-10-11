@@ -92,7 +92,7 @@ export async function renderFeed(store: FeedStore, uid: string, zone: string, no
     if (l.status !== "OPEN") continue;
     events.push(...eventsForLicense(l, names.get(l.customerId) ?? "Khách", { today, prefs: data.prefs, zone }));
   }
-  return renderCalendar(data.alarms ? events : events.map((e) => ({ ...e, alarm: "" })), { stamp: nowMs, name: "VHub Thư ký · Việc & Gia hạn", refreshHours: 1 });
+  return renderCalendar(data.alarms ? events : events.map((e) => ({ ...e, alarm: "" })), { stamp: nowMs, name: "VHub Desk · Việc & Gia hạn", refreshHours: 1 });
 }
 
 // ---------------------------------------------------------------- Firestore

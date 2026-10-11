@@ -126,7 +126,7 @@ test("exports: calendar file and JSON backup; sign out", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Cài đặt" })).toBeVisible();
   await shot(page, "08-settings");
   let [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Xuất một lần/ }).click()]);
-  expect(dl.suggestedFilename()).toBe("thu-ky-lich.ics");
+  expect(dl.suggestedFilename()).toBe("vhub-desk-lich.ics");
   const ics = readFileSync((await dl.path())!, "utf8");
   expect(ics).toContain("BEGIN:VEVENT");
   expect(ics).toContain("SUMMARY:Họp anh Nam");

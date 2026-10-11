@@ -25,5 +25,5 @@ export function buildEverythingCalendar(g: Graph, ctx: Ctx, stamp = Date.now()):
     if (e) events.push(e);
   }
   for (const l of g.licenses) if (l.status === "OPEN") events.push(...eventsForLicense(l, g.customerName(l.customerId), ctx));
-  return events.length > 0 ? renderCalendar(events, { stamp, name: "VHub Thư ký · Việc & Gia hạn" }) : "";
+  return events.length > 0 ? renderCalendar(events, { stamp, name: "VHub Desk · Việc & Gia hạn" }) : "";
 }

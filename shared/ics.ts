@@ -110,7 +110,7 @@ export interface CalendarOptions {
 /** iCalendar text for a set of entries (CRLF line ends, long lines folded). */
 export function renderCalendar(events: readonly CalEvent[], opts: CalendarOptions = {}): string {
   const stamp = opts.stamp ?? Date.now();
-  const head = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//VHub//Thu ky//VI", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  const head = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//VHub//Desk//VI", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
   if (opts.name) head.push(`X-WR-CALNAME:${escapeText(opts.name)}`);
   if (opts.refreshHours) head.push(`REFRESH-INTERVAL;VALUE=DURATION:PT${opts.refreshHours}H`, `X-PUBLISHED-TTL:PT${opts.refreshHours}H`);
   const lines = [...head, ...events.flatMap((e) => eventLines(e, stamp)), "END:VCALENDAR"];

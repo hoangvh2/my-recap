@@ -1,6 +1,6 @@
-# VHub Thư ký: bản web cho iPhone (PWA + Firebase)
+# VHub Desk: bản web cho iPhone (PWA + Firebase)
 
-> Tên app: **VHub Thư ký** (trước đây "My Recap · Thư ký"), thuộc hệ sinh thái VHub (`vhub.id.vn`).
+> Tên app: **VHub Desk** (trước đây "My Recap · Thư ký"), địa chỉ **`https://desk.vhub.id.vn`**, thuộc hệ sinh thái VHub (`vhub.id.vn`). Đổi địa chỉ từ `recap.vhub.id.vn`: xem [infra/README.md, Phần 8](../infra/README.md#đang-chạy-ở-recapvhubidvn-chuyển-sang-deskvhubidvn).
 
 Mục đích: người dùng iPhone chỉ cần chức năng **Thư ký** (ghi nhanh việc, lịch hẹn, chi tiêu, ghi chú), không cần ghi âm phỏng vấn/họp. Bản này có thêm bộ công cụ cho người **làm kinh doanh**: quản lý **khách**, **license/bảo hành** và nhắc **gia hạn trước khi hết hạn** (xem [Bán hàng](#bán-hàng-khách-licensebảo-hành-và-gia-hạn)). Không cần tài khoản Apple Developer: cài bằng Safari → Chia sẻ → **Thêm vào Màn hình chính**.
 
@@ -80,7 +80,7 @@ iPhone (PWA, Preact)
 - Đánh dấu xong, bỏ "Quan trọng" hay xoá mục trong app: phút sau server **huỷ** tin khẩn đang lặp trên điện thoại (Pushover receipt).
 - **Lịch hẹn** cũng có vòng tròn "Đã xong" (viền đứt nét), và màn sửa có nút **Đã xong**. Lịch lặp lại bấm Đã xong chỉ xong lần này, tự chuyển sang lần sau.
 
-**Nội dung tin:** tiêu đề `🟠 15 phút nữa · Họp anh Nam` (mức + khi nào + việc gì, đọc được ngay trên màn hình khoá); thân tin: giờ bắt đầu–kết thúc và ngày, 📍 địa điểm, 👤 người/khách, 📝 chi tiết, và nút **Mở Thư ký**. Tin nhắc lịch hẹn tự biến mất sau khi lịch đã bắt đầu 15 phút.
+**Nội dung tin:** tiêu đề `🟠 15 phút nữa · Họp anh Nam` (mức + khi nào + việc gì, đọc được ngay trên màn hình khoá); thân tin: giờ bắt đầu–kết thúc và ngày, 📍 địa điểm, 👤 người/khách, 📝 chi tiết, và nút **Mở VHub Desk**. Tin nhắc lịch hẹn tự biến mất sau khi lịch đã bắt đầu 15 phút.
 
 **Cách chạy:** Cloud Scheduler gọi function riêng tư `notifytick` mỗi phút. Mỗi lần chỉ đọc các mục trong khoảng thời gian liên quan + các mục lặp lại; mỗi tin có khoá riêng ghi vào `users/{uid}/notifylog` (tự xoá sau 14 ngày) nên **không bao giờ gửi trùng**; lỡ một lần chạy thì lần sau gửi bù (trong 10 phút). Lỗi tạm thời của Pushover thì thử lại phút sau; bị từ chối (key sai) thì dừng. Cài đặt chỉ lưu qua function `notifysettings`, function này **hỏi Pushover xác nhận User Key trước** khi lưu.
 
@@ -105,8 +105,8 @@ iPhone (PWA, Preact)
 | Nhấn (teal) | `#0f766e` | `#2dd4bf` |
 | Thẻ Ghi nhanh | graphite `#161b22 → #262d37` | `#1b2028 → #232a33` |
 
-- **Chữ ký thương hiệu**: dòng nhỏ "VHub Thư ký · phiên bản x.y.z · © năm VHub · vhub.id.vn" ở cuối màn Cài đặt và màn đăng nhập; không chiếm chỗ trên các màn làm việc. Tên, phiên bản, năm nằm ở `web/src/brand.ts` (phiên bản lấy từ `web/package.json`).
-- Tên hiển thị trên Màn hình chính iPhone: **VHub Thư ký**. Muốn đổi tên trên iPhone đã cài: xoá biểu tượng cũ rồi Thêm vào Màn hình chính lại.
+- **Chữ ký thương hiệu**: dòng nhỏ "VHub Desk · phiên bản x.y.z · © năm VHub · vhub.id.vn" ở cuối màn Cài đặt và màn đăng nhập; không chiếm chỗ trên các màn làm việc. Tên, phiên bản, năm nằm ở `web/src/brand.ts` (phiên bản lấy từ `web/package.json`).
+- Tên hiển thị trên Màn hình chính iPhone: **VHub Desk**. Muốn đổi tên trên iPhone đã cài: xoá biểu tượng cũ rồi Thêm vào Màn hình chính lại.
 
 ## Các lớp bảo mật
 
