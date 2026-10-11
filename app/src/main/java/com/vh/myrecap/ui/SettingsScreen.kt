@@ -84,6 +84,7 @@ import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.VadSensitivity
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
+import com.vh.myrecap.core.ThemeMode
 import com.vh.myrecap.settings.AppSettings
 import kotlinx.coroutines.launch
 
@@ -114,6 +115,11 @@ fun SettingsScreen(vm: AppViewModel) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            Section("Giao diện") {
+                ChoiceRow(ThemeMode.entries, s.themeMode, { it.label }) { m -> update { it.copy(themeMode = m) } }
+                Hint("Tự động theo chế độ sáng/tối của điện thoại. Màu sắc giữ nguyên bảng màu của app.")
+            }
+
             Section("1. Chuyển giọng nói → văn bản") {
                 ProviderChoice(s.sttProvider) { k -> update { it.copy(sttProvider = k) } }
                 Hint(

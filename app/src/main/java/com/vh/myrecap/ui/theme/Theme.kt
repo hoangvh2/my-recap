@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vh.myrecap.R
+import com.vh.myrecap.core.ThemeMode
 
 /** Colours taken from the app icon; used where the brand should show regardless of light/dark. */
 object Brand {
@@ -138,12 +139,12 @@ private val AppShapes = Shapes(
 
 /**
  * Fixed brand palette (no wallpaper-based dynamic colour) so the app looks the same on every
- * phone, in light and dark mode.
+ * phone, in light and dark mode. [mode] lets the user override the phone's setting.
  */
 @Composable
-fun MyRecapTheme(content: @Composable () -> Unit) {
+fun MyRecapTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (mode.isDark(isSystemInDarkTheme())) DarkColors else LightColors,
         typography = AppTypography,
         shapes = AppShapes,
         content = content,

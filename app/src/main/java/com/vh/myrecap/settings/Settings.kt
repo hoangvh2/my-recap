@@ -7,6 +7,7 @@ import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
 import com.vh.myrecap.core.SegmenterConfig
 import com.vh.myrecap.core.SessionMode
+import com.vh.myrecap.core.ThemeMode
 import com.vh.myrecap.core.VadSensitivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,6 +55,8 @@ data class AppSettings(
     val keepMemoAudio: Boolean = false,
     /** Delete folder audio this many days after its clip was transcribed; 0 = never. */
     val audioRetentionDays: Int = 30,
+    /** Light/dark appearance: follow the phone or fixed. */
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Last home tab (0 = Thư ký, 1 = Ghi âm). */
     val homeTab: Int = 0,
 
@@ -138,6 +141,7 @@ class SettingsRepository(context: Context) {
             interviewerSpeech = enumPref("interviewerSpeech", d.interviewerSpeech),
             keepMemoAudio = prefs.getBoolean("keepMemoAudio", d.keepMemoAudio),
             audioRetentionDays = prefs.getInt("audioRetentionDays", d.audioRetentionDays),
+            themeMode = enumPref("themeMode", d.themeMode),
             homeTab = prefs.getInt("homeTab", d.homeTab),
             autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
             autoBackupError = prefs.getString("autoBackupError", null) ?: d.autoBackupError,
@@ -173,6 +177,7 @@ class SettingsRepository(context: Context) {
             .putString("interviewerSpeech", s.interviewerSpeech.name)
             .putBoolean("keepMemoAudio", s.keepMemoAudio)
             .putInt("audioRetentionDays", s.audioRetentionDays)
+            .putString("themeMode", s.themeMode.name)
             .putInt("homeTab", s.homeTab)
             .putString("autoBackupUri", s.autoBackupUri)
             .putString("autoBackupError", s.autoBackupError)
