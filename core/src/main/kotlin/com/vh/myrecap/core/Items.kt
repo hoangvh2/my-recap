@@ -116,13 +116,18 @@ object ItemExtraction {
             "thành các mục cần lưu. Chỉ dùng thông tin có trong ghi chú, không bịa. Trả lời DUY NHẤT một JSON hợp lệ, " +
             "không markdown, không giải thích."
 
-    fun userMessage(transcript: String, now: ZonedDateTime): String = buildString {
+    /** Today and the next 13 days spelled out with weekdays, so relative dates resolve without app-side parsing. */
+    internal fun calendar(now: ZonedDateTime): String = buildString {
         appendLine("Thời điểm hiện tại: ${weekday(now.toLocalDate())}, ${now.toLocalDate()} ${now.format(HM)} (${now.zone.id}).")
         appendLine("Lịch 14 ngày tới để quy đổi ngày tương đối (mai, mốt, thứ 5 tuần sau…):")
         for (d in 0L until 14L) {
             val day = now.toLocalDate().plusDays(d)
             appendLine("- ${weekday(day)} $day" + if (d == 0L) " (hôm nay)" else if (d == 1L) " (mai)" else "")
         }
+    }
+
+    fun userMessage(transcript: String, now: ZonedDateTime): String = buildString {
+        append(calendar(now))
         appendLine()
         appendLine("Loại mục:")
         appendLine("- task: việc cần làm (có thể có hạn).")
@@ -341,3 +346,55 @@ private fun JSONObject.optStringOrNull(key: String): String? =
 
 private fun JSONObject.optLongOrNull(key: String): Long? =
     if (has(key) && !isNull(key)) optLong(key) else null
+
+/**
+ * Turns a meeting or interview summary into proposed follow-ups ("ai làm gì, khi nào"). Answers use
+ * the same JSON as [ItemExtraction], so they go through the same parser and arrive as DRAFT items for
+ * the owner to confirm; nothing is saved on its own.
+ */
+object ActionItems {
+    const val MAX_ITEMS = 15
+
+    fun system(): String =
+        "Bạn là thư ký cá nhân. Đọc bản tóm tắt cuộc họp/phỏng vấn và liệt kê các việc cần làm tiếp theo mà người " +
+            "trong cuộc họp đã cam kết hoặc được giao. Chỉ lấy việc được nói rõ trong bản tóm tắt, không suy diễn, " +
+            "không bịa người phụ trách hay hạn. Trả lời DUY NHẤT một JSON hợp lệ, không markdown, không giải thích."
+
+    fun userMessage(summary: String, now: ZonedDateTime): String = buildString {
+        append(ItemExtraction.calendar(now))
+        appendLine()
+        appendLine("Chỉ trả về việc cần làm (type \"task\") hoặc cuộc hẹn đã chốt có ngày giờ (type \"event\"). Bỏ qua quyết định, thông tin nền, ý kiến.")
+        appendLine("- title: hành động ngắn gọn bắt đầu bằng động từ, ≤ 10 từ.")
+        appendLine("- person: người chịu trách nhiệm nếu bản tóm tắt nêu tên, nếu không thì null.")
+        appendLine("- date/time: chỉ điền khi bản tóm tắt nói rõ hạn hoặc giờ; không có thì null.")
+        appendLine("- quote: câu gốc trong bản tóm tắt làm căn cứ. important: true chỉ khi nói rõ là gấp/quan trọng.")
+        appendLine("Tối đa $MAX_ITEMS việc. Không tạo việc trùng nhau.")
+        appendLine()
+        appendLine("Định dạng:")
+        appendLine(
+            """{"items":[{"type":"task|event","title":"…","details":"chuỗi rỗng nếu không cần","date":"YYYY-MM-DD hoặc null",""" +
+                """"time":"HH:mm hoặc null","place":null,"person":null,"repeat":null,"important":false,"quote":"…"}]}""",
+        )
+        appendLine("Nếu không có việc nào, trả về {\"items\":[]}.")
+        appendLine()
+        appendLine("Bản tóm tắt:")
+        appendLine("<<<")
+        appendLine(summary.trim())
+        appendLine(">>>")
+    }.trim()
+
+    /** Follow-ups only (the model sometimes adds notes or expenses), capped, or null when the answer is unreadable. */
+    fun parse(raw: String, zone: ZoneId, now: Long, sourceId: String, newId: () -> String): List<Item>? =
+        ItemExtraction.parse(raw, zone, now, sourceId, newId)
+            ?.filter { it.type == ItemType.TASK || it.type == ItemType.EVENT }
+            ?.take(MAX_ITEMS)
+
+    /**
+     * Drops proposals the owner already has from this source (same title once accents and case are
+     * ignored), so running the extraction twice does not create the same task twice.
+     */
+    fun withoutDuplicates(proposed: List<Item>, existing: List<Item>): List<Item> {
+        val seen = existing.map { TextSearch.fold(it.title) }.toMutableSet()
+        return proposed.filter { seen.add(TextSearch.fold(it.title)) }
+    }
+}
