@@ -150,6 +150,7 @@ fun AgendaTab(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item { CaptureHero(onCapture = capture, onAdd = vm::newItem) }
+            item(key = "quick-add") { QuickAddBar(vm) }
             recorder.error?.let { err -> item { Banner(StatusInfo(StatusKind.ERROR, err), "Đóng", RecorderState::clearError) } }
             if (micDenied) {
                 item { Banner(StatusInfo(StatusKind.WARNING, "Cần quyền micro để ghi âm"), "Mở cài đặt", { openAppSettings(context) }) }

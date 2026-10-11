@@ -329,6 +329,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDone(id: String, done: Boolean) = io { applyDone(id, done) }
 
+    /** Saves a typed quick-add as a confirmed item (the user saw what was understood), with its reminder. */
+    fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result) = io {
+        val item = parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis())
+        app.items.upsert(item)
+        Reminders.sync(app, item)
+        toast("Đã thêm “${item.title}”")
+    }
+
     /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */
     var extractingActionsFor by mutableStateOf<String?>(null)
         private set
