@@ -113,6 +113,18 @@ class SecretaryFlowTest {
         device.executeShellCommand("screencap -p $SHOTS/$name.png")
     }
 
+    /** Swipes the list until [selector] is on screen; the quick-add bar can push items below the fold on a small screen. */
+    private fun scrollTo(selector: androidx.test.uiautomator.BySelector): androidx.test.uiautomator.UiObject2? {
+        repeat(8) { attempt ->
+            if (device.wait(Until.hasObject(selector), 1_000)) device.findObject(selector)?.let { return it }
+            val w = device.displayWidth
+            val h = device.displayHeight
+            if (attempt < 4) device.swipe(w / 2, h * 3 / 4, w / 2, h / 3, 25) else device.swipe(w / 2, h / 3, w / 2, h * 3 / 4, 25)
+            Thread.sleep(400)
+        }
+        return device.findObject(selector)
+    }
+
     /** Taps a filter chip, swiping the chip row sideways until it is on screen. */
     private fun clickChip(label: String) {
         val row = device.findObject(By.textStartsWith("Tổng quan")) ?: device.findObject(By.textStartsWith("Chi tiêu"))
@@ -193,7 +205,7 @@ class SecretaryFlowTest {
             assertNotNull("appointment gets a reminder", Reminders.triggerAt(event))
 
             device.pressBack()
-            assertTrue("secretary tab not shown", device.wait(Until.hasObject(By.text("Gửi báo giá cho khách")), 5_000))
+            assertNotNull("secretary tab not shown", scrollTo(By.text("Gửi báo giá cho khách")))
             Thread.sleep(500)
             shot("18-agenda")
 
@@ -203,8 +215,9 @@ class SecretaryFlowTest {
             shot("19-expenses")
 
             clickChip("Việc")
-            assertTrue(device.wait(Until.hasObject(By.text("Gửi báo giá cho khách")), 5_000))
-            device.findObject(By.text("Gửi báo giá cho khách")).click()
+            val task = scrollTo(By.text("Gửi báo giá cho khách"))
+            assertNotNull("task not on screen", task)
+            task!!.click()
             assertTrue("item editor not shown", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000))
             shot("20-item-editor")
             // The link back to the capture sits at the end of the form.
