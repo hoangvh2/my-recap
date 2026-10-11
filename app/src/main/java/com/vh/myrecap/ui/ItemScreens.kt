@@ -112,11 +112,12 @@ private fun Item.withType(t: ItemType): Item = when (t) {
     ItemType.EXPENSE -> copy(
         type = t,
         recurrence = null,
+        important = false,
         whenAt = whenAt ?: LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli(),
         allDay = if (whenAt == null) true else allDay,
         category = category ?: "Khác",
     )
-    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null)
+    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null, important = false)
     else -> copy(type = t, amount = null, category = null)
 }
 
@@ -545,6 +546,13 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                 ReminderHint(current)
                 if ((edit.type == ItemType.TASK || edit.type == ItemType.EVENT) && edit.whenAt != null) {
                     RepeatRow(edit.recurrence) { edit = edit.copy(recurrence = it) }
+                }
+                if (edit.type == ItemType.TASK || edit.type == ItemType.EVENT) {
+                    FilterChip(
+                        selected = edit.important,
+                        onClick = { edit = edit.copy(important = !edit.important) },
+                        label = { Text("❗ Quan trọng") },
+                    )
                 }
             }
             if (edit.type == ItemType.EVENT || edit.place != null) {

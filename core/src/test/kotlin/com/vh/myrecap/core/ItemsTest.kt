@@ -120,4 +120,32 @@ class ItemsTest {
         val item = Item("a", ItemType.EXPENSE, ItemStatus.OPEN, "Taxi", whenAt = nowMs, allDay = true, amount = 250_000)
         assertEquals("- Taxi — 250.000 đ (10/10/2026)", ItemText.line(item, zone))
     }
+
+    @Test
+    fun importantIsReadOnlyForTasksAndEvents() {
+        val items = parse(
+            """{"items":[
+              {"type":"task","title":"Gửi báo giá","important":true},
+              {"type":"event","title":"Họp","date":"2026-10-15","time":"15:00","important":"true"},
+              {"type":"task","title":"Dọn bàn","important":false},
+              {"type":"expense","title":"Ăn trưa","amount":"85k","important":true},
+              {"type":"note","title":"Ý tưởng","important":true}
+            ]}""",
+        )!!
+        assertEquals(listOf(true, true, false, false, false), items.map { it.important })
+    }
+
+    @Test
+    fun importantSurvivesJsonRoundTripAndLegacyDefaultsToFalse() {
+        val item = Item("a", ItemType.TASK, ItemStatus.OPEN, "Gửi báo giá", important = true)
+        assertTrue(Item.fromJson(item.toJson()).important)
+        assertFalse(item.copy(important = false).toJson().has("important"))
+        assertFalse(Item.fromJson(item.copy(important = false).toJson()).important)
+    }
+
+    @Test
+    fun importantItemsAreFlaggedWhenShared() {
+        val line = ItemText.line(Item("a", ItemType.TASK, ItemStatus.OPEN, "Gửi báo giá", important = true), zone)
+        assertTrue(line.contains("❗ Gửi báo giá"))
+    }
 }

@@ -55,6 +55,8 @@ data class Item(
     val doneAt: Long? = null,
     /** Tasks and appointments only; needs [whenAt]. */
     val recurrence: Recurrence? = null,
+    /** Tasks and appointments only: must not be missed; highlighted in lists and reminded louder. */
+    val important: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -73,6 +75,7 @@ data class Item(
         .put("createdAt", createdAt)
         .putOpt("doneAt", doneAt)
         .putOpt("recurrence", recurrence?.name)
+        .apply { if (important) put("important", true) }
 
     companion object {
         fun fromJson(o: JSONObject) = Item(
@@ -92,6 +95,7 @@ data class Item(
             createdAt = o.optLong("createdAt", 0),
             doneAt = o.optLongOrNull("doneAt"),
             recurrence = o.optStringOrNull("recurrence")?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
+            important = o.optBoolean("important", false),
         )
     }
 }
@@ -131,13 +135,16 @@ object ItemExtraction {
             "Việc/lịch lặp lại (\"mỗi sáng\", \"thứ 2 hằng tuần\", \"ngày 5 hằng tháng\"): repeat là daily, weekdays, " +
                 "weekly hoặc monthly, và date là lần gần nhất sắp tới; không lặp thì repeat null.",
         )
+        appendLine(
+            "important: true khi ghi chú nói rõ là gấp, quan trọng, nhất định, đừng quên, không được quên (chỉ với task/event); còn lại false.",
+        )
         appendLine("Giờ nói kiểu Việt: \"3h chiều\" = 15:00, \"8 giờ tối\" = 20:00, \"sáng mai\" không rõ giờ thì để time null.")
         appendLine()
         appendLine("Định dạng:")
         appendLine(
             """{"items":[{"type":"task|event|expense|note","title":"ngắn gọn, ≤ 10 từ","details":"chi tiết thêm hoặc chuỗi rỗng",""" +
                 """"date":"YYYY-MM-DD hoặc null","time":"HH:mm hoặc null","amount":null,"category":null,"place":null,""" +
-                """"person":null,"repeat":null,"quote":"câu gốc trong ghi chú"}]}""",
+                """"person":null,"repeat":null,"important":false,"quote":"câu gốc trong ghi chú"}]}""",
         )
         appendLine("Nếu không có gì cần lưu, trả về {\"items\":[]}.")
         appendLine()
@@ -210,6 +217,9 @@ object ItemExtraction {
                 quote = o.optStringOrNull("quote")?.trim()?.ifEmpty { null },
                 createdAt = now,
                 recurrence = if ((type == ItemType.TASK || type == ItemType.EVENT) && whenAt != null) parseRecurrence(o.optStringOrNull("repeat")) else null,
+                // "true" as text is a common model slip.
+                important = (type == ItemType.TASK || type == ItemType.EVENT) &&
+                    (o.optBoolean("important", false) || o.optString("important").equals("true", ignoreCase = true)),
             )
         }
         return items
@@ -317,6 +327,7 @@ object ItemText {
 
     fun line(item: Item, zone: ZoneId): String = buildString {
         append(if (item.status == ItemStatus.DONE) "[x] " else "- ")
+        if (item.important) append("❗ ")
         append(item.title)
         item.amount?.let { append(" — ").append(Money.format(it)) }
         whenText(item, zone)?.let { append(" (").append(it).append(")") }
