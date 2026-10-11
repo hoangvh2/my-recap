@@ -75,6 +75,7 @@ import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Money
 import com.vh.myrecap.core.Triage
+import com.vh.myrecap.core.WeeklyRecap
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
@@ -383,6 +384,23 @@ private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowEx
                     }
                     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+    val recap = WeeklyRecap.build(saved, emptyList(), WeeklyRecap.weekStartOf(today), System.currentTimeMillis(), ZoneId.systemDefault())
+    item { SectionLabel("Tuần này") }
+    item {
+        Surface(onClick = vm::openWeekly, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Tổng kết tuần", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Xong ${recap.done} việc" + if (recap.insights.isNotEmpty()) " · ${recap.insights.size} điều cần chú ý" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
