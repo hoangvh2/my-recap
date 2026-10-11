@@ -58,6 +58,7 @@ sealed interface Screen {
     data class ItemEdit(val id: String?, val type: ItemType = ItemType.TASK) : Screen
     data object Settings : Screen
     data object Search : Screen
+    data object Spending : Screen
 
     /** Whether this screen shows folder/capture [folderId] (closed when that is deleted). */
     fun shows(folderId: String): Boolean = when (this) {
@@ -166,6 +167,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openSettings() = push(Screen.Settings)
     fun openSearch() = push(Screen.Search)
+    fun openSpending() = push(Screen.Spending)
     fun openClip(id: String, index: Int) = push(Screen.Clip(id, index))
     fun openSummary(id: String, jobId: String) = push(Screen.Summary(id, jobId))
     fun openItem(id: String) = push(Screen.ItemEdit(id))

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.FileDownload
@@ -490,6 +491,11 @@ private fun ExpenseView(expenses: List<Item>, vm: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
+                TextButton(onClick = vm::openSpending, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Icon(Icons.Rounded.BarChart, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Thống kê và dự báo")
+                }
                 if (inMonth.isNotEmpty()) {
                     val context = LocalContext.current
                     TextButton(

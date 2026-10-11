@@ -130,6 +130,7 @@ private fun AppRoot(vm: AppViewModel) {
             is Screen.ItemEdit -> ItemEditScreen(vm, target.id, target.type)
             Screen.Settings -> SettingsScreen(vm)
             Screen.Search -> SearchScreen(vm)
+            Screen.Spending -> SpendingScreen(vm)
         }
     }
 }
