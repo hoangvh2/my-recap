@@ -358,7 +358,7 @@ private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowEx
         return
     }
     itemGroup("Quá hạn", overdue, vm)
-    itemGroup("Hôm nay", todayItems, vm)
+    todayTimeline(todayItems, vm)
     itemGroup("Sắp tới", upcoming.take(12), vm, trailing = if (upcoming.size > 12) "+${upcoming.size - 12}" else null)
     itemGroup("Chưa có hạn", undated, vm)
     if (open.isEmpty()) {
