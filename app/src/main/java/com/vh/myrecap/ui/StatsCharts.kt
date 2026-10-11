@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -218,6 +219,7 @@ internal fun ColumnChart(
     onSelect: (Int) -> Unit,
     description: String,
     modifier: Modifier = Modifier,
+    format: (Long) -> String = ::shortMoney,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val grid = MaterialTheme.colorScheme.outlineVariant
@@ -260,9 +262,27 @@ internal fun ColumnChart(
             val tl = measurer.measure(labels[i], TextStyle(fontSize = 11.sp, color = if (i == selected) strong else ink))
             drawText(tl, topLeft = Offset(cx - tl.size.width / 2f, bottom + 4.dp.toPx()))
             if (v > 0 && (i == selected || i == highest)) {
-                val tv = measurer.measure(shortMoney(v), TextStyle(fontSize = 11.sp, color = strong))
+                val tv = measurer.measure(format(v), TextStyle(fontSize = 11.sp, color = strong))
                 drawText(tv, topLeft = Offset(cx - tv.size.width / 2f, bottom - h - tv.size.height - 2.dp.toPx()))
             }
         }
+    }
+}
+
+/** A "needs attention" line: warning icon plus words, so the state never rests on colour alone. */
+@Composable
+internal fun AlertRow(message: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val scheme = MaterialTheme.colorScheme
+    val content: @Composable () -> Unit = {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
+            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Rounded.WarningAmber, null, tint = scheme.onErrorContainer, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer)
+        }
+    }
+    if (onClick != null) {
+        androidx.compose.material3.Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = scheme.errorContainer, modifier = modifier.fillMaxWidth(), content = content)
+    } else {
+        androidx.compose.material3.Surface(shape = RoundedCornerShape(16.dp), color = scheme.errorContainer, modifier = modifier.fillMaxWidth(), content = content)
     }
 }

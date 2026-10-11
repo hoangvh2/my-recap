@@ -131,6 +131,7 @@ private fun AppRoot(vm: AppViewModel) {
             Screen.Settings -> SettingsScreen(vm)
             Screen.Search -> SearchScreen(vm)
             Screen.Spending -> SpendingScreen(vm)
+            Screen.Weekly -> WeeklyRecapScreen(vm)
         }
     }
 }

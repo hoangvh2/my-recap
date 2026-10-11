@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Inbox
-import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -135,20 +134,7 @@ fun SpendingScreen(vm: AppViewModel) {
                 item { SectionLabel("Cần chú ý", trailing = "${report.alerts.size}") }
                 items(report.alerts.size) { i ->
                     val alert = report.alerts[i]
-                    // Warning icon + words: the state is never carried by colour alone.
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = scheme.errorContainer,
-                        onClick = { alert.itemId?.let(vm::openItem) },
-                        enabled = alert.itemId != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
-                            Icon(Icons.Rounded.WarningAmber, null, tint = scheme.onErrorContainer, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text(alert.message, style = MaterialTheme.typography.bodyMedium, color = scheme.onErrorContainer)
-                        }
-                    }
+                    AlertRow(alert.message, onClick = alert.itemId?.let { id -> { vm.openItem(id) } })
                 }
             }
 
