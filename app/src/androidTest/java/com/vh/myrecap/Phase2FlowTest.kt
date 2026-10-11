@@ -160,8 +160,10 @@ class Phase2FlowTest {
     @Test
     fun deletedItemCanBeRestoredAndExpensesExport() {
         launch().use {
-            assertTrue(device.wait(Until.hasObject(By.text("Gửi báo giá cho khách Đông Á")), 10_000))
-            device.findObject(By.text("Gửi báo giá cho khách Đông Á")).click()
+            // The quick-add bar sits above the list, so on a small screen the task may need a scroll.
+            val task = scrollTo(By.text("Gửi báo giá cho khách Đông Á"))
+            assertNotNull("task not on screen", task)
+            task!!.click()
             assertTrue(device.wait(Until.hasObject(By.desc("Xoá mục")), 5_000))
             device.findObject(By.desc("Xoá mục")).click()
             assertTrue("deleted", waitFor(5_000) { app.items.get("p2-task") == null })

@@ -74,12 +74,14 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.Triage
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
 import com.vh.myrecap.ui.theme.Brand
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 
 /** Filter of the secretary list; null shows the overview. */
 private val FILTERS: List<ItemType?> = listOf(null, ItemType.TASK, ItemType.EVENT, ItemType.EXPENSE, ItemType.NOTE)
@@ -149,6 +151,7 @@ fun AgendaTab(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item { CaptureHero(onCapture = capture, onAdd = vm::newItem) }
+            item(key = "quick-add") { QuickAddBar(vm) }
             recorder.error?.let { err -> item { Banner(StatusInfo(StatusKind.ERROR, err), "Đóng", RecorderState::clearError) } }
             if (micDenied) {
                 item { Banner(StatusInfo(StatusKind.WARNING, "Cần quyền micro để ghi âm"), "Mở cài đặt", { openAppSettings(context) }) }
@@ -358,6 +361,7 @@ private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowEx
         }
         return
     }
+    triageCard(Triage.overdueTasks(overdue, System.currentTimeMillis(), ZoneId.systemDefault()), vm)
     itemGroup("Quá hạn", overdue, vm)
     todayTimeline(todayItems, vm)
     itemGroup("Sắp tới", upcoming.take(12), vm, trailing = if (upcoming.size > 12) "+${upcoming.size - 12}" else null)

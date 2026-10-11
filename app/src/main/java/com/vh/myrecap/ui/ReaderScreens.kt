@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
@@ -252,6 +253,13 @@ fun SummaryScreen(vm: AppViewModel, id: String, jobId: String) {
                     IconButton(onClick = vm::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Quay lại") }
                 },
                 actions = {
+                    IconButton(onClick = { vm.extractActions(id, jobId) }, enabled = vm.extractingActionsFor == null && text.isNotBlank()) {
+                        if (vm.extractingActionsFor == jobId) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Rounded.Checklist, contentDescription = "Rút việc cần làm")
+                        }
+                    }
                     IconButton(onClick = { Sharing.copy(context, d.session.title, ShareText.plain(text)) }) {
                         Icon(Icons.Rounded.ContentCopy, contentDescription = "Sao chép")
                     }
