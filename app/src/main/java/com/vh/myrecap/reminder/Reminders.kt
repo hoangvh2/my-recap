@@ -89,11 +89,11 @@ object Reminders {
             .joinToString(" · ")
         val builder = NotificationCompat.Builder(context, MyRecapApp.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_mic)
-            .setContentTitle(if (item.type == ItemType.EVENT) "Sắp tới: ${item.title}" else item.title)
+            .setContentTitle((if (item.important) "❗ " else "") + if (item.type == ItemType.EVENT) "Sắp tới: ${item.title}" else item.title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setCategory(if (item.type == ItemType.EVENT) NotificationCompat.CATEGORY_EVENT else NotificationCompat.CATEGORY_REMINDER)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (item.important) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(open)
             .setAutoCancel(true)
         if (item.type == ItemType.TASK) {

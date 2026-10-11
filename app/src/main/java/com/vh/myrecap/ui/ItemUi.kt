@@ -132,13 +132,17 @@ fun ItemRow(item: Item, onOpen: () -> Unit, onToggleDone: ((Boolean) -> Unit)?, 
             Spacer(Modifier.width(6.dp))
             Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                 Text(
-                    item.title,
+                    if (item.important) "❗ ${item.title}" else item.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
-                    color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    color = when {
+                        done -> MaterialTheme.colorScheme.onSurfaceVariant
+                        item.important -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
                 )
                 val sub = itemSubtitle(item)
                 if (sub.isNotEmpty()) {
