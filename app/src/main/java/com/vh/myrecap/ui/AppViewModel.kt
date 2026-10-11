@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateListOf
 import com.vh.myrecap.backup.BackupManager
 import com.vh.myrecap.backup.BackupResult
 import com.vh.myrecap.backup.RestoreResult
+import com.vh.myrecap.core.ActionItems
+import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.BackupException
 import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Item
@@ -22,6 +24,7 @@ import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.core.TextSearch
+import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.StorageStats
 import com.vh.myrecap.data.TaskStatus
@@ -323,6 +326,46 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setDone(id: String, done: Boolean) = io { applyDone(id, done) }
+
+    /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */
+    var extractingActionsFor by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Reads a finished summary and proposes its follow-ups as DRAFT items (shown under "Chờ xác nhận"
+     * in the Việc tab). Nothing is saved without the owner confirming.
+     */
+    fun extractActions(sessionId: String, jobId: String) {
+        if (extractingActionsFor != null) return
+        extractingActionsFor = jobId
+        io {
+            try {
+                val summary = store.readSummary(sessionId, jobId)?.takeIf { it.isNotBlank() } ?: return@io
+                val config = app.settings.current.summaryConfig()
+                if (!config.isComplete) return@io toast("Chưa cấu hình AI (API key/model) trong Cài đặt")
+                val zone = ZoneId.systemDefault()
+                val now = System.currentTimeMillis()
+                val raw = try {
+                    Providers.textGenerator(config).generate(
+                        ActionItems.system(),
+                        ActionItems.userMessage(summary, java.time.ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(now), zone)),
+                    )
+                } catch (e: ApiException) {
+                    if (e.emptyResult) "" else throw e
+                }
+                val parsed = ActionItems.parse(raw, zone, now, sessionId, ItemStore::newId)
+                    ?: return@io toast("AI trả lời không đọc được, thử lại sau")
+                val fresh = ActionItems.withoutDuplicates(parsed, app.items.bySource(sessionId))
+                if (fresh.isEmpty()) return@io toast("Không có việc mới cần làm trong bản tóm tắt")
+                fresh.forEach { app.items.upsert(it) }
+                toast("Đã thêm ${fresh.size} việc chờ xác nhận ở tab Việc")
+            } catch (e: ApiException) {
+                toast(e.message ?: "Lỗi dịch vụ AI")
+            } finally {
+                extractingActionsFor = null
+            }
+        }
+    }
 
     /** Saves edits and completes (or reopens) in order, so the next instance of a repeating task carries the edits. */
     fun saveAndSetDone(item: Item, done: Boolean) = io {
