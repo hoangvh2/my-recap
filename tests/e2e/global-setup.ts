@@ -11,9 +11,12 @@ export default async function globalSetup() {
   // Tests read the recorded calls over HTTP-free shared memory via a tiny JSON endpoint on a side port.
   const { createServer } = await import("node:http");
   const side = createServer((req, res) => {
-    if (req.url === "/reset") gemini.calls.length = 0;
+    if (req.url === "/reset") {
+      gemini.calls.length = 0;
+      gemini.pushes.length = 0;
+    }
     res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
-    res.end(JSON.stringify(gemini.calls));
+    res.end(JSON.stringify(req.url === "/pushes" ? gemini.pushes : gemini.calls));
   }).listen(8788, "127.0.0.1");
   return async () => {
     side.close();

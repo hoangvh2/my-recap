@@ -8,10 +8,11 @@ ROOT="$(cd .. && pwd)"
 export ALLOWED_EMAILS="owner@example.com,member@example.com"
 node "$ROOT/scripts/configure.mjs"
 (cd "$ROOT/functions" && npm run build >/dev/null)
-printf 'GEMINI_API_KEY=fake-e2e-key\n' > "$ROOT/functions/.secret.local"
+printf 'GEMINI_API_KEY=fake-e2e-key\nPUSHOVER_TOKEN=fake-pushover-token\n' > "$ROOT/functions/.secret.local"
 
 VITE_USE_EMULATORS=true VITE_FIREBASE_API_KEY=fake-key VITE_FIREBASE_PROJECT_ID=demo-myrecap VITE_FIREBASE_APP_ID=1:1:web:e2e \
   npm --prefix "$ROOT/web" run build -- --outDir dist-e2e >/dev/null
 
 export GEMINI_BASE_URL_OVERRIDE="http://127.0.0.1:8787"
+export PUSHOVER_BASE_URL_OVERRIDE="http://127.0.0.1:8787"
 npx firebase emulators:exec --config "$ROOT/firebase.json" --only auth,firestore,functions --project demo-myrecap "npx playwright test $*"

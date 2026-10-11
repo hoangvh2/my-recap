@@ -17,6 +17,20 @@ export const licenses = createStore<License[]>([]);
 export const proposals = createStore<Proposal[]>([]);
 export const prefs = createStore<Prefs>(normalizePrefs(null));
 export const syncState = createStore<SyncState>("connecting");
+/** The owner's notification settings as saved by the server (null: never set up). */
+export const notifySettings = createStore<NotifyDoc | null>(null);
+
+export interface NotifyDoc {
+  enabled: boolean;
+  pushoverUser?: string;
+  device?: string;
+  morning?: number;
+  evening?: number;
+  quietFrom?: number;
+  quietTo?: number;
+  lead?: number;
+  calendarAlarms?: boolean;
+}
 
 const LIMITS = { items: 1_000, captures: 100, customers: 2_000, licenses: 3_000, proposals: 500 } as const;
 
@@ -79,6 +93,7 @@ export function startSync(uid: string): () => void {
     list<License>("licenses", "createdAt", LIMITS.licenses, licenses),
     list<Proposal>("proposals", "createdAt", LIMITS.proposals, proposals),
     onSnapshot(prefsRef(uid), (snap) => prefs.set(normalizePrefs(snap.data() as Partial<Prefs> | undefined)), quiet),
+    onSnapshot(doc(db, "users", uid, "settings", "notify"), (snap) => notifySettings.set((snap.data() as NotifyDoc | undefined) ?? null), quiet),
   ];
   return () => {
     offs.forEach((off) => off());
@@ -88,6 +103,7 @@ export function startSync(uid: string): () => void {
     licenses.set([]);
     proposals.set([]);
     prefs.set(normalizePrefs(null));
+    notifySettings.set(null);
   };
 }
 

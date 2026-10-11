@@ -31,7 +31,7 @@ export function ItemRow(props: { item: Item; onOpen: (i: Item) => void; onToggle
         <span class={`badge t-${item.type}`}><Icon name={TYPE_ICON[item.type]} size={18} /></span>
       )}
       <button class="row-main" onClick={() => onOpen(item)}>
-        <span class="title">{item.title}</span>
+        <span class="title">{item.important && <span class="flag" aria-label="Quan trọng">❗ </span>}{item.title}</span>
         {(meta.length > 0 || item.recurrence) && (
           <span class="meta">
             {meta.join(" · ")}

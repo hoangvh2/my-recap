@@ -14,6 +14,7 @@ import { confirmDialog, Link, Section, TopBar } from "./common";
 import { saveFile } from "./download";
 import { useCtx, useGraph, useUid } from "./hooks";
 import { Icon } from "./icons";
+import { NotifySettingsCard } from "./Notify";
 import { showToast } from "./toast";
 
 const FIELD_LABEL: Record<ImportField, string> = {
@@ -143,6 +144,10 @@ export function Settings({ email }: { email: string }) {
   return (
     <>
       <TopBar title="Cài đặt" backTo={to.today} />
+
+      <Section title="Thông báo trên điện thoại">
+        <div class="card-block"><NotifySettingsCard /></div>
+      </Section>
 
       <Section title="Nhắc gia hạn">
         <div class="card-block">

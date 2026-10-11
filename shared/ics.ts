@@ -93,7 +93,9 @@ function eventLines(e: CalEvent, stamp: number): string[] {
   if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`);
   if (e.location) lines.push(`LOCATION:${escapeText(e.location)}`);
   if (e.rrule) lines.push(`RRULE:${e.rrule}`);
-  lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(e.summary)}`, e.alarm, "END:VALARM", "END:VEVENT");
+  // An empty alarm means "no alarm": the owner is reminded another way (Pushover) and should not be told twice.
+  if (e.alarm) lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(e.summary)}`, e.alarm, "END:VALARM");
+  lines.push("END:VEVENT");
   return lines;
 }
 

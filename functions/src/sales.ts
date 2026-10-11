@@ -5,6 +5,7 @@ import { fold, matchByName } from "../../shared/text";
 import { LIMITS } from "./config";
 import { calendarLines, clean, cleanMultiline, itemFromRecord, str } from "./items";
 import { parseVnd } from "./money";
+import { fixTiming } from "./timing";
 
 /**
  * What the owner already has (customers and licences), sent along with a capture so the AI can say
@@ -103,7 +104,11 @@ export const SalesExtraction = {
     }
     lines.push(
       "Loại mục (items):",
-      "- task: việc cần làm (có thể có hạn). event: lịch hẹn/cuộc họp/demo có thời điểm.",
+      "- task: việc phải làm cho xong (gọi, gửi, nộp, mua…); có hạn thì date/time là hạn chót.",
+      "- event: việc diễn ra vào một thời điểm (họp, hẹn gặp, khám, đón con, tiệc, sinh nhật, phỏng vấn, demo, chuyến bay).",
+      "- Câu nào nói thời gian (giờ, ngày, thứ, hạn chót, \"trước ngày\", \"cuối tháng\") thì PHẢI điền date/time của mục đó; không bỏ trống.",
+      "- Một việc chỉ tạo MỘT mục: không tạo cả task lẫn event cho cùng một việc.",
+      '- important: true khi ghi chú nói rõ là gấp, quan trọng, nhất định, đừng quên, không được quên; còn lại false.',
       '- expense: khoản chi. amount là số nguyên VND ("85k" = 85000, "1 triệu 2" = 1200000).',
       "- note: thông tin cần nhớ về khách hoặc việc, không thuộc 3 loại trên.",
       "Một ghi chú có thể chứa nhiều mục. Không tạo mục trùng nhau.",
@@ -124,7 +129,7 @@ export const SalesExtraction = {
       "",
       "Định dạng:",
       '{"customers":[{"key":"n1","name":"...","contact":null,"phone":null,"email":null}],' +
-        '"items":[{"type":"task|event|expense|note","title":"ngắn gọn, ≤ 10 từ","details":"","date":null,"time":null,"amount":null,"category":null,"place":null,"person":null,"repeat":null,"quote":"câu gốc","customer":null,"license":null}],' +
+        '"items":[{"type":"task|event|expense|note","title":"ngắn gọn, ≤ 10 từ","details":"","date":null,"time":null,"amount":null,"category":null,"place":null,"person":null,"repeat":null,"important":false,"quote":"câu gốc","customer":null,"license":null}],' +
         '"licenses":[{"customer":"c1 hoặc n1","product":"...","kind":"license|warranty|maintenance|subscription","startDate":null,"endDate":null,"termMonths":null,"value":null,"contractNo":null}],' +
         '"updates":[{"license":"l1","stage":null,"value":null,"endDate":null,"note":null,"lostReason":null}]}',
       'Nếu không có gì cần lưu, trả về {"items":[]}.',
@@ -270,6 +275,7 @@ export function parseSalesExtraction(raw: string, ctx: CaptureContext, env: Pars
     if (out.items.length >= LIMITS.maxItems) break;
     const item = itemFromRecord(rec, { zone, nowMs, sourceId: captureId, newId });
     if (!item) continue;
+    fixTiming(item, nowMs, zone);
     const named = str(rec.customer) !== null || str(rec.license) !== null;
     const lic = licenseRef(rec.license) ?? (named ? undefined : focusLicense);
     const customerId = customerRef(rec.customer) ?? lic?.customerId ?? (named ? undefined : focusCustomerId);

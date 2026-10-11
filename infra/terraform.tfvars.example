@@ -18,3 +18,7 @@ allowed_emails = [
 
 # Optional: your own hostname, after connecting it to Firebase Hosting (see docs/web-secretary.md).
 # custom_domain = "recap.example.com"
+
+# Optional: phone notifications through Pushover. Create an application at https://pushover.net/apps/build
+# (name "Thư ký"), paste its API token here, deploy, then each person enters their User Key in Settings.
+# pushover_app_token = "<30-character application token>"

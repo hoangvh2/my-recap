@@ -30,6 +30,7 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
   const [repeat, setRepeat] = useState<Recurrence | "">(item.recurrence ?? "");
   const [customerId, setCustomerId] = useState<string | undefined>(item.customerId);
   const [licenseId, setLicenseId] = useState<string | undefined>(item.licenseId);
+  const [important, setImportant] = useState(item.important === true);
   const [error, setError] = useState("");
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
@@ -71,6 +72,7 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
         out.allDay = eventAllDay;
         if (repeat) out.recurrence = repeat;
       }
+      if (important) out.important = true;
       if (place.trim()) out.place = place.trim().slice(0, MAX.place);
       if (person.trim()) out.person = person.trim().slice(0, MAX.person);
     }
@@ -140,6 +142,7 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
               <label>Giờ<input type="time" value={time} disabled={allDay} onInput={(e) => setTime((e.target as HTMLInputElement).value)} /></label>
             </div>
             <label class="check-row"><input type="checkbox" checked={allDay} onChange={(e) => setAllDay((e.target as HTMLInputElement).checked)} /> Cả ngày</label>
+            <label class="check-row important"><input type="checkbox" checked={important} onChange={(e) => setImportant((e.target as HTMLInputElement).checked)} /> ❗ Quan trọng (nhắc khẩn đến khi bấm xác nhận)</label>
             <label>Lặp lại
               <select value={repeat} disabled={!date} onChange={(e) => setRepeat((e.target as HTMLSelectElement).value as Recurrence | "")}>
                 <option value="">Không lặp</option>

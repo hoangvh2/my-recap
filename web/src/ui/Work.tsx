@@ -1,7 +1,9 @@
 import { useMemo, useState } from "preact/hooks";
 import { blankItem, items as itemsStore, setDone } from "../data";
 import { TYPE_LABEL, TYPES, type Item, type ItemType } from "../lib/model";
+import { startOfDay } from "../lib/schedule";
 import { useStore } from "../lib/store";
+import { agenda } from "../lib/views";
 import { Sheet, TopBar } from "./common";
 import { useUid } from "./hooks";
 import { openEditor } from "./host";
@@ -11,7 +13,8 @@ import { Events, Expenses, Notes, Overview, Tasks } from "./Lists";
 import { showToast } from "./toast";
 
 type Tab = "ALL" | ItemType;
-const TABS: { key: Tab; label: string }[] = [{ key: "ALL", label: "Tất cả" }, ...TYPES.map((t) => ({ key: t as Tab, label: TYPE_LABEL[t] }))];
+// "Lịch" shows every dated task and appointment (the calendar), not only appointments.
+const TABS: { key: Tab; label: string }[] = [{ key: "ALL", label: "Tất cả" }, ...TYPES.map((t) => ({ key: t as Tab, label: t === "EVENT" ? "Lịch" : TYPE_LABEL[t] }))];
 
 /** Everything that is not a renewal: tasks, appointments, expenses and notes, wherever they belong. */
 export function Work() {
@@ -22,7 +25,11 @@ export function Work() {
   const saved = useMemo(() => all.filter((i) => i.status !== "DRAFT"), [all]);
   const counts = useMemo(() => {
     const open = saved.filter((i) => i.status === "OPEN");
-    return { ALL: open.filter((i) => i.type === "TASK" || i.type === "EVENT").length, TASK: open.filter((i) => i.type === "TASK").length, EVENT: open.filter((i) => i.type === "EVENT").length, EXPENSE: 0, NOTE: 0 } as Record<Tab, number>;
+    // The calendar chip counts what is on it today: overdue tasks and today's entries.
+    const now = Date.now();
+    const ag = agenda(open, now);
+    const today = ag.overdue.length + ag.ahead.filter((i) => i.whenAt! < startOfDay(now) + 86_400_000).length;
+    return { ALL: open.filter((i) => i.type === "TASK" || i.type === "EVENT").length, TASK: open.filter((i) => i.type === "TASK").length, EVENT: today, EXPENSE: 0, NOTE: 0 } as Record<Tab, number>;
   }, [saved]);
 
   const fail = () => showToast("Chưa lưu được, kiểm tra mạng rồi thử lại");

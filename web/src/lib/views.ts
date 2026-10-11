@@ -34,6 +34,38 @@ export function overview(items: Item[], now: number): Overview {
   return out;
 }
 
+export interface Agenda {
+  /** Tasks whose time has passed and are not done: they stay on top until done. */
+  overdue: Item[];
+  /** Everything dated from today on, tasks and appointments together, in time order. */
+  ahead: Item[];
+  /** Appointments that are over, newest first. */
+  past: Item[];
+}
+
+/**
+ * The calendar view: one list of every open dated task and appointment. The same item also shows in
+ * its own list ("Việc"); it is one record in two views, never a copy.
+ */
+export function agenda(items: Item[], now: number): Agenda {
+  const today0 = startOfDay(now);
+  const out: Agenda = { overdue: [], ahead: [], past: [] };
+  for (const i of items) {
+    if (i.status !== "OPEN" || i.whenAt === undefined || (i.type !== "TASK" && i.type !== "EVENT")) continue;
+    if (i.type === "TASK") {
+      const late = i.allDay ? i.whenAt < today0 : i.whenAt < now;
+      (late ? out.overdue : out.ahead).push(i);
+    } else {
+      const end = i.allDay ? startOfDay(i.whenAt) + 86_400_000 : i.whenAt + 3_600_000;
+      (end <= now ? out.past : out.ahead).push(i);
+    }
+  }
+  out.overdue.sort(byWhen);
+  out.ahead.sort(byWhen);
+  out.past.sort((a, b) => b.whenAt! - a.whenAt!);
+  return out;
+}
+
 export function monthKey(t: number): string {
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

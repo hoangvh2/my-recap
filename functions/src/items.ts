@@ -158,6 +158,8 @@ export function itemFromRecord(rec: Record<string, unknown>, ctx: ItemContext): 
   if (quote) item.quote = quote;
   const repeat = (type === "TASK" || type === "EVENT") && whenAt !== undefined ? recurrenceFrom(str(rec.repeat)) : undefined;
   if (repeat) item.recurrence = repeat;
+  // Only for things that are reminded; "true" as text is a common model slip.
+  if ((type === "TASK" || type === "EVENT") && (rec.important === true || rec.important === "true")) item.important = true;
   return item;
 }
 

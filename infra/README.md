@@ -267,6 +267,8 @@ Xoá biểu tượng app cũ khỏi Màn hình chính, mở Safari vào `https:/
 | Xoay khoá Gemini | `cd infra && terraform apply -replace='google_apikeys_key.gemini[0]'` (chưa thử thật) |
 | Chỉ xem thay đổi, không áp dụng | `node infra/deploy.mjs --plan` |
 | Hosting lỗi nhưng Terraform đã xong | Sửa đăng nhập Firebase CLI rồi `node infra/deploy.mjs --skip-terraform` |
+| Bật thông báo Pushover | Tạo Application tại pushover.net/apps/build (tên "Thư ký") → chép **API Token** vào `pushover_app_token` trong tfvars → `node infra/deploy.mjs --yes --skip-web`. Sau đó mỗi người vào app: **Cài đặt → Thông báo trên điện thoại** → dán User Key → **Lưu và bật** → **Gửi thử** |
+| Xem thông báo có chạy không | Cloud Console → Cloud Run → `notifytick` → Logs: mỗi phút một dòng `notifytick` (`sent`, `failed`, `capped`) |
 | Lịch iPhone tự cập nhật | Trong app: **Hôm nay → ⚙ Cài đặt → Lịch trên điện thoại → Bật** (cần Hosting đã deploy, xem Phần 10) |
 
 ---
@@ -282,6 +284,7 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 - [ ] Thu âm một câu bằng micro (trên iPhone thật).
 - [ ] Thêm một khách và một license sắp hết hạn: xuất hiện ở **Hôm nay → Gia hạn cần xử lý**.
 - [ ] Settings → Lịch trên điện thoại → Bật → mở địa chỉ liên kết trong trình duyệt: tải được file `.ics` (nếu `404` xem mục lỗi `calendar`).
+- [ ] (Nếu đã đặt `pushover_app_token`) Cài đặt → Thông báo → dán User Key → Lưu và bật → **Gửi thử**: điện thoại nhận tin trong vài giây. Thêm một lịch hẹn 20 phút nữa: nhận tin "🟠 15 phút nữa · …" đúng lúc.
 - [ ] Với tên miền riêng: `https://recap.vhub.id.vn` **ở nguyên** địa chỉ đó (không bị chuyển) và đăng nhập được.
 
 ---
@@ -363,6 +366,7 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 Đã kiểm: `terraform validate`, `plan` offline, chạy `apply` và Hosting thật cho bản thư ký ban đầu. **Chưa kiểm trên Google thật** (cần chạy lần đầu để biết):
 
 - Hai Function mới `calendarlink`, `calendarfeed` và quy tắc chuyển tiếp `/calendar/**` của Hosting sang Cloud Run.
+- Thông báo: Function `notifysettings`, `notifytick`, job Cloud Scheduler mỗi phút (OIDC), TTL của `notifylog`, và gửi thật tới Pushover.
 - Đăng ký lịch `webcal://` trên iPhone thật và tần suất cập nhật.
 - Chất lượng Gemini thật với ghi chú bán hàng.
 - Đăng nhập Google trong app đã thêm vào Màn hình chính của iOS với tên miền riêng.

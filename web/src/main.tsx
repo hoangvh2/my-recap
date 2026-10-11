@@ -1,6 +1,9 @@
 import { render } from "preact";
 import "./styles.css";
+import { blockZoom } from "./lib/nozoom";
 import { App } from "./ui/App";
+
+blockZoom();
 
 if (import.meta.env.VITE_USE_EMULATORS === "true") await import("./e2e");
 

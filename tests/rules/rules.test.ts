@@ -320,6 +320,27 @@ describe("settings", () => {
   });
 });
 
+describe("notifications", () => {
+  it("settings are readable by their owner only and written only by the function", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/uOwner/settings/notify"), { enabled: true, pushoverUser: "u".repeat(30) });
+      await setDoc(doc(ctx.firestore(), "notifiers/uOwner"), { enabled: true });
+      await setDoc(doc(ctx.firestore(), "users/uOwner/notifylog/k"), { state: "sent" });
+    });
+    await assertSucceeds(getDoc(doc(ownerCtx(), "users/uOwner/settings/notify")));
+    await assertFails(getDoc(doc(memberCtx(), "users/uOwner/settings/notify")));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/settings/notify"), { enabled: true, pushoverUser: "x" }));
+    await assertFails(getDoc(doc(ownerCtx(), "notifiers/uOwner")));
+    await assertFails(setDoc(doc(ownerCtx(), "notifiers/uOwner"), { enabled: true }));
+    await assertFails(getDoc(doc(ownerCtx(), "users/uOwner/notifylog/k")));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/notifylog/k2"), { state: "sent" }));
+  });
+  it("an item can be marked important (a boolean, nothing else)", async () => {
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/imp"), item({ id: "imp", important: true })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/imp2"), item({ id: "imp2", important: "yes" })));
+  });
+});
+
 describe("calendar feed tokens", () => {
   it("are server-only: no client can read, list or write them", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

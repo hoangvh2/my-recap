@@ -29,6 +29,8 @@ export interface Item {
   /** The customer this belongs to, and (optionally) the licence it is about. */
   customerId?: string;
   licenseId?: string;
+  /** Must not be missed: reminded louder (Pushover emergency, repeated until acknowledged). */
+  important?: boolean;
 }
 
 export interface Capture {

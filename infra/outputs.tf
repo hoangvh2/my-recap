@@ -23,3 +23,8 @@ output "auth_console" {
   description = "One manual step: enable the Google provider here."
   value       = "https://console.firebase.google.com/project/${var.project_id}/authentication/providers"
 }
+
+output "notifications" {
+  description = "Phone notifications: on when pushover_app_token is set."
+  value       = !local.pushover_ready ? "off: set pushover_app_token in terraform.tfvars and deploy again" : "on: every minute; each person enters their Pushover User Key in Settings"
+}

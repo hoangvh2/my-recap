@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Item } from "../src/lib/model";
-import { expensesOfMonth, fold, matches, monthKey, overview, shiftMonth } from "../src/lib/views";
+import { agenda, expensesOfMonth, fold, matches, monthKey, overview, shiftMonth } from "../src/lib/views";
 
 const now = new Date(2026, 9, 10, 14, 0).getTime();
 let n = 0;
@@ -54,5 +54,22 @@ describe("search", () => {
     expect(matches(it_({ title: "Họp với anh Nam" }), "HỌP VỚI")).toBe(true);
     expect(matches(it_({ title: "x", place: "Cà phê" }), "ca phe")).toBe(true);
     expect(matches(it_({ title: "x" }), "  ")).toBe(true);
+  });
+});
+
+describe("agenda", () => {
+  it("puts dated tasks and appointments on one calendar, each once, overdue tasks first", () => {
+    const late = it_({ title: "late", whenAt: at(9, 20) });
+    const todayTask = it_({ title: "today-task", whenAt: at(10, 16) });
+    const meeting = it_({ type: "EVENT", title: "meeting", whenAt: at(10, 15) });
+    const pastMeeting = it_({ type: "EVENT", title: "past", whenAt: at(10, 9) });
+    const tomorrow = it_({ title: "tomorrow", whenAt: at(11), allDay: true });
+    const undated = it_({ title: "undated" });
+    const note = it_({ type: "NOTE", title: "note", whenAt: at(11) });
+    const done = it_({ title: "done", status: "DONE", whenAt: at(11) });
+    const a = agenda([tomorrow, meeting, late, todayTask, pastMeeting, undated, note, done], now);
+    expect(a.overdue.map((i) => i.title)).toEqual(["late"]);
+    expect(a.ahead.map((i) => i.title)).toEqual(["meeting", "today-task", "tomorrow"]);
+    expect(a.past.map((i) => i.title)).toEqual(["past"]);
   });
 });

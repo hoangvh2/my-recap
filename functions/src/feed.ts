@@ -4,6 +4,7 @@ import { isoDateIn } from "../../shared/dates";
 import { eventForItem, eventsForLicense, renderCalendar, type CalEvent } from "../../shared/ics";
 import { normalizePrefs, type Customer, type Item, type License, type Prefs } from "../../shared/model";
 import { isValidZone } from "./items";
+import { readSettings } from "./notify/settings";
 
 /**
  * The calendar subscription: a secret link that phone calendars poll. The link carries a random
@@ -48,6 +49,8 @@ export interface FeedData {
   customers: Pick<Customer, "id" | "name">[];
   licenses: License[];
   prefs: Prefs;
+  /** False when the owner gets Pushover reminders and asked the calendar to stay silent. */
+  alarms: boolean;
 }
 
 export interface FeedStore {
@@ -89,7 +92,7 @@ export async function renderFeed(store: FeedStore, uid: string, zone: string, no
     if (l.status !== "OPEN") continue;
     events.push(...eventsForLicense(l, names.get(l.customerId) ?? "Khách", { today, prefs: data.prefs, zone }));
   }
-  return renderCalendar(events, { stamp: nowMs, name: "Thư ký · Việc & Gia hạn", refreshHours: 1 });
+  return renderCalendar(data.alarms ? events : events.map((e) => ({ ...e, alarm: "" })), { stamp: nowMs, name: "Thư ký · Việc & Gia hạn", refreshHours: 1 });
 }
 
 // ---------------------------------------------------------------- Firestore
@@ -129,17 +132,20 @@ export class FirestoreFeedStore implements FeedStore {
 
   async load(uid: string): Promise<FeedData> {
     const col = (name: string) => this.db.collection(`users/${uid}/${name}`);
-    const [items, customers, licenses, prefs] = await Promise.all([
+    const [items, customers, licenses, prefs, notify] = await Promise.all([
       col("items").where("status", "==", "OPEN").limit(FEED_LIMIT).get(),
       col("customers").select("name").limit(FEED_LIMIT).get(),
       col("licenses").where("status", "==", "OPEN").limit(FEED_LIMIT).get(),
       this.db.doc(`users/${uid}/settings/prefs`).get(),
+      this.db.doc(`users/${uid}/settings/notify`).get(),
     ]);
+    const n = readSettings(notify.data());
     return {
       items: items.docs.map((d) => ({ ...(d.data() as Omit<Item, "id">), id: d.id })),
       customers: customers.docs.map((d) => ({ id: d.id, name: String(d.get("name") ?? "") })),
       licenses: licenses.docs.map((d) => ({ ...(d.data() as Omit<License, "id">), id: d.id })),
       prefs: normalizePrefs(prefs.data() as Partial<Prefs> | undefined),
+      alarms: !n || n.calendarAlarms,
     };
   }
 }

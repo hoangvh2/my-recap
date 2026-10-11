@@ -9,6 +9,9 @@ import { CaptureError, parseCaptureInput, runCapture, type CaptureDeps } from ".
 import { allowedOrigins, DEFAULT_GEMINI_MODEL, GEMINI_BASE_URL, REGION } from "./config";
 import { FeedHandler, FeedRequestError, FirestoreFeedStore, manageFeed, parseFeedRequest } from "./feed";
 import { GeminiClient } from "./gemini";
+import { PUSHOVER_BASE_URL, PushoverClient } from "./notify/pushover";
+import { FirestoreNotifyStore, manageNotify, NotifyError, tick } from "./notify/run";
+import { parseSettingsRequest, SettingsError } from "./notify/settings";
 import { FirestoreQuota } from "./usage";
 
 initializeApp();
@@ -18,6 +21,10 @@ const ALLOWED_EMAILS = defineString("ALLOWED_EMAILS");
 const GEMINI_MODEL = defineString("GEMINI_MODEL", { default: DEFAULT_GEMINI_MODEL });
 /** Lives in Secret Manager; only this function's service account can read it. */
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+/** Pushover application token (Secret Manager). "unset" until the owner registers a Pushover app. */
+const PUSHOVER_TOKEN = defineSecret("PUSHOVER_TOKEN");
+/** https://… of the web app, for the "open" link in notifications. Empty: no link. */
+const APP_URL = defineString("APP_URL", { default: "" });
 
 const inEmulator = process.env.FUNCTIONS_EMULATOR === "true";
 const project = process.env.GCLOUD_PROJECT ?? "";
@@ -125,6 +132,68 @@ export const calendarfeed = onRequest(
       res.send(req.method === "HEAD" ? undefined : r.body);
     } catch (e) {
       logger.error("calendarfeed crashed", { error: e instanceof Error ? e.name : "unknown" });
+      res.status(500).end();
+    }
+  },
+);
+
+// ---------------------------------------------------------------- notifications (Pushover)
+
+function pushover(): PushoverClient {
+  const token = PUSHOVER_TOKEN.value().trim();
+  if (!token || token === "unset") throw new NotifyError("failed-precondition", "Máy chủ chưa có Pushover App Token (xem infra/README.md)");
+  const override = inEmulator ? process.env.PUSHOVER_BASE_URL_OVERRIDE : undefined;
+  return new PushoverClient(token, override ?? PUSHOVER_BASE_URL);
+}
+
+const appUrl = () => APP_URL.value().trim() || undefined;
+
+/** The owner's notification settings: save (Pushover checks the key first), send a test, or switch off. */
+export const notifysettings = onCall(
+  {
+    region: REGION,
+    secrets: [PUSHOVER_TOKEN],
+    enforceAppCheck: !inEmulator,
+    consumeAppCheckToken: !inEmulator,
+    cors: inEmulator ? true : allowedOrigins(project, process.env.EXTRA_ORIGINS),
+    maxInstances: 2,
+    concurrency: 8,
+    timeoutSeconds: 30,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const uid = requireAllowed(request, "notifysettings");
+    try {
+      const req = parseSettingsRequest(request.data);
+      const result = await manageNotify(new FirestoreNotifyStore(getFirestore()), pushover(), uid, req, Date.now(), appUrl());
+      logger.info("notifysettings", { uid: shortHash(uid), action: req.action });
+      return result;
+    } catch (e) {
+      if (e instanceof SettingsError) throw new HttpsError("invalid-argument", e.message);
+      if (e instanceof NotifyError) throw new HttpsError(e.code, e.message);
+      logger.error("notifysettings crashed", { uid: shortHash(uid), error: e instanceof Error ? e.name : "unknown" });
+      throw new HttpsError("internal", "Không lưu được cài đặt thông báo");
+    }
+  },
+);
+
+/**
+ * Called every minute by Cloud Scheduler (an OIDC-authenticated job; the service is private, so
+ * nobody else can invoke it). Sends the reminders that fell due and the morning/evening summaries.
+ */
+export const notifytick = onRequest(
+  { region: REGION, invoker: "private", secrets: [PUSHOVER_TOKEN], cors: false, maxInstances: 1, concurrency: 1, timeoutSeconds: 120, memory: "256MiB" },
+  async (req, res) => {
+    const started = Date.now();
+    // The emulator end-to-end run sets the clock; a deployed instance always uses the real one.
+    const forced = inEmulator ? Number(req.query.now) : NaN;
+    const now = Number.isFinite(forced) && forced > 0 ? forced : started;
+    try {
+      const r = await tick(new FirestoreNotifyStore(getFirestore()), pushover(), now, appUrl(), (msg, data) => logger.warn(msg, data));
+      logger.info("notifytick", { ...r, ms: Date.now() - started });
+      res.status(200).json(r);
+    } catch (e) {
+      logger.error("notifytick crashed", { error: e instanceof Error ? e.message.slice(0, 120) : "unknown" });
       res.status(500).end();
     }
   },
