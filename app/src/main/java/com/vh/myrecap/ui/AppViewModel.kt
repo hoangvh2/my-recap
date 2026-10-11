@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateListOf
 import com.vh.myrecap.backup.BackupManager
 import com.vh.myrecap.backup.BackupResult
 import com.vh.myrecap.backup.RestoreResult
+import com.vh.myrecap.core.ActionItems
+import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.BackupException
 import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Item
@@ -23,6 +25,7 @@ import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.core.TextSearch
 import com.vh.myrecap.core.Triage
+import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.StorageStats
 import com.vh.myrecap.data.TaskStatus
@@ -31,6 +34,7 @@ import com.vh.myrecap.reminder.Reminders
 import com.vh.myrecap.recorder.RecordingService
 import com.vh.myrecap.settings.AppSettings
 import com.vh.myrecap.work.Processing
+import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +46,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.ZoneId
 
 sealed interface Screen {
     data object Home : Screen
@@ -325,6 +328,46 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setDone(id: String, done: Boolean) = io { applyDone(id, done) }
+
+    /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */
+    var extractingActionsFor by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Reads a finished summary and proposes its follow-ups as DRAFT items (shown under "Chờ xác nhận"
+     * in the Việc tab). Nothing is saved without the owner confirming.
+     */
+    fun extractActions(sessionId: String, jobId: String) {
+        if (extractingActionsFor != null) return
+        extractingActionsFor = jobId
+        io {
+            try {
+                val summary = store.readSummary(sessionId, jobId)?.takeIf { it.isNotBlank() } ?: return@io
+                val config = app.settings.current.summaryConfig()
+                if (!config.isComplete) return@io toast("Chưa cấu hình AI (API key/model) trong Cài đặt")
+                val zone = ZoneId.systemDefault()
+                val now = System.currentTimeMillis()
+                val raw = try {
+                    Providers.textGenerator(config).generate(
+                        ActionItems.system(),
+                        ActionItems.userMessage(summary, java.time.ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(now), zone)),
+                    )
+                } catch (e: ApiException) {
+                    if (e.emptyResult) "" else throw e
+                }
+                val parsed = ActionItems.parse(raw, zone, now, sessionId, ItemStore::newId)
+                    ?: return@io toast("AI trả lời không đọc được, thử lại sau")
+                val fresh = ActionItems.withoutDuplicates(parsed, app.items.bySource(sessionId))
+                if (fresh.isEmpty()) return@io toast("Không có việc mới cần làm trong bản tóm tắt")
+                fresh.forEach { app.items.upsert(it) }
+                toast("Đã thêm ${fresh.size} việc chờ xác nhận ở tab Việc")
+            } catch (e: ApiException) {
+                toast(e.message ?: "Lỗi dịch vụ AI")
+            } finally {
+                extractingActionsFor = null
+            }
+        }
+    }
 
     /** One tap of the morning review: moves an overdue task to a new day, or off the calendar. */
     fun triage(id: String, move: Triage.Move) = io {
