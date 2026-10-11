@@ -8,7 +8,9 @@ export type Route =
   | { name: "license"; id: string }
   | { name: "work" }
   | { name: "settings" }
-  | { name: "import" };
+  | { name: "import" }
+  /** Opened from a notification's "Đã xong" button: tick that item off, then show Today. */
+  | { name: "done"; id: string };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -26,6 +28,8 @@ export function parseRoute(hash: string): Route {
       return b === undefined ? { name: "renewals" } : ID.test(b) ? { name: "license", id: b } : { name: "renewals" };
     case "viec":
       return { name: "work" };
+    case "xong":
+      return b !== undefined && ID.test(b) ? { name: "done", id: b } : { name: "today" };
     case "cai-dat":
       return { name: "settings" };
     case "nhap":
@@ -45,12 +49,13 @@ export const to = {
   work: "#/viec",
   settings: "#/cai-dat",
   import: "#/nhap",
+  done: (id: string) => `#/xong/${id}`,
 } as const;
 
 /** Which bottom tab a route belongs to (a customer or licence keeps its own tab lit). */
 export function tabOf(r: Route): "today" | "customers" | "renewals" | "work" | null {
   switch (r.name) {
-    case "today": return "today";
+    case "today": case "done": return "today";
     case "customers": case "customer": return "customers";
     case "renewals": case "license": return "renewals";
     case "work": return "work";

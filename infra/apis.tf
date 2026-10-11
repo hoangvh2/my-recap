@@ -20,6 +20,7 @@ locals {
     "logging.googleapis.com",
     "storage.googleapis.com",
     "billingbudgets.googleapis.com",
+    "cloudscheduler.googleapis.com",
   ]
 }
 

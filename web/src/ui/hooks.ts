@@ -21,6 +21,21 @@ export function useToday(): ISODate {
   return today;
 }
 
+/** The current time, refreshed every minute and when the app comes back to the screen (the timeline's "now"). */
+export function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const t = setInterval(tick, 60_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
+  return now;
+}
+
 /** Every record and the links between them. */
 export function useGraph(): Graph {
   const c = useStore(customers);

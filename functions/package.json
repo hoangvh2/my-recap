@@ -2,7 +2,7 @@
   "name": "my-recap-functions",
   "private": true,
   "version": "0.1.0",
-  "description": "Backend of the My Recap web secretary: Gemini capture behind Google sign-in, allowlist, App Check and a daily quota.",
+  "description": "Backend of VHub Desk (desk.vhub.id.vn): Gemini capture behind Google sign-in, allowlist, App Check and a daily quota.",
   "main": "lib/index.js",
   "engines": {
     "node": "22"

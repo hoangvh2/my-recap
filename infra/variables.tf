@@ -85,3 +85,14 @@ variable "custom_domain" {
     error_message = "custom_domain must be a plain lowercase hostname such as recap.example.com (no https://, no path)."
   }
 }
+
+variable "pushover_app_token" {
+  description = "Optional. Application API token from pushover.net (Your Applications > Create an Application). Turns on phone notifications; each person then enters their own User Key in the app's Settings."
+  type        = string
+  default     = null
+  sensitive   = true
+  validation {
+    condition     = var.pushover_app_token == null ? true : can(regex("^[A-Za-z0-9]{30}$", var.pushover_app_token))
+    error_message = "A Pushover application token is 30 letters and digits."
+  }
+}

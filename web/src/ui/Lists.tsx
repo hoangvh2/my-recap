@@ -2,7 +2,7 @@ import { useMemo, useState } from "preact/hooks";
 import { dayLabel } from "../lib/format";
 import { formatVnd } from "../lib/money";
 import type { Item } from "../lib/model";
-import { expensesOfMonth, monthKey, overview, shiftMonth } from "../lib/views";
+import { agenda, expensesOfMonth, monthKey, overview, shiftMonth } from "../lib/views";
 import { Icon } from "./icons";
 import { ItemRow } from "./ItemRow";
 
@@ -62,22 +62,22 @@ export function Tasks({ items, ...h }: { items: Item[] } & Handlers) {
   );
 }
 
+/** "Lịch": every dated task and appointment by day, overdue tasks first. */
 export function Events({ items, ...h }: { items: Item[] } & Handlers) {
   const [showPast, setShowPast] = useState(false);
   const now = Date.now();
-  const events = items.filter((i) => i.type === "EVENT" && i.status === "OPEN" && i.whenAt !== undefined).sort((a, b) => a.whenAt! - b.whenAt!);
-  const isPast = (i: Item) => (i.allDay ? i.whenAt! + 86_400_000 : i.whenAt! + 3_600_000) <= now;
-  const upcoming = events.filter((i) => !isPast(i));
-  const past = events.filter(isPast).reverse().slice(0, 50);
+  const a = useMemo(() => agenda(items, now), [items, now]);
   const groups = new Map<string, Item[]>();
-  for (const e of upcoming) {
+  for (const e of a.ahead) {
     const k = dayLabel(e.whenAt!, now);
     groups.set(k, [...(groups.get(k) ?? []), e]);
   }
+  const past = a.past.slice(0, 50);
   return (
     <>
+      <Section title="Quá hạn" tone="warn" items={a.overdue} {...h} />
       {[...groups].map(([day, list]) => <Section key={day} title={day} items={list} {...h} showDate={false} />)}
-      {upcoming.length === 0 && <Empty>Chưa có lịch hẹn sắp tới.</Empty>}
+      {a.ahead.length === 0 && a.overdue.length === 0 && <Empty>Chưa có lịch hay việc có hạn sắp tới.</Empty>}
       {past.length > 0 && (
         <>
           <button class="btn text" onClick={() => setShowPast(!showPast)}>{showPast ? "Ẩn" : "Hiện"} lịch đã qua ({past.length})</button>

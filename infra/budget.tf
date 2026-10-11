@@ -1,7 +1,7 @@
 resource "google_billing_budget" "monthly" {
   count           = var.billing_account_id != null && var.monthly_budget != null ? 1 : 0
   billing_account = var.billing_account_id
-  display_name    = "My Recap monthly"
+  display_name    = "VHub Desk monthly"
 
   budget_filter {
     projects = ["projects/${data.google_project.this.number}"]

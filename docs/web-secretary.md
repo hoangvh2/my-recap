@@ -1,4 +1,6 @@
-# Bản web "Thư ký" cho iPhone (PWA + Firebase)
+# VHub Desk: bản web cho iPhone (PWA + Firebase)
+
+> Tên app: **VHub Desk** (trước đây "My Recap · Thư ký"), địa chỉ **`https://desk.vhub.id.vn`**, thuộc hệ sinh thái VHub (`vhub.id.vn`). Đổi địa chỉ từ `recap.vhub.id.vn`: xem [infra/README.md, Phần 8](../infra/README.md#đang-chạy-ở-recapvhubidvn-chuyển-sang-deskvhubidvn).
 
 Mục đích: người dùng iPhone chỉ cần chức năng **Thư ký** (ghi nhanh việc, lịch hẹn, chi tiêu, ghi chú), không cần ghi âm phỏng vấn/họp. Bản này có thêm bộ công cụ cho người **làm kinh doanh**: quản lý **khách**, **license/bảo hành** và nhắc **gia hạn trước khi hết hạn** (xem [Bán hàng](#bán-hàng-khách-licensebảo-hành-và-gia-hạn)). Không cần tài khoản Apple Developer: cài bằng Safari → Chia sẻ → **Thêm vào Màn hình chính**.
 
@@ -22,7 +24,7 @@ iPhone (PWA, Preact)
 - Dữ liệu: `users/{uid}/items`, `captures`, `customers`, `licenses`, `proposals`, `settings/prefs` trên Firestore. **Không có bản sao trong trình duyệt** (Firestore chạy cache bộ nhớ; E2E kiểm tra IndexedDB/localStorage chỉ còn token đăng nhập của Firebase).
 - Audio ghi ở máy, đổi sang WAV 16 kHz, gửi cho Function rồi bỏ; không lưu.
 - Dữ liệu của các tài khoản hoàn toàn tách nhau, và **tách khỏi app Android** (Android vẫn lưu cục bộ).
-- Nhắc việc: web không hẹn giờ thông báo được như Android. Có hai cách dùng Lịch iPhone: **Cài đặt → Lịch trên điện thoại → Bật lịch tự cập nhật** (đăng ký một lần, lịch tự cập nhật) hoặc xuất file `.ics` một lần / từng mục / từng license. Lịch iPhone báo 15 phút trước lịch hẹn, đúng giờ với việc, 9:00 với mốc gia hạn và mục cả ngày.
+- Nhắc việc: **thông báo qua Pushover** (xem [Thông báo](#thông-báo-pushover)) là kênh chính. Lịch iPhone (đăng ký lịch tự cập nhật hoặc xuất `.ics`) vẫn dùng được; khi đã bật Pushover, lịch mặc định **không đổ chuông** để khỏi nhắc hai lần (bật lại được trong Cài đặt).
 
 ## Bán hàng: khách, license/bảo hành và gia hạn
 
@@ -43,9 +45,68 @@ iPhone (PWA, Preact)
 
 **AI hiểu ngữ cảnh bán hàng.** Ghi nhanh được gửi kèm danh sách khách và license đang theo dõi (dưới dạng mã ngắn c1, l1; tối đa 300 khách / 500 license), nên "gọi anh Nam bên ABC, đã gửi báo giá" gắn đúng khách và đề xuất đổi giai đoạn. Mọi tham chiếu do model trả về đều được kiểm tra lại ở server: mã bịa bị bỏ, trùng tên khách thì dùng khách có sẵn, câu mô tả đề xuất do server tự viết. **Mọi thứ vào dạng nháp**; chỉ khi bấm **Lưu tất cả** mới thành thật (từng dòng sửa hoặc bỏ được).
 
+**Bán/gia hạn luôn ra license (không phụ thuộc AI).** Model nhỏ hay xếp "chị Vân muốn mua license Windows Office ngày 12/11/2026" thành một lịch hẹn mà quên phần license. Server tự nhận ra mục nào nói về **mua** hoặc **gia hạn** license/bảo hành/bảo trì/thuê bao cho một khách (mọi loại mục trừ chi tiêu) và tạo **license nháp** cho khách đó, gắn với việc/lịch hẹn: tên sản phẩm lấy từ câu nói ("Windows Office"); ngày hết hạn lấy từ "đến / hết hạn …"; chỉ có ngày mua thì **tạm tính 12 tháng** và ghi rõ trên license để kiểm tra lại. Không có ngày nào thì không tạo (không bịa). Khách đã có license đó (cùng sản phẩm, cùng ngày hết hạn) hoặc AI đã đề xuất cập nhật license cũ thì chỉ gắn vào, không tạo trùng.
+
 **Nhập từ Excel:** dán các ô từ Excel hoặc chọn file CSV; app xem trước, nêu rõ dòng lỗi bằng tiếng Việt, bỏ dòng trùng, rồi mới nhập. Tên cột mặc định (Khách hàng, Người liên hệ, Số điện thoại, Email, Sản phẩm, Loại, Ngày bắt đầu, Ngày hết hạn, Thời hạn (tháng), Giá trị, Số hợp đồng, Ghi chú) **sửa được trong Cài đặt**; app cũng tự nhận các tên thông dụng. Chưa đọc trực tiếp `.xlsx` (cần thêm thư viện); dán hoặc lưu CSV UTF-8.
 
 **Lịch tự cập nhật:** địa chỉ `https://<host>/calendar/<token>.ics` (token ngẫu nhiên 256 bit; server chỉ lưu bản băm để tra cứu). Lịch gồm việc/lịch hẹn đang mở và mọi mốc gia hạn phía trước; **không có số điện thoại hay email**. Đổi liên kết thì liên kết cũ chết; tắt thì lịch ngừng cập nhật. Mỗi lần có người gọi, server kiểm tra liên kết (1 lần đọc nhỏ) nên đổi/tắt liên kết có hiệu lực **ngay**; chỉ phần dựng lịch (đọc toàn bộ việc/license) được cache 10 phút để giới hạn số lần đọc Firestore.
+
+## Lịch: mục nào có thời gian thì lên lịch
+
+- **Một câu nói = một mục**, không tạo cả "việc" lẫn "lịch hẹn" cho cùng một thứ (trùng lặp gây nhiễu, đánh dấu xong một bên thì bên kia vẫn nhắc).
+- Tab **Việc → Lịch** hiện **mọi mục có ngày giờ** (việc có hạn + lịch hẹn) theo ngày, việc quá hạn ở trên cùng. Cùng một bản ghi hiện ở hai chỗ (danh sách Việc và Lịch), không phải hai bản sao.
+- Server sửa hai lỗi hay gặp của AI: (1) việc/ghi chú có ngày mà là **cuộc hẹn** (họp, hẹn gặp, khám, đón con, sinh nhật, phỏng vấn, demo, chuyến bay…) → chuyển thành **lịch hẹn**; (2) việc AI quên điền ngày mà câu có ngày rõ ràng ("hạn 20/11", "ngày 5 tháng 3") → điền ngày. Việc phải làm (gọi, gửi, nộp…) **vẫn là việc** dù có giờ, để nếu chưa làm thì hiện **quá hạn** chứ không trôi qua như một lịch hẹn.
+
+**Màn Hôm nay theo giờ:** cột giờ bên trái ("Cả ngày" ở đầu, rồi 09:00, 10:30…), vạch đỏ "bây giờ", lịch đã qua làm mờ.
+
+**Khách cần/mua license → luôn ra license nháp trong Gia hạn:** "cần", "muốn", "lấy thêm", "báo giá", "chốt", "mua"… cùng chữ license/bản quyền/phần mềm/bảo hành → mỗi sản phẩm một license ("SIM và CheckPoint" = 2). Ngày tính từ ngày giao/hạn của việc, không có thì từ hôm nay, thời hạn tạm 12 tháng, ghi rõ "tạm tính" trên thẻ nháp để kiểm tra lại.
+
+## Thông báo (Pushover)
+
+**Vì sao Pushover chứ không phải Web Push:** Web Push trên iPhone chỉ chạy khi app đã thêm vào Màn hình chính (iOS 16.4+), không có mức ưu tiên, không nhắc lặp đến khi xác nhận. Pushover (app iOS, trả một lần ~5 USD sau 30 ngày dùng thử) có 4 mức ưu tiên, mức khẩn lặp lại đến khi bấm xác nhận, và vượt được giờ yên lặng.
+
+| Mức | Khi nào | Trên điện thoại |
+|---|---|---|
+| 🔴 KHẨN (2) | Mục đánh dấu **Quan trọng**, đúng lúc nhắc | Âm "persistent", lặp mỗi 5 phút đến khi bấm Xác nhận (tối đa 1 giờ) |
+| 🟠 Cao (1) | Trước lịch hẹn N phút (mặc định 15), đúng giờ của việc; tóm tắt sáng có việc quá hạn / gia hạn đỏ | Kêu cả khi Pushover đang yên lặng |
+| 🔵 Thường (0) | Việc chưa xong sau 2 giờ; tóm tắt sáng; 1 giờ trước lịch hẹn quan trọng | Bình thường |
+| ⚪ Nhẹ (-1) | Xem trước ngày mai (20:00) | Không chuông |
+
+**Tần suất thông minh:** mỗi lịch hẹn nhắc một lần; mỗi việc nhắc đúng giờ + một lần nhắc lại; tin nhắc lại không gửi trong giờ yên lặng (mặc định 22:00–06:30) nhưng nhắc đúng giờ thì luôn gửi; mục cả ngày vào tóm tắt sáng (tắt tóm tắt thì nhắc riêng lúc 08:00); tóm tắt trống thì không gửi; nhiều nhắc cùng phút gộp thành một tin; tối đa 60 tin/người/ngày.
+
+**Tắt nhắc mà không cần thao tác rắc rối:**
+- Tin của **việc** có nút **✅ Đã xong**: chạm là app mở ra và tự đánh dấu xong (có Hoàn tác).
+- Tin **KHẨN** tự dừng: lịch hẹn thì dừng lúc đến giờ hẹn (+5 phút), việc thì sau 30 phút. Bấm Xác nhận trong Pushover cũng dừng.
+- Đánh dấu xong, bỏ "Quan trọng" hay xoá mục trong app: phút sau server **huỷ** tin khẩn đang lặp trên điện thoại (Pushover receipt).
+- **Lịch hẹn** cũng có vòng tròn "Đã xong" (viền đứt nét), và màn sửa có nút **Đã xong**. Lịch lặp lại bấm Đã xong chỉ xong lần này, tự chuyển sang lần sau.
+
+**Nội dung tin:** tiêu đề `🟠 15 phút nữa · Họp anh Nam` (mức + khi nào + việc gì, đọc được ngay trên màn hình khoá); thân tin: giờ bắt đầu–kết thúc và ngày, 📍 địa điểm, 👤 người/khách, 📝 chi tiết, và nút **Mở VHub Desk**. Tin nhắc lịch hẹn tự biến mất sau khi lịch đã bắt đầu 15 phút.
+
+**Cách chạy:** Cloud Scheduler gọi function riêng tư `notifytick` mỗi phút. Mỗi lần chỉ đọc các mục trong khoảng thời gian liên quan + các mục lặp lại; mỗi tin có khoá riêng ghi vào `users/{uid}/notifylog` (tự xoá sau 14 ngày) nên **không bao giờ gửi trùng**; lỡ một lần chạy thì lần sau gửi bù (trong 10 phút). Lỗi tạm thời của Pushover thì thử lại phút sau; bị từ chối (key sai) thì dừng. Cài đặt chỉ lưu qua function `notifysettings`, function này **hỏi Pushover xác nhận User Key trước** khi lưu.
+
+**Bật:** chủ app tạo một Application trên pushover.net, đặt `pushover_app_token` trong `infra/terraform.tfvars`, deploy. Mỗi người: cài Pushover, chép **User Key** vào **Cài đặt → Thông báo trên điện thoại**, bấm **Lưu và bật**, rồi **Gửi thử**. Trong Cài đặt iPhone → Thông báo → Pushover, bật **Thông báo nhạy cảm thời gian** để tin quan trọng vẫn đến khi đang bật Tập trung.
+
+**Chi phí ước tính:** 1 job Cloud Scheduler (3 job đầu miễn phí mỗi tài khoản billing); ~43.000 lần gọi function/tháng (trong hạn mức miễn phí 2 triệu); đọc Firestore ~ (số mục trong khoảng + số mục lặp lại + 3) mỗi phút mỗi người, thường < 15.000 lượt/ngày/người (miễn phí 50.000/ngày). Pushover: 10.000 tin/tháng miễn phí cho mỗi Application.
+
+## Giao diện iPhone
+
+- Bố cục chạy hết chiều ngang (E2E kiểm ở 428 × 926, iPhone 12 Pro Max): không màn nào cuộn ngang hay có phần tử tràn ra ngoài.
+- **Không phóng to/thu nhỏ được**: viewport `maximum-scale=1, user-scalable=no`, CSS `touch-action: pan-x pan-y` (chặn chụm 2 ngón và chạm đúp), chặn sự kiện `gesturestart` của Safari, và mọi ô nhập ≥ 16px (iOS tự phóng to khi chạm vào ô chữ nhỏ hơn). Đánh đổi: người cần phóng chữ để đọc không phóng được; nếu cần, nên thêm nút cỡ chữ trong Cài đặt thay vì mở lại zoom.
+
+## Giao diện và thương hiệu VHub
+
+- **Chế độ màu**: Cài đặt → Giao diện → Tự động (theo điện thoại) / Sáng / Tối. Nhớ trên từng máy (localStorage, chỉ là tuỳ chọn hiển thị, không phải dữ liệu cá nhân); áp dụng trước khi vẽ giao diện nên không nháy màu.
+- **Bảng màu VHub**: nền graphite trung tính (không ánh xanh dương), một màu nhấn teal dùng tiết chế (nút chính, micro, liên kết), màu đỏ/vàng/xanh lá chỉ cho trạng thái. Mọi màu chữ đạt tương phản ≥ 4.5:1 (WCAG AA) trên nền của nó, ở cả hai chế độ.
+
+| Token | Sáng | Tối |
+|---|---|---|
+| Nền / bề mặt | `#f6f7f9` / `#ffffff` | `#0b0d10` / `#14171c` |
+| Chữ / chữ phụ | `#111418` / `#5b6472` | `#e8eaed` / `#9aa3ae` |
+| Nhấn (teal) | `#0f766e` | `#2dd4bf` |
+| Thẻ Ghi nhanh | graphite `#161b22 → #262d37` | `#1b2028 → #232a33` |
+
+- **Chữ ký thương hiệu**: dòng nhỏ "VHub Desk · phiên bản x.y.z · © năm VHub · vhub.id.vn" ở cuối màn Cài đặt và màn đăng nhập; không chiếm chỗ trên các màn làm việc. Tên, phiên bản, năm nằm ở `web/src/brand.ts` (phiên bản lấy từ `web/package.json`).
+- Tên hiển thị trên Màn hình chính iPhone: **VHub Desk**. Muốn đổi tên trên iPhone đã cài: xoá biểu tượng cũ rồi Thêm vào Màn hình chính lại.
 
 ## Các lớp bảo mật
 
@@ -153,6 +214,9 @@ Cần Java 21 (emulator Firestore) và Chromium (`CHROMIUM=/đường/dẫn/chro
 | Chất lượng AI trên ghi chú bán hàng thật (tên khách, tiếng Việt, số tiền, "đã gửi báo giá") | Gemini thật chưa được gọi; E2E dùng Gemini giả đã biết câu trả lời | Thử 10–20 câu thật; mọi kết quả đều là nháp nên sai thì sửa/bỏ, không mất dữ liệu |
 | Quy mô lớn (hàng nghìn license) | Chỉ test vài chục bản ghi | Giới hạn hiện tại: 1.000 việc, 2.000 khách, 3.000 license mỗi tài khoản |
 | Tên model Gemini `gemini-3.5-flash-lite` (lấy từ app Android) và chi phí thực tế | Gemini thật chưa được gọi | Đổi bằng param `GEMINI_MODEL` nếu cần; theo dõi chi phí tuần đầu |
+| Gửi tin qua Pushover thật, độ trễ, Time Sensitive / Tập trung trên iOS | Máy chủ Pushover bị chặn trong môi trường build; E2E dùng Pushover giả. Tham số API theo tài liệu Pushover (priority −2…2, `retry`/`expire` cho mức 2, `html=1`, `ttl`, `url_title`) | Sau deploy: **Gửi thử**; tạo một lịch hẹn 20 phút nữa và một việc **Quan trọng** 2 phút nữa, xem tin đến đúng giờ, mức khẩn lặp lại đến khi bấm Xác nhận |
+| Cloud Scheduler gọi `notifytick` bằng OIDC | Chưa `apply` thật | `gcloud scheduler jobs describe myrecap-notify-every-minute --location asia-southeast1`; xem log `notifytick` mỗi phút |
+| Chặn zoom trên Safari iOS thật | Chỉ kiểm được thuộc tính/sự kiện trong Chromium | Thử chụm 2 ngón và chạm đúp trên iPhone (cả trong Safari và app đã thêm vào Màn hình chính) |
 | Quota chạy lại ở 00:00 UTC (07:00 giờ VN) | Thiết kế, không phải lỗi | — |
 
 ## Mức kiểm chứng của phần Terraform
@@ -164,10 +228,10 @@ Cần Java 21 (emulator Firestore) và Chromium (`CHROMIUM=/đường/dẫn/chro
 ## Giới hạn đã biết
 
 - Cần mạng để dùng (không offline vì không lưu dữ liệu trong trình duyệt).
-- Không có thông báo đẩy: nhắc việc dựa vào Lịch iPhone (đăng ký lịch hoặc `.ics`). Mốc gia hạn chỉ "hiện" trên màn hình Hôm nay khi mở app và trong Lịch iPhone.
+- Thông báo cần app Pushover (trả một lần sau 30 ngày dùng thử) và `pushover_app_token`; chưa bật thì nhắc việc dựa vào Lịch iPhone.
 - Chưa đọc trực tiếp file `.xlsx`; dán từ Excel hoặc dùng CSV.
 - Chưa có phân quyền theo vai trò hay chia sẻ khách giữa nhiều người: mỗi tài khoản có dữ liệu riêng.
-- Xoá khách xoá luôn license và việc liên quan (có xác nhận và nút Hoàn tác; sau khi tắt toast không khôi phục được ngoài sao lưu JSON). Web Push trên iOS cần server hẹn giờ và có báo cáo không ổn định; chưa làm.
+- Xoá khách xoá luôn license và việc liên quan (có xác nhận và nút Hoàn tác; sau khi tắt toast không khôi phục được ngoài sao lưu JSON).
 - Không nhập được bản sao lưu của app Android.
 - iOS có thể dọn dữ liệu đăng nhập của web app lâu không dùng → phải đăng nhập lại (dữ liệu vẫn an toàn trên Firestore).
 - `npm audit` của `web/` báo 4 lỗi mức cao trong `@grpc/grpc-js` (phụ thuộc gián tiếp của SDK Firebase). Thư viện này **không có trong bundle trình duyệt** (đã kiểm), nên không khai thác được ở web; `functions/` và `tests/` báo 0 lỗi.

@@ -6,7 +6,7 @@ import { applyProposal, renew as renewLicense, type RenewalInput } from "./lib/f
 import { buildGraph, customerCascade, type Graph } from "./lib/graph";
 import { createStore } from "./lib/store";
 import { normalizePrefs, type Capture, type Customer, type Item, type ItemType, type License, type Prefs, type Proposal } from "./lib/model";
-import { nextInstance, rollForward } from "./lib/schedule";
+import { finishEvent, nextInstance, rollForward } from "./lib/schedule";
 
 export type SyncState = "connecting" | "ready" | "denied" | "error";
 
@@ -17,6 +17,20 @@ export const licenses = createStore<License[]>([]);
 export const proposals = createStore<Proposal[]>([]);
 export const prefs = createStore<Prefs>(normalizePrefs(null));
 export const syncState = createStore<SyncState>("connecting");
+/** The owner's notification settings as saved by the server (null: never set up). */
+export const notifySettings = createStore<NotifyDoc | null>(null);
+
+export interface NotifyDoc {
+  enabled: boolean;
+  pushoverUser?: string;
+  device?: string;
+  morning?: number;
+  evening?: number;
+  quietFrom?: number;
+  quietTo?: number;
+  lead?: number;
+  calendarAlarms?: boolean;
+}
 
 const LIMITS = { items: 1_000, captures: 100, customers: 2_000, licenses: 3_000, proposals: 500 } as const;
 
@@ -79,6 +93,7 @@ export function startSync(uid: string): () => void {
     list<License>("licenses", "createdAt", LIMITS.licenses, licenses),
     list<Proposal>("proposals", "createdAt", LIMITS.proposals, proposals),
     onSnapshot(prefsRef(uid), (snap) => prefs.set(normalizePrefs(snap.data() as Partial<Prefs> | undefined)), quiet),
+    onSnapshot(doc(db, "users", uid, "settings", "notify"), (snap) => notifySettings.set((snap.data() as NotifyDoc | undefined) ?? null), quiet),
   ];
   return () => {
     offs.forEach((off) => off());
@@ -88,6 +103,7 @@ export function startSync(uid: string): () => void {
     licenses.set([]);
     proposals.set([]);
     prefs.set(normalizePrefs(null));
+    notifySettings.set(null);
   };
 }
 
@@ -123,6 +139,7 @@ export function deleteItems(uid: string, ids: string[]): Promise<void> {
  * same batch, under an id derived from the date, so a double tap or a second device cannot duplicate it.
  */
 export function setDone(uid: string, item: Item, done: boolean, now = Date.now()): Promise<void> {
+  if (done && item.type === "EVENT") return commit(uid, { items: [finishEvent(item, now)] });
   if (done) {
     const finished: Item = { ...item, status: "DONE", doneAt: now };
     const probe = nextInstance(finished, "probe", now);

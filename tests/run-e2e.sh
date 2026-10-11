@@ -7,11 +7,15 @@ ROOT="$(cd .. && pwd)"
 
 export ALLOWED_EMAILS="owner@example.com,member@example.com"
 node "$ROOT/scripts/configure.mjs"
+# Links in notifications point at the app; in the e2e run that is the local web server. Written to .env.local
+# (which overrides .env), so a value left there by an earlier emulator run cannot change the result.
+printf 'APP_URL=http://127.0.0.1:4173\n' > "$ROOT/functions/.env.local"
 (cd "$ROOT/functions" && npm run build >/dev/null)
-printf 'GEMINI_API_KEY=fake-e2e-key\n' > "$ROOT/functions/.secret.local"
+printf 'GEMINI_API_KEY=fake-e2e-key\nPUSHOVER_TOKEN=fake-pushover-token\n' > "$ROOT/functions/.secret.local"
 
 VITE_USE_EMULATORS=true VITE_FIREBASE_API_KEY=fake-key VITE_FIREBASE_PROJECT_ID=demo-myrecap VITE_FIREBASE_APP_ID=1:1:web:e2e \
   npm --prefix "$ROOT/web" run build -- --outDir dist-e2e >/dev/null
 
 export GEMINI_BASE_URL_OVERRIDE="http://127.0.0.1:8787"
+export PUSHOVER_BASE_URL_OVERRIDE="http://127.0.0.1:8787"
 npx firebase emulators:exec --config "$ROOT/firebase.json" --only auth,firestore,functions --project demo-myrecap "npx playwright test $*"

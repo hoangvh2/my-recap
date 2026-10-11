@@ -31,7 +31,7 @@ service cloud.firestore {
       return d.keys().hasAll(['id', 'type', 'status', 'title', 'details', 'allDay', 'createdAt'])
         && d.keys().hasOnly(['id', 'type', 'status', 'title', 'details', 'whenAt', 'allDay', 'amount',
                              'category', 'place', 'person', 'sourceId', 'quote', 'createdAt', 'doneAt', 'recurrence',
-                             'customerId', 'licenseId'])
+                             'customerId', 'licenseId', 'important'])
         && id.matches('^[A-Za-z0-9_-]{1,64}$')
         && d.id == id
         && d.type in ['TASK', 'EVENT', 'EXPENSE', 'NOTE']
@@ -51,6 +51,7 @@ service cloud.firestore {
         && optString(d, 'quote', 400)
         && optString(d, 'customerId', 64)
         && optString(d, 'licenseId', 64)
+        && (!('important' in d) || d.important == null || d.important is bool)
         && (!('recurrence' in d) || d.recurrence == null
             || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY']);
     }
@@ -175,6 +176,11 @@ service cloud.firestore {
       allow delete: if owner(uid);
     }
 
+    // Notification settings: written only by the notifysettings function, which checks the Pushover key first.
+    match /users/{uid}/settings/notify {
+      allow get: if owner(uid);
+    }
+
     // Written only by the capture function (admin SDK, which bypasses rules).
     match /users/{uid}/captures/{id} {
       allow get: if owner(uid);
@@ -182,7 +188,8 @@ service cloud.firestore {
       allow delete: if owner(uid);
     }
 
-    // Quota counters (users/{uid}/meta/usage), calendar feed tokens (/feeds) and anything unknown: no client access at all.
+    // Quota counters (users/{uid}/meta/*), calendar feed tokens (/feeds), the notification log and the list of
+    // people to notify (/notifiers), and anything unknown: no client access at all.
     match /{document=**} {
       allow read, write: if false;
     }

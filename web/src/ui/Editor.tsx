@@ -12,11 +12,13 @@ export interface EditorProps {
   isNew: boolean;
   onSave: (item: Item) => void;
   onDelete: (item: Item) => void;
+  /** Tick off an open task or appointment straight from the editor. */
+  onDone?: (item: Item) => void;
   onClose: () => void;
 }
 
 /** Bottom sheet to create or change one item. */
-export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) {
+export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: EditorProps) {
   const [type, setType] = useState<ItemType>(item.type);
   const [title, setTitle] = useState(item.title);
   const [details, setDetails] = useState(item.details);
@@ -30,6 +32,7 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
   const [repeat, setRepeat] = useState<Recurrence | "">(item.recurrence ?? "");
   const [customerId, setCustomerId] = useState<string | undefined>(item.customerId);
   const [licenseId, setLicenseId] = useState<string | undefined>(item.licenseId);
+  const [important, setImportant] = useState(item.important === true);
   const [error, setError] = useState("");
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
@@ -71,6 +74,7 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
         out.allDay = eventAllDay;
         if (repeat) out.recurrence = repeat;
       }
+      if (important) out.important = true;
       if (place.trim()) out.place = place.trim().slice(0, MAX.place);
       if (person.trim()) out.person = person.trim().slice(0, MAX.person);
     }
@@ -140,6 +144,7 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
               <label>Giờ<input type="time" value={time} disabled={allDay} onInput={(e) => setTime((e.target as HTMLInputElement).value)} /></label>
             </div>
             <label class="check-row"><input type="checkbox" checked={allDay} onChange={(e) => setAllDay((e.target as HTMLInputElement).checked)} /> Cả ngày</label>
+            <label class="check-row important"><input type="checkbox" checked={important} onChange={(e) => setImportant((e.target as HTMLInputElement).checked)} /> ❗ Quan trọng (nhắc khẩn đến khi bấm xác nhận)</label>
             <label>Lặp lại
               <select value={repeat} disabled={!date} onChange={(e) => setRepeat((e.target as HTMLSelectElement).value as Recurrence | "")}>
                 <option value="">Không lặp</option>
@@ -162,6 +167,9 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
 
         <footer>
           {!isNew && !wasDraft && <button type="button" class="btn danger" onClick={() => onDelete(item)}><Icon name="trash" size={18} /> Xoá</button>}
+          {!isNew && !wasDraft && onDone && item.status === "OPEN" && (item.type === "TASK" || item.type === "EVENT") && (
+            <button type="button" class="btn ghost" onClick={() => onDone(item)}><Icon name="check" size={18} /> Đã xong</button>
+          )}
           {dated && date && <button type="button" class="btn ghost" onClick={() => void addToCalendar()}><Icon name="calendar" size={18} /> Thêm vào Lịch</button>}
           <button type="submit" class="btn solid grow">Lưu</button>
         </footer>

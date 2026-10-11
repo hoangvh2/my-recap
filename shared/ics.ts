@@ -93,7 +93,9 @@ function eventLines(e: CalEvent, stamp: number): string[] {
   if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`);
   if (e.location) lines.push(`LOCATION:${escapeText(e.location)}`);
   if (e.rrule) lines.push(`RRULE:${e.rrule}`);
-  lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(e.summary)}`, e.alarm, "END:VALARM", "END:VEVENT");
+  // An empty alarm means "no alarm": the owner is reminded another way (Pushover) and should not be told twice.
+  if (e.alarm) lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(e.summary)}`, e.alarm, "END:VALARM");
+  lines.push("END:VEVENT");
   return lines;
 }
 
@@ -108,7 +110,7 @@ export interface CalendarOptions {
 /** iCalendar text for a set of entries (CRLF line ends, long lines folded). */
 export function renderCalendar(events: readonly CalEvent[], opts: CalendarOptions = {}): string {
   const stamp = opts.stamp ?? Date.now();
-  const head = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//My Recap//Thu ky//VI", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  const head = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//VHub//Desk//VI", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
   if (opts.name) head.push(`X-WR-CALNAME:${escapeText(opts.name)}`);
   if (opts.refreshHours) head.push(`REFRESH-INTERVAL;VALUE=DURATION:PT${opts.refreshHours}H`, `X-PUBLISHED-TTL:PT${opts.refreshHours}H`);
   const lines = [...head, ...events.flatMap((e) => eventLines(e, stamp)), "END:VCALENDAR"];

@@ -70,3 +70,12 @@ export function rollForward(item: Item, now: number): Item | null {
   while (end(t) <= now && steps++ < MAX_STEPS) t = next(t, item.recurrence);
   return { ...item, whenAt: t };
 }
+
+/**
+ * "Đã xong" on an appointment. A one-off one is done. A repeating one is not ended by it: only this
+ * occurrence is, so it moves to the next one (a weekly meeting ticked today shows next week).
+ */
+export function finishEvent(item: Item, now: number): Item {
+  if (!item.recurrence || item.whenAt === undefined) return { ...item, status: "DONE", doneAt: now };
+  return { ...item, whenAt: nextAfter(item.whenAt, item.recurrence, Math.max(now, item.whenAt)) };
+}

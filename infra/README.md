@@ -36,7 +36,7 @@ Mọi thứ chạy **trên PC của bạn**. Cấu hình (`terraform.tfvars`) v�
 | Một project Google Cloud **đã bật billing** | Chính là project đang tính tiền Gemini của bạn. Ghi lại **Project ID** (không phải tên hiển thị), ví dụ `gen-lang-client-0422114781` |
 | Tài khoản Google **Owner** của project đó | Terraform và Firebase CLI chạy bằng tài khoản này |
 | Danh sách email Gmail được phép dùng app | Ví dụ email của bạn và của vợ. Chỉ các email này vào được (cứng trong Firestore Rules và Function) |
-| (Tuỳ chọn) Một tên miền | Ví dụ `vhub.id.vn`, dùng subdomain `recap.vhub.id.vn` |
+| (Tuỳ chọn) Một tên miền | Ví dụ `vhub.id.vn`, dùng subdomain `desk.vhub.id.vn` |
 | Máy Windows / macOS / Linux, có mạng | Windows: dùng **PowerShell hoặc CMD**, xem [lưu ý Git Bash](#đăng-nhập-firebase-cli-lần-riêng) |
 
 Không cần tài khoản Apple Developer.
@@ -126,14 +126,14 @@ allowed_emails = [
 ]
 
 # Điền SAU khi đã làm Phần 8 (nối tên miền). Lần deploy đầu để trống.
-# custom_domain = "recap.vhub.id.vn"
+# custom_domain = "desk.vhub.id.vn"
 ```
 
 | Biến | Ý nghĩa | Lưu ý |
 |---|---|---|
 | `project_id` | Project có billing | Sai ID là nguồn lỗi phổ biến nhất |
 | `allowed_emails` | Ai được dùng | Chỉ chữ thường, **không có khoảng trắng thừa**, không để trống. Email Google Workspace cũng được. Đổi danh sách = deploy lại |
-| `custom_domain` | Tên miền riêng | Chỉ hostname (`recap.vhub.id.vn`), **không** có `https://`, không có `/` |
+| `custom_domain` | Tên miền riêng | Chỉ hostname (`desk.vhub.id.vn`), **không** có `https://`, không có `/` |
 | `gemini_api_key` | Dùng khoá có sẵn | Để trống (khuyến nghị): Terraform tạo khoá giới hạn riêng cho Generative Language API và đưa thẳng vào Secret Manager |
 | `gemini_model` | Model | Mặc định `gemini-3.5-flash-lite` |
 | `enforce_app_check` | Bắt buộc App Check cho Firestore | Mặc định `true`. Nếu app không đọc được dữ liệu sau deploy, đặt `false`, deploy lại, kiểm tra rồi bật lại |
@@ -194,42 +194,58 @@ Email không có trong danh sách sẽ thấy màn hình "Chưa được cấp q
 
 ## 8. Nối tên miền riêng (CNAME / TXT / A)
 
-Ví dụ dưới đây dùng subdomain `recap.vhub.id.vn`. App đăng nhập theo **một host duy nhất** (Safari/iOS yêu cầu host đăng nhập trùng host của app), nên phải làm **đủ 4 bước theo đúng thứ tự**; chỉ trỏ DNS là chưa đủ (đây là lý do `recap.vhub.id.vn` vẫn bị chuyển về `*.firebaseapp.com` nếu thiếu Bước D).
+Ví dụ dưới đây dùng subdomain `desk.vhub.id.vn`. App đăng nhập theo **một host duy nhất** (Safari/iOS yêu cầu host đăng nhập trùng host của app), nên phải làm **đủ 4 bước theo đúng thứ tự**; chỉ trỏ DNS là chưa đủ (đây là lý do `desk.vhub.id.vn` vẫn bị chuyển về `*.firebaseapp.com` nếu thiếu Bước D).
+
+### Đang chạy ở `recap.vhub.id.vn`? Chuyển sang `desk.vhub.id.vn`
+
+Tên mới **VHub Desk** đi với địa chỉ `desk.vhub.id.vn`. Dữ liệu nằm trên Firestore nên **không mất gì** khi đổi địa chỉ; chỉ phải đăng nhập lại và cài lại biểu tượng trên iPhone.
+
+| Thứ tự | Việc | Ở đâu | Ghi chú |
+|---|---|---|---|
+| 1 | Thêm `desk.vhub.id.vn` vào Hosting, thêm bản ghi DNS Firebase đưa ra, chờ **Connected** | Firebase Console + trang DNS | [Bước A](#bước-a-kết-nối-tên-miền-với-firebase-hosting). **Chưa xoá** `recap` |
+| 2 | Cho phép đăng nhập Google từ `desk.vhub.id.vn` | Firebase Auth + Google Cloud OAuth client | [Bước B](#bước-b-cho-phép-đăng-nhập-google-từ-host-mới). Giữ nguyên mục của `recap` trong thời gian chuyển |
+| 3 | `custom_domain = "desk.vhub.id.vn"` | `infra/terraform.tfvars` | [Bước C](#bước-c-khai-báo-trong-terraformtfvars) |
+| 4 | `node infra/deploy.mjs --yes` | Máy của bạn | Terraform đổi: host đăng nhập, CORS của Function, khoá reCAPTCHA (App Check), liên kết trong tin Pushover (`APP_URL`), tên hiển thị "VHub Desk". Plan chỉ được **update in-place**; nếu thấy `must be replaced` ở `google_firebase_web_app` thì **dừng lại** và báo |
+| 5 | Trên iPhone: xoá biểu tượng cũ, mở Safari `https://desk.vhub.id.vn`, Thêm vào Màn hình chính, đăng nhập lại; vào Cài đặt → Thông báo → **Gửi thử** | iPhone | Tên dưới biểu tượng: "VHub Desk" |
+| 6 | Lịch iPhone đã đăng ký: Cài đặt → Lịch trên điện thoại → **Thêm vào Lịch iPhone** (liên kết mới ở `desk`), rồi xoá lịch cũ trong app Lịch iPhone | App + iPhone | Liên kết lịch cũ ở `recap` **vẫn chạy** chừng nào `recap` còn nối với Hosting |
+| 7 | Sau 2–4 tuần, khi mọi máy đã dùng `desk`: gỡ `recap` khỏi Hosting, xoá bản ghi DNS của `recap`, xoá mục `recap` trong Authorized domains và OAuth client | Firebase/Google Cloud Console + DNS | Không bắt buộc. Giữ lại cũng không tốn tiền |
+
+**Trong thời gian chuyển, mở địa chỉ cũ thì sao?** `https://recap.vhub.id.vn` vẫn mở được và **tự chuyển sang** `https://desk.vhub.id.vn` (app chỉ chạy ở host đăng nhập đã build, xem `web/src/main.tsx`). Vì vậy không cần cấu hình chuyển hướng riêng cho `recap`. Firebase Console có tuỳ chọn chuyển hướng cả tên miền (redirect) khi thêm custom domain; **đừng bật cho `recap`** trong lúc còn lịch iPhone đăng ký ở địa chỉ cũ (chưa kiểm chứng app Lịch iPhone có đi theo chuyển hướng không).
 
 ### Hiểu nhanh các loại bản ghi DNS
 
 | Loại | Dùng làm gì | Ví dụ |
 |---|---|---|
-| **TXT** | **Xác minh bạn sở hữu tên miền.** Chỉ là một dòng chữ, không ảnh hưởng truy cập. Giữ vĩnh viễn, đừng xoá | Name `recap` (hoặc tên Firebase chỉ định) → giá trị `firebase=...` |
-| **A** | Trỏ tên về **địa chỉ IP** của Firebase Hosting | Name `recap` → `199.36.158.100` |
-| **CNAME** | Trỏ tên về **một tên khác** (bí danh) | Name `recap` → `<project>.web.app` |
+| **TXT** | **Xác minh bạn sở hữu tên miền.** Chỉ là một dòng chữ, không ảnh hưởng truy cập. Giữ vĩnh viễn, đừng xoá | Name `desk` (hoặc tên Firebase chỉ định) → giá trị `firebase=...` |
+| **A** | Trỏ tên về **địa chỉ IP** của Firebase Hosting | Name `desk` → `199.36.158.100` |
+| **CNAME** | Trỏ tên về **một tên khác** (bí danh) | Name `desk` → `<project>.web.app` |
 
 Quy tắc quan trọng:
 
 - **Làm đúng những gì Firebase Console hiện ra.** Nó quyết định bạn cần TXT, A hay CNAME cho tên miền của bạn; giá trị (IP, chuỗi `firebase=…`) lấy từ Console, đừng tự nghĩ ra.
-- **Một tên không được vừa có CNAME vừa có bản ghi khác** (A, TXT…) cùng tên. Nếu nhà cung cấp DNS từ chối lưu, đó thường là lý do: dùng **hoặc** CNAME **hoặc** (A + TXT) cho `recap`, theo đúng cách Console hướng dẫn.
-- **Dấu chấm cuối (`.`):** có panel DNS yêu cầu viết tên đầy đủ kết thúc bằng dấu chấm (`recap.vhub.id.vn.`), panel khác chỉ cần phần đầu (`recap`). Nếu bản ghi lưu xong mà tra cứu thấy `recap.vhub.id.vn.vhub.id.vn`, nghĩa là bạn đã viết thừa tên miền; sửa lại.
+- **Một tên không được vừa có CNAME vừa có bản ghi khác** (A, TXT…) cùng tên. Nếu nhà cung cấp DNS từ chối lưu, đó thường là lý do: dùng **hoặc** CNAME **hoặc** (A + TXT) cho `desk`, theo đúng cách Console hướng dẫn.
+- **Dấu chấm cuối (`.`):** có panel DNS yêu cầu viết tên đầy đủ kết thúc bằng dấu chấm (`desk.vhub.id.vn.`), panel khác chỉ cần phần đầu (`desk`). Nếu bản ghi lưu xong mà tra cứu thấy `desk.vhub.id.vn.vhub.id.vn`, nghĩa là bạn đã viết thừa tên miền; sửa lại.
 - **Không dùng proxy** (ví dụ "đám mây cam" của Cloudflare) cho bản ghi này: để chế độ **DNS only**, nếu không Firebase không cấp được chứng chỉ SSL.
-- **Chờ lan truyền:** từ vài phút đến vài giờ (tối đa 24–48 giờ tuỳ nhà cung cấp). SSL tự cấp sau khi bản ghi đúng. Kiểm tra bằng `nslookup recap.vhub.id.vn` (Windows/macOS/Linux đều có) hoặc <https://dnschecker.org>.
-- Có thể có nhiều subdomain cho nhiều web khác (`blog.vhub.id.vn`…), mỗi cái một bản ghi riêng; chỉ `recap` gắn với app này.
+- **Chờ lan truyền:** từ vài phút đến vài giờ (tối đa 24–48 giờ tuỳ nhà cung cấp). SSL tự cấp sau khi bản ghi đúng. Kiểm tra bằng `nslookup desk.vhub.id.vn` (Windows/macOS/Linux đều có) hoặc <https://dnschecker.org>.
+- Có thể có nhiều subdomain cho nhiều web khác (`blog.vhub.id.vn`…), mỗi cái một bản ghi riêng; chỉ `desk` gắn với app này.
 
 ### Bước A. Kết nối tên miền với Firebase Hosting
 
 > ### ⚠️ LÀM BẰNG TAY
-> 1. **Firebase Console → Hosting → Add custom domain** → nhập `recap.vhub.id.vn` → Continue.
-> 2. Console hiện các bản ghi cần thêm (TXT xác minh và A hoặc CNAME). Mở trang quản lý DNS của nơi bạn mua tên miền (với `.id.vn` là nhà đăng ký bạn mua) và **thêm đúng các bản ghi đó**, trường *Name/Host* chỉ là `recap` (hoặc theo cách panel yêu cầu, xem mục dấu chấm cuối).
+> 1. **Firebase Console → Hosting → Add custom domain** → nhập `desk.vhub.id.vn` → Continue.
+> 2. Console hiện các bản ghi cần thêm (TXT xác minh và A hoặc CNAME). Mở trang quản lý DNS của nơi bạn mua tên miền (với `.id.vn` là nhà đăng ký bạn mua) và **thêm đúng các bản ghi đó**, trường *Name/Host* chỉ là `desk` (hoặc theo cách panel yêu cầu, xem mục dấu chấm cuối).
 > 3. Quay lại Firebase, bấm **Verify**. Trạng thái chuyển **Pending → Connected** (vài phút đến vài giờ).
 
-Xong bước này mở `https://recap.vhub.id.vn` sẽ thấy app nhưng **vẫn bị chuyển về `*.firebaseapp.com`** cho tới khi làm xong Bước C và D.
+Xong bước này mở `https://desk.vhub.id.vn` sẽ thấy app nhưng **vẫn bị chuyển về `*.firebaseapp.com`** cho tới khi làm xong Bước C và D.
 
 ### Bước B. Cho phép đăng nhập Google từ host mới
 
 > ### ⚠️ LÀM BẰNG TAY (2 chỗ; thiếu một trong hai là lỗi đăng nhập)
-> **B1. Firebase Console → Authentication → Settings → Authorized domains → Add domain** → `recap.vhub.id.vn`.
+> **B1. Firebase Console → Authentication → Settings → Authorized domains → Add domain** → `desk.vhub.id.vn`.
 >
 > **B2. Google Cloud Console → APIs & Services → Credentials** → mở OAuth client **"Web client (auto created by Google Service)"** rồi thêm:
-> - *Authorized JavaScript origins*: `https://recap.vhub.id.vn`
-> - *Authorized redirect URIs*: `https://recap.vhub.id.vn/__/auth/handler`
+> - *Authorized JavaScript origins*: `https://desk.vhub.id.vn`
+> - *Authorized redirect URIs*: `https://desk.vhub.id.vn/__/auth/handler`
 >
 > → **Save**. Thay đổi OAuth có thể mất vài phút mới có hiệu lực.
 >
@@ -238,7 +254,7 @@ Xong bước này mở `https://recap.vhub.id.vn` sẽ thấy app nhưng **vẫn
 ### Bước C. Khai báo trong `terraform.tfvars`
 
 ```hcl
-custom_domain = "recap.vhub.id.vn"
+custom_domain = "desk.vhub.id.vn"
 ```
 
 ### Bước D. Deploy lại để app đổi host đăng nhập
@@ -253,7 +269,7 @@ Lệnh này: đổi host đăng nhập của app sang tên miền riêng, thêm 
 
 ### Bước E. Cài lại trên iPhone
 
-Xoá biểu tượng app cũ khỏi Màn hình chính, mở Safari vào `https://recap.vhub.id.vn`, **Thêm vào Màn hình chính** lại và đăng nhập. Địa chỉ cũ (`*.firebaseapp.com`) vẫn mở được và tự chuyển sang tên miền mới.
+Xoá biểu tượng app cũ khỏi Màn hình chính, mở Safari vào `https://desk.vhub.id.vn`, **Thêm vào Màn hình chính** lại và đăng nhập. Địa chỉ cũ (`*.firebaseapp.com`) vẫn mở được và tự chuyển sang tên miền mới.
 
 ---
 
@@ -267,6 +283,8 @@ Xoá biểu tượng app cũ khỏi Màn hình chính, mở Safari vào `https:/
 | Xoay khoá Gemini | `cd infra && terraform apply -replace='google_apikeys_key.gemini[0]'` (chưa thử thật) |
 | Chỉ xem thay đổi, không áp dụng | `node infra/deploy.mjs --plan` |
 | Hosting lỗi nhưng Terraform đã xong | Sửa đăng nhập Firebase CLI rồi `node infra/deploy.mjs --skip-terraform` |
+| Bật thông báo Pushover | Tạo Application tại pushover.net/apps/build (tên "Thư ký") → chép **API Token** vào `pushover_app_token` trong tfvars → `node infra/deploy.mjs --yes --skip-web`. Sau đó mỗi người vào app: **Cài đặt → Thông báo trên điện thoại** → dán User Key → **Lưu và bật** → **Gửi thử** |
+| Xem thông báo có chạy không | Cloud Console → Cloud Run → `notifytick` → Logs: mỗi phút một dòng `notifytick` (`sent`, `failed`, `capped`) |
 | Lịch iPhone tự cập nhật | Trong app: **Hôm nay → ⚙ Cài đặt → Lịch trên điện thoại → Bật** (cần Hosting đã deploy, xem Phần 10) |
 
 ---
@@ -282,7 +300,8 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 - [ ] Thu âm một câu bằng micro (trên iPhone thật).
 - [ ] Thêm một khách và một license sắp hết hạn: xuất hiện ở **Hôm nay → Gia hạn cần xử lý**.
 - [ ] Settings → Lịch trên điện thoại → Bật → mở địa chỉ liên kết trong trình duyệt: tải được file `.ics` (nếu `404` xem mục lỗi `calendar`).
-- [ ] Với tên miền riêng: `https://recap.vhub.id.vn` **ở nguyên** địa chỉ đó (không bị chuyển) và đăng nhập được.
+- [ ] (Nếu đã đặt `pushover_app_token`) Cài đặt → Thông báo → dán User Key → Lưu và bật → **Gửi thử**: điện thoại nhận tin trong vài giây. Thêm một lịch hẹn 20 phút nữa: nhận tin "🟠 15 phút nữa · …" đúng lúc.
+- [ ] Với tên miền riêng: `https://desk.vhub.id.vn` **ở nguyên** địa chỉ đó (không bị chuyển) và đăng nhập được.
 
 ---
 
@@ -318,7 +337,7 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 | Bấm đăng nhập báo lỗi ngay, hoặc "Tên miền này chưa được khai báo trong Firebase Authentication" (`auth/unauthorized-domain`) | Chưa thêm host vào Authorized domains | Phần 8, Bước B1 |
 | Google báo `redirect_uri_mismatch` | Chưa thêm origin / redirect URI vào OAuth client, hoặc chưa lưu / chưa lan truyền | Phần 8, Bước B2; đợi vài phút |
 | Đăng nhập báo lỗi vì chưa bật Google | Chưa làm Phần 6 | Phần 6 |
-| Mở `https://recap.vhub.id.vn` bị **chuyển về `*.firebaseapp.com`** | Chưa đặt `custom_domain` và chưa deploy lại | Phần 8, Bước C + D |
+| Mở `https://desk.vhub.id.vn` bị **chuyển về `*.firebaseapp.com`** | Chưa đặt `custom_domain` và chưa deploy lại | Phần 8, Bước C + D |
 | Đăng nhập xong báo **"Chưa được cấp quyền"** | Email không nằm trong `allowed_emails`, hoặc bạn thêm email nhưng chưa deploy lại | Sửa tfvars, `node infra/deploy.mjs --yes --skip-web` |
 | Đăng nhập được nhưng dữ liệu không tải ("Không tải được dữ liệu") | App Check chặn Firestore (chưa thử trên Google thật) | Đặt `enforce_app_check = false`, deploy lại, kiểm tra reCAPTCHA / App Check, rồi bật lại |
 | Trên iPhone bị đăng xuất sau một thời gian | iOS dọn dữ liệu đăng nhập của web app lâu không dùng | Đăng nhập lại; dữ liệu vẫn an toàn trên Firestore |
@@ -330,7 +349,7 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 | Firebase mãi ở trạng thái *Pending* | Chờ DNS lan truyền (tới 24–48 giờ); kiểm tra bằng `nslookup`; xem bản ghi có đúng giá trị Console hiện không; tắt proxy (DNS only) |
 | DNS panel không cho lưu CNAME | Cùng tên đang có A / TXT: chỉ dùng một kiểu theo hướng dẫn của Console |
 | Trình duyệt báo chứng chỉ SSL không hợp lệ | Firebase chưa cấp xong chứng chỉ (đợi) hoặc DNS đang qua proxy |
-| Địa chỉ `recap.vhub.id.vn.vhub.id.vn` | Viết thừa tên miền ở ô Name: chỉ cần `recap` (hoặc đầy đủ kèm dấu chấm cuối tuỳ panel) |
+| Địa chỉ `desk.vhub.id.vn.vhub.id.vn` | Viết thừa tên miền ở ô Name: chỉ cần `desk` (hoặc đầy đủ kèm dấu chấm cuối tuỳ panel) |
 
 ### Ghi nhanh, lịch, nhập Excel
 
@@ -363,6 +382,7 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 Đã kiểm: `terraform validate`, `plan` offline, chạy `apply` và Hosting thật cho bản thư ký ban đầu. **Chưa kiểm trên Google thật** (cần chạy lần đầu để biết):
 
 - Hai Function mới `calendarlink`, `calendarfeed` và quy tắc chuyển tiếp `/calendar/**` của Hosting sang Cloud Run.
+- Thông báo: Function `notifysettings`, `notifytick`, job Cloud Scheduler mỗi phút (OIDC), TTL của `notifylog`, và gửi thật tới Pushover.
 - Đăng ký lịch `webcal://` trên iPhone thật và tần suất cập nhật.
 - Chất lượng Gemini thật với ghi chú bán hàng.
 - Đăng nhập Google trong app đã thêm vào Màn hình chính của iOS với tên miền riêng.

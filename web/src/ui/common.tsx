@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { createPortal } from "preact/compat";
 import { useEffect } from "preact/hooks";
 import { formatDate } from "../../../shared/dates";
 import { daysLeftText, urgencyOf, type Ctx, type Urgency } from "../../../shared/renewals";
@@ -8,6 +9,7 @@ import { back, go, to } from "../lib/router";
 import { createStore, useStore } from "../lib/store";
 import { Icon, type IconName } from "./icons";
 import { useGraph } from "./hooks";
+import { BRAND, copyright } from "../brand";
 
 /** An anchor that moves inside the app without reloading, and still works with "open in new tab". */
 export function Link(props: { to: string; class?: string; children: ComponentChildren; label?: string }) {
@@ -74,7 +76,7 @@ export function TopBar(props: { title: string; sub?: string; backTo?: string; ri
     <header class="top">
       <div class="row gap">
         {props.backTo && (
-          <button class="icon-btn back" aria-label="Quay lại" onClick={() => back(props.backTo!)}><Icon name="chevronLeft" /></button>
+          <button type="button" class="icon-btn back" aria-label="Quay lại" onClick={() => back(props.backTo!)}><Icon name="chevronLeft" /></button>
         )}
         <div class="grow">
           <h1>{props.title}</h1>
@@ -112,7 +114,7 @@ export function Field(props: { label: string; hint?: string; children: Component
 }
 
 export function IconButton(props: { icon: IconName; label: string; onClick: () => void; small?: boolean }) {
-  return <button class="icon-btn" aria-label={props.label} onClick={props.onClick}><Icon name={props.icon} size={props.small ? 18 : 22} /></button>;
+  return <button type="button" class="icon-btn" aria-label={props.label} onClick={props.onClick}><Icon name={props.icon} size={props.small ? 18 : 22} /></button>;
 }
 
 /** Bottom sheet. `level` 2 sits above another sheet (a picker opened from a form). */
@@ -122,16 +124,20 @@ export function Sheet(props: { title: string; onClose: () => void; children: Com
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [props.onClose]);
-  return (
+  // Rendered at the end of <body>, never inside the form or <label> that opened it: a button inside a form
+  // submits it, and Safari forwards a tap inside a <label> to the label's first button (which reopened the
+  // customer picker the moment it closed, on iPhone only).
+  return createPortal(
     <div class={`sheet-backdrop ${props.level === 2 ? "l2" : ""}`} onClick={(e) => e.target === e.currentTarget && props.onClose()}>
       <div class="sheet" role="dialog" aria-modal="true" aria-label={props.title}>
         <header>
           <h2>{props.title}</h2>
-          <button class="icon-btn" aria-label="Đóng" onClick={props.onClose}><Icon name="close" /></button>
+          <button type="button" class="icon-btn" aria-label="Đóng" onClick={props.onClose}><Icon name="close" /></button>
         </header>
         {props.children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -164,10 +170,21 @@ export function ConfirmHost() {
         <h2>{a.title}</h2>
         {a.body && <p class="muted">{a.body}</p>}
         <div class="row gap">
-          <button class="btn ghost grow" onClick={() => close(false)}>Không</button>
-          <button class={`btn grow ${a.danger ? "danger-solid" : "solid"}`} onClick={() => close(true)}>{a.ok}</button>
+          <button type="button" class="btn ghost grow" onClick={() => close(false)}>Không</button>
+          <button type="button" class={`btn grow ${a.danger ? "danger-solid" : "solid"}`} onClick={() => close(true)}>{a.ok}</button>
         </div>
       </div>
     </div>
+  );
+}
+
+/** The small VHub signature: app name, version, copyright. Quiet, at the end of a screen, never in the way. */
+export function Signature() {
+  return (
+    <footer class="signature" aria-label="Thông tin ứng dụng">
+      <span class="mark" aria-hidden="true">V</span>
+      <span><strong>{BRAND.app}</strong> · phiên bản {BRAND.version}</span>
+      <span>{copyright()} · {BRAND.domain}</span>
+    </footer>
   );
 }

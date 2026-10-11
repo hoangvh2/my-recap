@@ -48,6 +48,35 @@ export async function calendarToken(action: FeedAction): Promise<string | null> 
 /** Address a phone calendar subscribes to. Same host as the app, which Hosting forwards to the feed function. */
 export const feedUrl = (token: string, scheme: "https" | "webcal" = "https"): string => `${scheme === "https" ? location.protocol.replace(":", "") : scheme}://${location.host}/calendar/${token}.ics`;
 
+export interface NotifyForm {
+  pushoverUser: string;
+  device?: string;
+  zone: string;
+  morning: number;
+  evening: number;
+  quietFrom: number;
+  quietTo: number;
+  lead: number;
+  calendarAlarms: boolean;
+}
+type NotifyRequest = { action: "save"; settings: NotifyForm } | { action: "test" } | { action: "off" };
+const notifyCall = httpsCallable<NotifyRequest, { enabled: boolean }>(functions, "notifysettings", { timeout: 30_000, limitedUseAppCheckTokens: true });
+
+/** Save notification settings (the server checks the Pushover key first), send a test, or switch off. */
+export async function notify(req: NotifyRequest): Promise<{ enabled: boolean }> {
+  try {
+    return (await notifyCall(req)).data;
+  } catch (e) {
+    // This function's own refusals ("not set up yet", "Pushover refused") come as failed-precondition with a message.
+    const code = (e as { code?: string } | null)?.code ?? "";
+    const msg = (e as { message?: string } | null)?.message ?? "";
+    if (code === "functions/failed-precondition" && msg && !/app check/i.test(msg) && msg !== "failed-precondition") throw new ApiError(msg, false);
+    throw toApiError(e);
+  }
+}
+
+export const deviceZone = zone;
+
 export function toApiError(e: unknown): ApiError {
   const code = (e as { code?: string } | null)?.code ?? "";
   const msg = (e as { message?: string } | null)?.message ?? "";

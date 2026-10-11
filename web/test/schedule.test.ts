@@ -69,3 +69,15 @@ describe("rolling a repeating appointment forward", () => {
     expect(rollForward(once, now)).toBeNull();
   });
 });
+
+describe("finishEvent", () => {
+  it("ends a one-off appointment, and moves a repeating one to its next occurrence instead of ending the series", async () => {
+    const { finishEvent } = await import("../src/lib/schedule");
+    const now = new Date(2026, 9, 12, 10, 30).getTime();
+    const base = { id: "e", type: "EVENT" as const, status: "OPEN" as const, title: "Họp", details: "", allDay: false, createdAt: 0 };
+    expect(finishEvent({ ...base, whenAt: new Date(2026, 9, 12, 10).getTime() }, now)).toMatchObject({ status: "DONE", doneAt: now });
+    const weekly = finishEvent({ ...base, whenAt: new Date(2026, 9, 12, 10).getTime(), recurrence: "WEEKLY" }, now);
+    expect(weekly.status).toBe("OPEN");
+    expect(weekly.whenAt).toBe(new Date(2026, 9, 19, 10).getTime());
+  });
+});

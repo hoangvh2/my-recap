@@ -20,7 +20,7 @@ function memory(data?: Partial<FeedData>) {
     uidForHash: async (h) => lookup.get(h) ?? null,
     load: async () => {
       loads++;
-      return { items: [], customers: [{ id: "c1", name: "Công ty ABC" }], licenses: [], prefs: DEFAULT_PREFS, ...data };
+      return { items: [], customers: [{ id: "c1", name: "Công ty ABC" }], licenses: [], prefs: DEFAULT_PREFS, alarms: true, ...data };
     },
   };
   return { store, metas, lookup, loads: () => loads };
@@ -110,6 +110,16 @@ describe("FeedHandler", () => {
     expect(text).not.toContain("Ăn trưa");
     expect(text).not.toContain("Không có ngày");
     expect(text).toContain("REFRESH-INTERVAL");
+  });
+
+  it("keeps the calendar silent when the owner is reminded by Pushover instead", async () => {
+    const event = { id: "i1", type: "EVENT" as const, status: "OPEN" as const, title: "Demo", details: "", allDay: false, whenAt: Date.UTC(2026, 9, 12, 8, 0), createdAt: NOW };
+    const loud = await setup({ items: [event] });
+    expect((await loud.handler.handle("GET", `/calendar/${loud.token}.ics`)).body).toContain("BEGIN:VALARM");
+    const quiet = await setup({ items: [event], licenses: [lic], alarms: false });
+    const body = (await quiet.handler.handle("GET", `/calendar/${quiet.token}.ics`)).body;
+    expect(body).toContain("SUMMARY:Demo");
+    expect(body).not.toContain("VALARM");
   });
 
   it("answers 404 with no body for a wrong, malformed or revoked link, and 405 for other methods", async () => {

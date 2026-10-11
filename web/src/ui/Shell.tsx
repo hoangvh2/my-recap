@@ -3,9 +3,10 @@ import { dueNudges } from "../../../shared/renewals";
 import { startRouter, route, tabOf, to, go, type Route } from "../lib/router";
 import { useStore } from "../lib/store";
 import { pendingCount } from "../lib/pending";
-import { proposals as proposalStore } from "../data";
+import { items as itemsStore, proposals as proposalStore, setDone, syncState } from "../data";
 import { CustomerDetail, Customers } from "./Customers";
-import { useCtx, useGraph } from "./hooks";
+import { useCtx, useGraph, useUid } from "./hooks";
+import { showToast } from "./toast";
 import { Hosts, openCapture } from "./host";
 import { Icon, type IconName } from "./icons";
 import { ImportScreen } from "./Import";
@@ -25,7 +26,31 @@ function Screen({ r, email }: { r: Route; email: string }) {
     case "work": return <Work />;
     case "settings": return <Settings email={email} />;
     case "import": return <ImportScreen />;
+    case "done": return <MarkDone id={r.id} key={r.id} />;
   }
+}
+
+/**
+ * The "✅ Đã xong" link of a notification: ticks the item off as soon as the data has loaded (an appointment
+ * repeating every week moves to its next date), says so with an undo, and lands on Today. Nothing else to tap.
+ */
+function MarkDone({ id }: { id: string }) {
+  const uid = useUid();
+  const all = useStore(itemsStore);
+  const sync = useStore(syncState);
+  useEffect(() => {
+    if (sync !== "ready") return;
+    const item = all.find((i) => i.id === id);
+    go(to.today, { replace: true });
+    if (!item) return void showToast("Mục này không còn nữa (có thể đã bị xoá)");
+    if (item.status !== "OPEN") return void showToast(`Đã xong từ trước: ${item.title}`);
+    const fail = () => showToast("Chưa lưu được, kiểm tra mạng rồi thử lại");
+    setDone(uid, item, true).then(
+      () => showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(fail) }),
+      fail,
+    );
+  }, [sync]);
+  return <Today />;
 }
 
 const TABS: { key: "today" | "customers" | "renewals" | "work"; label: string; icon: IconName; href: string }[] = [

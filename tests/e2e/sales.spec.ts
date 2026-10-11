@@ -344,7 +344,7 @@ test("deleting a customer says what goes with it, and can be undone", async ({ p
   await page.getByRole("button", { name: "Sửa thông tin khách" }).click();
   await page.getByRole("button", { name: "Xoá" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("Sẽ xoá luôn 2 license và 1 việc/ghi chú liên quan");
-  await page.getByRole("button", { name: "Xoá", exact: true }).last().click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Xoá", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Khách hàng" })).toBeVisible();
   await expect(page.getByText("Công ty ABC")).toHaveCount(0);
   await page.getByRole("button", { name: "Hoàn tác" }).click();
@@ -396,5 +396,34 @@ test("an agreed renewal with no licence yet becomes a task for that customer, wh
   await page.getByRole("link", { name: /Khánh/ }).click();
   await expect(page.locator(".lic-row")).toHaveCount(1);
   await expect(page.locator(".row-item", { hasText: "Xử lý gia hạn license cho Khánh" })).toHaveCount(2);
+  expectNoProblems(problems);
+});
+
+test("a planned purchase filed only as an event still drafts the licence, which lands in Gia hạn once saved", async ({ page }) => {
+  const problems = watchBrowser(page);
+  await signIn(page, OWNER);
+  // New customer: customer, event and licence (from the purchase day, a year assumed) all in the review card.
+  await textCapture(page, "FAKE_BUY_EVENT_NEW Chị Vân muốn mua license Windows Office vào ngày 12 tháng 11 năm 2026.");
+  let card = page.locator(".draft-card");
+  await expect(card.locator("h4", { hasText: "License / bảo hành mới" })).toBeVisible();
+  await expect(card.locator(".row-item", { hasText: "Chị Vân · Windows Office" })).toContainText("11/11/2027");
+  const event = card.locator(".row-item", { hasText: "Mua license Windows Office" });
+  await expect(event.getByRole("link", { name: "Windows Office" })).toBeVisible();
+  await card.getByRole("button", { name: "Lưu tất cả" }).click();
+  await expect(page.locator(".draft-card")).toHaveCount(0);
+
+  // Existing customer (the case reported from the phone): same outcome, no second customer.
+  await textCapture(page, "FAKE_BUY_EVENT_KNOWN Chị Vân muốn mua license Windows Server ngày 1/12/2026.");
+  card = page.locator(".draft-card");
+  await expect(card.locator("h4", { hasText: "Khách mới" })).toHaveCount(0);
+  await expect(card.locator(".row-item", { hasText: "Chị Vân · Windows Server" })).toContainText("30/11/2027");
+  await shot(page, "25-purchase-licence");
+  await card.getByRole("button", { name: "Lưu tất cả" }).click();
+  await expect(page.locator(".draft-card")).toHaveCount(0);
+
+  await tab(page, "Gia hạn");
+  await page.getByRole("button", { name: "Đang theo dõi" }).click();
+  await expect(page.locator(".lic-row", { hasText: "Windows Office" })).toBeVisible();
+  await expect(page.locator(".lic-row", { hasText: "Windows Server" })).toBeVisible();
   expectNoProblems(problems);
 });
