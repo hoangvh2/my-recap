@@ -6,9 +6,21 @@ import { Icon, type IconName } from "./icons";
 
 export const TYPE_ICON: Record<Item["type"], IconName> = { TASK: "task", EVENT: "calendar", EXPENSE: "coin", NOTE: "note" };
 
-export function ItemRow(props: { item: Item; onOpen: (i: Item) => void; onToggle?: (i: Item, done: boolean) => void; showDate?: boolean; hideCustomer?: boolean }) {
+export function ItemRow(props: {
+  item: Item;
+  onOpen: (i: Item) => void;
+  onToggle?: (i: Item, done: boolean) => void;
+  showDate?: boolean;
+  hideCustomer?: boolean;
+  /** Timeline layout: the time in a column of its own ("09:30", "Cả ngày"). */
+  time?: string;
+  /** Already over (a past appointment today): shown dimmed. */
+  past?: boolean;
+}) {
   const { item, onOpen, onToggle } = props;
   const done = item.status === "DONE";
+  // Tasks and appointments can both be ticked off; expenses and notes cannot.
+  const tickable = (item.type === "TASK" || item.type === "EVENT") && !!onToggle;
   const meta = [
     props.showDate === false ? null : whenLabel(item),
     item.place,
@@ -16,16 +28,18 @@ export function ItemRow(props: { item: Item; onOpen: (i: Item) => void; onToggle
     item.type === "EXPENSE" && item.category ? item.category : null,
   ].filter(Boolean);
   return (
-    <li class={`row-item ${done ? "done" : ""}`}>
-      {item.type === "TASK" && onToggle ? (
+    <li class={`row-item ${done ? "done" : ""} ${props.time !== undefined ? "tl" : ""} ${props.past ? "past" : ""} t-${item.type}`}>
+      {props.time !== undefined && <span class="when">{props.time}</span>}
+      {tickable ? (
         <button
-          class={`check ${done ? "on" : ""}`}
+          type="button"
+          class={`check ${done ? "on" : ""} ${item.type === "EVENT" ? "ev" : ""}`}
           role="checkbox"
           aria-checked={done}
           aria-label={done ? "Đánh dấu chưa xong" : "Đánh dấu đã xong"}
-          onClick={() => onToggle(item, !done)}
+          onClick={() => onToggle!(item, !done)}
         >
-          {done && <Icon name="check" size={16} />}
+          {done ? <Icon name="check" size={16} /> : item.type === "EVENT" ? <Icon name="calendar" size={14} /> : null}
         </button>
       ) : (
         <span class={`badge t-${item.type}`}><Icon name={TYPE_ICON[item.type]} size={18} /></span>

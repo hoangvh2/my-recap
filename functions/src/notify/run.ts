@@ -22,7 +22,12 @@ export interface NotifyStore {
   sent(uid: string, keys: string[]): Promise<Set<string>>;
   /** Marks keys as being sent, atomically: false when one is taken already or the day's cap is reached. */
   claim(uid: string, keys: string[], nowMs: number, zoneDay: string): Promise<"ok" | "taken" | "capped">;
-  finish(uid: string, keys: string[], state: "sent" | "failed"): Promise<void>;
+  /** Records the outcome; an emergency also keeps its receipt (so it can be cancelled) until it expires. */
+  finish(uid: string, keys: string[], state: "sent" | "failed", receipt?: { receipt: string; itemId: string; until: number }): Promise<void>;
+  /** Emergencies that may still be repeating on the phone. */
+  activeReceipts(uid: string, nowMs: number): Promise<{ key: string; receipt: string; itemId: string }[]>;
+  clearReceipt(uid: string, key: string): Promise<void>;
+  itemsById(uid: string, ids: string[]): Promise<Map<string, Item>>;
   /** Forget a claim after a temporary failure, so the next run tries again. */
   release(uid: string, keys: string[]): Promise<void>;
   /** Save, read or switch off the owner's settings. */
@@ -35,16 +40,19 @@ export interface TickResult {
   sent: number;
   failed: number;
   capped: number;
+  /** Emergencies stopped because their item was done, no longer important, or deleted. */
+  cancelled: number;
 }
 
 /** One scheduler run (every minute): reminders that fell due, and the summaries whose time has come. */
 export async function tick(store: NotifyStore, sender: Sender, nowMs: number, appUrl?: string, log: (msg: string, data: object) => void = () => undefined): Promise<TickResult> {
-  const result: TickResult = { users: 0, sent: 0, failed: 0, capped: 0 };
+  const result: TickResult = { users: 0, sent: 0, failed: 0, capped: 0, cancelled: 0 };
   for (const uid of await store.notifiers()) {
     try {
       const s = await store.settings(uid);
       if (!s) continue;
       result.users++;
+      result.cancelled += await stopFinished(store, sender, uid, nowMs);
       const messages = await plan(store, uid, s, nowMs, appUrl);
       for (const m of messages) {
         const keys = m.parts ?? [m.key];
@@ -57,7 +65,8 @@ export async function tick(store: NotifyStore, sender: Sender, nowMs: number, ap
         if (claim === "taken") continue;
         const r = await sender.send(s.pushoverUser, s.device, m);
         if (r.ok) {
-          await store.finish(uid, keys, "sent");
+          const receipt = m.priority === 2 && r.receipt && m.itemId ? { receipt: r.receipt, itemId: m.itemId, until: nowMs + (m.expireSec ?? 3600) * 1000 } : undefined;
+          await store.finish(uid, keys, "sent", receipt);
           result.sent++;
         } else if (r.retry) {
           await store.release(uid, keys);
@@ -74,6 +83,24 @@ export async function tick(store: NotifyStore, sender: Sender, nowMs: number, ap
     }
   }
   return result;
+}
+
+/** An emergency keeps ringing until acknowledged: stop it as soon as its item is done, unmarked or deleted. */
+async function stopFinished(store: NotifyStore, sender: Sender, uid: string, nowMs: number): Promise<number> {
+  const active = await store.activeReceipts(uid, nowMs);
+  if (active.length === 0) return 0;
+  const items = await store.itemsById(uid, active.map((a) => a.itemId));
+  let stopped = 0;
+  for (const a of active) {
+    const item = items.get(a.itemId);
+    if (item && item.status === "OPEN" && item.important) continue;
+    const r = await sender.cancel(a.receipt);
+    if (r.ok || !r.retry) {
+      await store.clearReceipt(uid, a.key);
+      if (r.ok) stopped++;
+    }
+  }
+  return stopped;
 }
 
 async function plan(store: NotifyStore, uid: string, s: NotifySettings, nowMs: number, appUrl?: string): Promise<Message[]> {
@@ -210,10 +237,28 @@ export class FirestoreNotifyStore implements NotifyStore {
     });
   }
 
-  async finish(uid: string, keys: string[], state: "sent" | "failed"): Promise<void> {
+  async finish(uid: string, keys: string[], state: "sent" | "failed", receipt?: { receipt: string; itemId: string; until: number }): Promise<void> {
     const batch = this.db.batch();
-    for (const k of keys) batch.update(this.log(uid, k), { state });
+    for (const k of keys) batch.update(this.log(uid, k), { state, ...(receipt ? { receipt: receipt.receipt, itemId: receipt.itemId, receiptUntil: receipt.until } : {}) });
     await batch.commit();
+  }
+
+  async activeReceipts(uid: string, nowMs: number): Promise<{ key: string; receipt: string; itemId: string }[]> {
+    const snap = await this.db.collection(`users/${uid}/notifylog`).where("receiptUntil", ">", nowMs).limit(50).get();
+    return snap.docs
+      .filter((d) => typeof d.get("receipt") === "string" && typeof d.get("itemId") === "string")
+      .map((d) => ({ key: d.id, receipt: d.get("receipt") as string, itemId: d.get("itemId") as string }));
+  }
+
+  async clearReceipt(uid: string, key: string): Promise<void> {
+    await this.log(uid, key).update({ receiptUntil: FieldValue.delete(), receipt: FieldValue.delete() });
+  }
+
+  async itemsById(uid: string, ids: string[]): Promise<Map<string, Item>> {
+    const unique = [...new Set(ids)].slice(0, 100);
+    if (unique.length === 0) return new Map();
+    const docs = await this.db.getAll(...unique.map((id) => this.col(uid, "items").doc(id)));
+    return new Map(docs.filter((d) => d.exists).map((d) => [d.id, { ...(d.data() as Omit<Item, "id">), id: d.id }]));
   }
 
   async release(uid: string, keys: string[]): Promise<void> {

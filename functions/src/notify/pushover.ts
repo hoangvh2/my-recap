@@ -3,11 +3,13 @@ import type { Message } from "./plan";
 export const PUSHOVER_BASE_URL = "https://api.pushover.net";
 
 /** How a send ended: delivered, worth retrying later (network, 5xx, 429), or refused for good (bad key, 4xx). */
-export type SendResult = { ok: true } | { ok: false; retry: boolean; status?: number };
+export type SendResult = { ok: true; receipt?: string } | { ok: false; retry: boolean; status?: number };
 
 export interface Sender {
   send(user: string, device: string | undefined, m: Message): Promise<SendResult>;
   validate(user: string, device: string | undefined): Promise<SendResult>;
+  /** Stops an emergency message from repeating. */
+  cancel(receipt: string): Promise<SendResult>;
 }
 
 /** Emergency messages repeat every 5 minutes for at most an hour, until acknowledged. */
@@ -42,12 +44,17 @@ export class PushoverClient implements Sender {
     }
     if (m.priority === 2) {
       form.retry = String(EMERGENCY.retry);
-      form.expire = String(EMERGENCY.expire);
+      form.expire = String(Math.min(EMERGENCY.expire, Math.max(60, m.expireSec ?? EMERGENCY.expire)));
       form.sound = "persistent";
     } else if (m.ttlSec) {
       form.ttl = String(m.ttlSec);
     }
     return this.post("/1/messages.json", form);
+  }
+
+  cancel(receipt: string): Promise<SendResult> {
+    if (!/^[A-Za-z0-9]{1,64}$/.test(receipt)) return Promise.resolve({ ok: false, retry: false });
+    return this.post(`/1/receipts/${receipt}/cancel.json`, { token: this.token });
   }
 
   validate(user: string, device: string | undefined): Promise<SendResult> {
@@ -63,8 +70,9 @@ export class PushoverClient implements Sender {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       if (res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { status?: number };
-        return body.status === 1 ? { ok: true } : { ok: false, retry: false, status: res.status };
+        const body = (await res.json().catch(() => ({}))) as { status?: number; receipt?: unknown };
+        if (body.status !== 1) return { ok: false, retry: false, status: res.status };
+        return typeof body.receipt === "string" ? { ok: true, receipt: body.receipt } : { ok: true };
       }
       // Pushover: 4xx means the request itself is wrong (do not repeat it); 429 and 5xx are temporary.
       return { ok: false, retry: res.status === 429 || res.status >= 500, status: res.status };

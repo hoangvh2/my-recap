@@ -12,11 +12,13 @@ export interface EditorProps {
   isNew: boolean;
   onSave: (item: Item) => void;
   onDelete: (item: Item) => void;
+  /** Tick off an open task or appointment straight from the editor. */
+  onDone?: (item: Item) => void;
   onClose: () => void;
 }
 
 /** Bottom sheet to create or change one item. */
-export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) {
+export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: EditorProps) {
   const [type, setType] = useState<ItemType>(item.type);
   const [title, setTitle] = useState(item.title);
   const [details, setDetails] = useState(item.details);
@@ -165,6 +167,9 @@ export function Editor({ item, isNew, onSave, onDelete, onClose }: EditorProps) 
 
         <footer>
           {!isNew && !wasDraft && <button type="button" class="btn danger" onClick={() => onDelete(item)}><Icon name="trash" size={18} /> Xoá</button>}
+          {!isNew && !wasDraft && onDone && item.status === "OPEN" && (item.type === "TASK" || item.type === "EVENT") && (
+            <button type="button" class="btn ghost" onClick={() => onDone(item)}><Icon name="check" size={18} /> Đã xong</button>
+          )}
           {dated && date && <button type="button" class="btn ghost" onClick={() => void addToCalendar()}><Icon name="calendar" size={18} /> Thêm vào Lịch</button>}
           <button type="submit" class="btn solid grow">Lưu</button>
         </footer>

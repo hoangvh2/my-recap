@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { CONTEXT_LIMITS, EMPTY_CONTEXT, licenceIntent, parseContext, parseSalesExtraction, productFrom, renewalEndDate, SalesExtraction, startDateFrom, type CaptureContext } from "../src/sales";
+import { CONTEXT_LIMITS, EMPTY_CONTEXT, licenceIntent, parseContext, parseSalesExtraction, productFrom, productsFrom, renewalEndDate, SalesExtraction, splitProducts, startDateFrom, type CaptureContext } from "../src/sales";
 
 const zone = "Asia/Ho_Chi_Minh";
 const NOW = Date.UTC(2026, 9, 10, 7, 0, 0);
@@ -125,17 +125,17 @@ describe("parseSalesExtraction", () => {
     expect(b.licenses[0].value).toBe(120_000_000);
   });
 
-  it("skips a licence that already exists and notes one without an end date", () => {
+  it("skips a licence that already exists, and keeps one without any date (counted from today, said on the draft)", () => {
     const b = parse({
       licenses: [
         { customer: "c1", product: "phần mềm kế toán", endDate: "2026-12-31" },
         { customer: "c2", product: "Cloud backup" },
       ],
     })!;
-    expect(b.licenses).toHaveLength(0);
-    expect(b.items).toHaveLength(1);
-    expect(b.items[0]).toMatchObject({ type: "NOTE" });
-    expect(b.items[0].title).toContain("Cloud backup");
+    expect(b.licenses).toHaveLength(1);
+    expect(b.licenses[0]).toMatchObject({ customerId: "cus_xyz", product: "Cloud backup", startDate: "2026-10-10", endDate: "2027-10-09", termMonths: 12 });
+    expect(b.licenses[0].note).toContain("Chưa rõ ngày");
+    expect(b.items).toHaveLength(0);
   });
 
   it("turns progress on an existing licence into a proposal with a server-written summary", () => {
@@ -310,9 +310,11 @@ describe("a sale or renewal the model filed without a licence", () => {
     expect(b.items[0].licenseId).toBe("lic_v");
   });
 
-  it("drafts nothing when there is no date, no sale, no customer, or the item is an expense", () => {
+  it("drafts nothing when there is no sale, no customer, or the item is an expense; a sale with no date counts from today", () => {
     const noDate = parse({ items: [{ type: "task", title: "Bán license Windows Office", details: "chị Vân muốn mua", customer: "c1" }] }, van, "Chị Vân muốn mua license Windows Office")!;
-    expect(noDate.licenses).toHaveLength(0);
+    expect(noDate.licenses).toHaveLength(1);
+    expect(noDate.licenses[0]).toMatchObject({ product: "Windows Office", startDate: "2026-10-10", endDate: "2027-10-09" });
+    expect(noDate.licenses[0].note).toContain("Chưa rõ ngày");
     const askOnly = parse({ items: [{ type: "task", title: "Hỏi chị Vân về license Windows", date: "2026-11-12", customer: "c1" }] }, van, "hỏi chị Vân về license")!;
     expect(askOnly.licenses).toHaveLength(0);
     const nobody = parse({ items: [{ type: "event", title: "Mua license Windows Office", date: "2026-11-12" }] }, van, said)!;
@@ -329,6 +331,37 @@ describe("a sale or renewal the model filed without a licence", () => {
     expect(b.items[0].licenseId).toBe("lic_1");
   });
 
+  it("'cần 2 license SIM và CheckPoint trước thứ 2 tuần sau' drafts both licences, counted from that Monday (reported from the phone)", () => {
+    const said = "Chị Vân cần 2 license SIM và CheckPoint trước thứ 2 tuần sau";
+    // What a small model typically answers: one task with the deadline, nothing in "licenses".
+    const b = parse({ items: [{ type: "task", title: "Chuẩn bị 2 license SIM và CheckPoint", date: "2026-10-19", customer: "c1", quote: said }], licenses: [] }, van, said)!;
+    expect(b.licenses.map((l) => l.product)).toEqual(["SIM", "CheckPoint"]);
+    for (const l of b.licenses) expect(l).toMatchObject({ customerId: "cus_van", status: "DRAFT", kind: "LICENSE", startDate: "2026-10-19", endDate: "2027-10-18", termMonths: 12 });
+    expect(b.items[0]).toMatchObject({ type: "TASK", licenseId: b.licenses[0].id });
+    // The model put both in one licence with no date: still two, dated from the task.
+    const one = parse({
+      items: [{ type: "task", title: "Gửi license cho chị Vân", date: "2026-10-19", customer: "c1" }],
+      licenses: [{ customer: "c1", product: "SIM và CheckPoint" }],
+    }, van, said)!;
+    expect(one.licenses.map((l) => [l.product, l.startDate])).toEqual([["SIM", "2026-10-19"], ["CheckPoint", "2026-10-19"]]);
+    // The model drafted only one of the two: the other is added, none repeated.
+    const half = parse({
+      items: [{ type: "task", title: "Chuẩn bị 2 license SIM và CheckPoint", date: "2026-10-19", customer: "c1" }],
+      licenses: [{ customer: "c1", product: "SIM", startDate: "2026-10-19" }],
+    }, van, said)!;
+    expect(half.licenses.map((l) => l.product)).toEqual(["SIM", "CheckPoint"]);
+  });
+
+  it("other ways of saying a customer wants licences", () => {
+    for (const t of ["Chị Vân muốn lấy thêm 5 license Office", "Báo giá license Kaspersky cho chị Vân", "Chị Vân cần bảo hành server"]) {
+      const b = parse({ items: [{ type: "task", title: t, customer: "c1" }] }, van, t)!;
+      expect(b.licenses, t).toHaveLength(1);
+    }
+    const five = parse({ items: [{ type: "task", title: "Chị Vân muốn lấy thêm 5 license Office", customer: "c1" }] }, van)!;
+    expect(five.licenses[0]).toMatchObject({ product: "Office" });
+    expect(five.licenses[0].note).toContain("Số lượng: 5");
+  });
+
   it("tells the model a planned purchase is a licence and its date is not the end date", () => {
     const p = SalesExtraction.userMessage("x", DateTime.fromMillis(NOW, { zone }), van);
     expect(p).toContain("MUỐN MUA");
@@ -342,6 +375,10 @@ describe("licence words", () => {
     expect(productFrom("gia hạn license đến 12/2027")).toEqual({ kind: "LICENSE" });
     expect(productFrom("mua Office 365, giao tuần sau")).toBeNull();
     expect(productFrom("mua bản quyền Office 365, giao tuần sau")).toEqual({ product: "Office 365", kind: "LICENSE" });
+    expect(productsFrom("cần 2 license SIM và CheckPoint trước thứ 2 tuần sau")).toEqual({ products: ["SIM", "CheckPoint"], kind: "LICENSE", quantity: 2 });
+    expect(productsFrom("license Office, Windows & Visio cho chị Vân")?.products).toEqual(["Office", "Windows", "Visio"]);
+    expect(splitProducts("SIM và CheckPoint")).toEqual(["SIM", "CheckPoint"]);
+    expect(splitProducts("Phần mềm kế toán")).toEqual(["Phần mềm kế toán"]);
     expect(startDateFrom("ngày 12 tháng 11 năm 2026", NOW, zone)).toBe("2026-11-12");
     expect(startDateFrom("mua ngày 5/3", NOW, zone)).toBe("2027-03-05");
     expect(startDateFrom("mua sớm", NOW, zone)).toBeNull();

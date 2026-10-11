@@ -69,7 +69,10 @@ test("the scheduler reminds an appointment before it starts, an important task a
   expect(meeting.message).toContain("Mang hợp đồng");
   expect(Number(meeting.ttl)).toBeGreaterThan(0);
   const urgent = got.find((p) => p.title.includes("Đóng tiền học"))!;
-  expect(urgent).toMatchObject({ priority: "2", retry: "300", expire: "3600", sound: "persistent" });
+  // Repeats every 5 minutes until acknowledged, for at most 30 minutes after the task's time.
+  expect(urgent).toMatchObject({ priority: "2", retry: "300", sound: "persistent" });
+  expect(Number(urgent.expire)).toBeGreaterThan(25 * 60);
+  expect(Number(urgent.expire)).toBeLessThanOrEqual(30 * 60);
   expect(urgent.title).toContain("🔴 KHẨN");
 
   // The next minute, nothing new: every reminder goes out once.
@@ -88,4 +91,25 @@ test("an item can be marked important in the editor, and shows the flag", async 
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.locator(".row-item", { hasText: "Nộp hồ sơ visa" }).locator(".flag")).toBeVisible();
   expectNoProblems(problems);
+});
+
+test("an emergency stops as soon as the task is ticked off from the notification's Đã xong link", async ({ page, request }) => {
+  await signIn(page, OWNER);
+  await enable(page);
+  const who = await idTokenFor(request, OWNER);
+  const now = Date.now();
+  await seed(request, who, "items", "t1", { type: "TASK", status: "OPEN", title: "Đóng tiền điện", details: "", allDay: false, whenAt: now - 60_000, important: true, createdAt: now });
+  await tick(request, now);
+  const [urgent] = await pushes(request);
+  expect(urgent).toMatchObject({ priority: "2", url_title: "✅ Đã xong", expire: expect.stringMatching(/^\d+$/) });
+  expect(Number(urgent.expire)).toBeLessThanOrEqual(30 * 60);
+  // What tapping "✅ Đã xong" does: open the app on that link (the URL host is the app's; here the test server).
+  const path = new URL(urgent.url ?? "http://x/#/xong/t1").hash;
+  expect(path).toBe("#/xong/t1");
+  await page.goto(`/${path}`);
+  await expect(page.getByText("Đã xong: Đóng tiền điện")).toBeVisible();
+  await expect(page).toHaveURL(/#\/$/);
+  // The next scheduler run cancels the repeating notification on the phone.
+  expect(await tick(request, now + 60_000)).toMatchObject({ cancelled: 1 });
+  expect((await pushes(request)).some((p) => p.cancel)).toBe(true);
 });

@@ -55,6 +55,10 @@ iPhone (PWA, Preact)
 - Tab **Việc → Lịch** hiện **mọi mục có ngày giờ** (việc có hạn + lịch hẹn) theo ngày, việc quá hạn ở trên cùng. Cùng một bản ghi hiện ở hai chỗ (danh sách Việc và Lịch), không phải hai bản sao.
 - Server sửa hai lỗi hay gặp của AI: (1) việc/ghi chú có ngày mà là **cuộc hẹn** (họp, hẹn gặp, khám, đón con, sinh nhật, phỏng vấn, demo, chuyến bay…) → chuyển thành **lịch hẹn**; (2) việc AI quên điền ngày mà câu có ngày rõ ràng ("hạn 20/11", "ngày 5 tháng 3") → điền ngày. Việc phải làm (gọi, gửi, nộp…) **vẫn là việc** dù có giờ, để nếu chưa làm thì hiện **quá hạn** chứ không trôi qua như một lịch hẹn.
 
+**Màn Hôm nay theo giờ:** cột giờ bên trái ("Cả ngày" ở đầu, rồi 09:00, 10:30…), vạch đỏ "bây giờ", lịch đã qua làm mờ.
+
+**Khách cần/mua license → luôn ra license nháp trong Gia hạn:** "cần", "muốn", "lấy thêm", "báo giá", "chốt", "mua"… cùng chữ license/bản quyền/phần mềm/bảo hành → mỗi sản phẩm một license ("SIM và CheckPoint" = 2). Ngày tính từ ngày giao/hạn của việc, không có thì từ hôm nay, thời hạn tạm 12 tháng, ghi rõ "tạm tính" trên thẻ nháp để kiểm tra lại.
+
 ## Thông báo (Pushover)
 
 **Vì sao Pushover chứ không phải Web Push:** Web Push trên iPhone chỉ chạy khi app đã thêm vào Màn hình chính (iOS 16.4+), không có mức ưu tiên, không nhắc lặp đến khi xác nhận. Pushover (app iOS, trả một lần ~5 USD sau 30 ngày dùng thử) có 4 mức ưu tiên, mức khẩn lặp lại đến khi bấm xác nhận, và vượt được giờ yên lặng.
@@ -67,6 +71,12 @@ iPhone (PWA, Preact)
 | ⚪ Nhẹ (-1) | Xem trước ngày mai (20:00) | Không chuông |
 
 **Tần suất thông minh:** mỗi lịch hẹn nhắc một lần; mỗi việc nhắc đúng giờ + một lần nhắc lại; tin nhắc lại không gửi trong giờ yên lặng (mặc định 22:00–06:30) nhưng nhắc đúng giờ thì luôn gửi; mục cả ngày vào tóm tắt sáng (tắt tóm tắt thì nhắc riêng lúc 08:00); tóm tắt trống thì không gửi; nhiều nhắc cùng phút gộp thành một tin; tối đa 60 tin/người/ngày.
+
+**Tắt nhắc mà không cần thao tác rắc rối:**
+- Tin của **việc** có nút **✅ Đã xong**: chạm là app mở ra và tự đánh dấu xong (có Hoàn tác).
+- Tin **KHẨN** tự dừng: lịch hẹn thì dừng lúc đến giờ hẹn (+5 phút), việc thì sau 30 phút. Bấm Xác nhận trong Pushover cũng dừng.
+- Đánh dấu xong, bỏ "Quan trọng" hay xoá mục trong app: phút sau server **huỷ** tin khẩn đang lặp trên điện thoại (Pushover receipt).
+- **Lịch hẹn** cũng có vòng tròn "Đã xong" (viền đứt nét), và màn sửa có nút **Đã xong**. Lịch lặp lại bấm Đã xong chỉ xong lần này, tự chuyển sang lần sau.
 
 **Nội dung tin:** tiêu đề `🟠 15 phút nữa · Họp anh Nam` (mức + khi nào + việc gì, đọc được ngay trên màn hình khoá); thân tin: giờ bắt đầu–kết thúc và ngày, 📍 địa điểm, 👤 người/khách, 📝 chi tiết, và nút **Mở Thư ký**. Tin nhắc lịch hẹn tự biến mất sau khi lịch đã bắt đầu 15 phút.
 

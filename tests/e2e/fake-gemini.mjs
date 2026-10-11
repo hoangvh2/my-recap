@@ -12,10 +12,17 @@ export function startFakeGemini(port = 8787) {
     req.on("end", () => {
       if (req.url?.startsWith("/1/")) {
         const form = Object.fromEntries(new URLSearchParams(body));
+        const cancel = /^\/1\/receipts\/([A-Za-z0-9]+)\/cancel\.json$/.exec(req.url);
+        if (cancel) {
+          pushes.push({ cancel: cancel[1] });
+          res.writeHead(200, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ status: 1 }));
+        }
         const bad = !/^[A-Za-z0-9]{30}$/.test(form.user ?? "") || form.user.startsWith("BAD") || form.token !== "fake-pushover-token";
         if (req.url === "/1/messages.json" && !bad) pushes.push(form);
         res.writeHead(bad ? 400 : 200, { "content-type": "application/json" });
-        return res.end(JSON.stringify(bad ? { status: 0, errors: ["user identifier is invalid"] } : { status: 1, request: "r" }));
+        const receipt = form.priority === "2" ? { receipt: `rc${pushes.length}` } : {};
+        return res.end(JSON.stringify(bad ? { status: 0, errors: ["user identifier is invalid"] } : { status: 1, request: "r", ...receipt }));
       }
       let json = {};
       try { json = JSON.parse(body); } catch { /* ignore */ }
@@ -85,6 +92,14 @@ export function startFakeGemini(port = 8787) {
         return reply(JSON.stringify({
           customers: [],
           items: [{ type: "event", title: "Mua license Windows Server", details: "", date: "2026-12-01", time: null, customer: "c1", license: null, quote: "Chị Vân muốn mua license Windows Server ngày 1/12/2026." }],
+          licenses: [], updates: [],
+        }));
+      }
+      // "Chị Vân cần 2 license SIM và CheckPoint trước thứ 2 tuần sau": one task with the deadline, no licences.
+      if (/FAKE_NEED_TWO/.test(text)) {
+        return reply(JSON.stringify({
+          customers: [],
+          items: [{ type: "task", title: "Chuẩn bị 2 license SIM và CheckPoint", details: "", date: tomorrow, time: null, customer: "c1", license: null, quote: "Chị Vân cần 2 license SIM và CheckPoint trước thứ 2 tuần sau" }],
           licenses: [], updates: [],
         }));
       }

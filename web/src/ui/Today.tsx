@@ -1,16 +1,17 @@
+import { Fragment } from "preact";
 import { useMemo } from "preact/hooks";
 import { diffDays } from "../../../shared/dates";
 import { dueNudges, upcomingNudges } from "../../../shared/renewals";
 import { items as itemsStore, setDone } from "../data";
-import { todayLabel } from "../lib/format";
+import { clock, todayLabel } from "../lib/format";
 import type { Item } from "../lib/model";
 import { go, to } from "../lib/router";
 import { useStore } from "../lib/store";
-import { overview } from "../lib/views";
+import { overview, timeline } from "../lib/views";
 import { NudgeRow, useLicenseActions } from "./actions";
 import { Capture } from "./Capture";
 import { Empty, Link, Section, TopBar } from "./common";
-import { useCtx, useGraph, useUid } from "./hooks";
+import { useCtx, useGraph, useNow, useUid } from "./hooks";
 import { Icon } from "./icons";
 import { openEditor } from "./host";
 import { ItemRow } from "./ItemRow";
@@ -28,7 +29,9 @@ export function Today() {
   const open = useMemo(() => g.licenses.filter((l) => l.status === "OPEN"), [g.licenses]);
   const due = useMemo(() => dueNudges(open, ctx), [open, ctx]);
   const soon = useMemo(() => upcomingNudges(open, ctx, 14), [open, ctx]);
-  const o = useMemo(() => overview(all.filter((i) => i.status !== "DRAFT"), Date.now()), [all]);
+  const now = useNow();
+  const o = useMemo(() => overview(all.filter((i) => i.status !== "DRAFT"), now), [all, now]);
+  const tl = useMemo(() => timeline(o.today, now), [o.today, now]);
 
   const openItem = (i: Item) => openEditor(i);
   const fail = () => showToast("Chưa lưu được, kiểm tra mạng rồi thử lại");
@@ -57,8 +60,15 @@ export function Today() {
         </Section>
       )}
       {o.today.length > 0 && (
-        <Section title="Việc và lịch hôm nay" count={o.today.length}>
-          <ul class="list">{o.today.map((i) => <ItemRow key={i.id} item={i} onOpen={openItem} onToggle={toggle} showDate={false} />)}</ul>
+        <Section title="Hôm nay theo giờ" count={o.today.length}>
+          <ul class="list timeline" aria-label="Lịch trình hôm nay">
+            {tl.rows.map((r, i) => (
+              <Fragment key={r.item.id}>
+                {i === tl.nowAt && tl.nowAt > 0 && <li class="now-line" key="now" aria-label={`Bây giờ ${clock(now)}`}><span>{clock(now)}</span></li>}
+                <ItemRow item={r.item} onOpen={openItem} onToggle={toggle} showDate={false} time={r.time} past={r.past} />
+              </Fragment>
+            ))}
+          </ul>
         </Section>
       )}
 

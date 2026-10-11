@@ -73,3 +73,18 @@ describe("agenda", () => {
     expect(a.past.map((i) => i.title)).toEqual(["past"]);
   });
 });
+
+describe("timeline", () => {
+  it("puts all-day entries first, then by time, with the now line before the first entry still ahead", async () => {
+    const { timeline } = await import("../src/lib/views");
+    const day = it_({ title: "day", whenAt: new Date(2026, 9, 10).getTime(), allDay: true });
+    const nine = it_({ type: "EVENT", title: "nine", whenAt: at(10, 9) });
+    const sixteen = it_({ type: "EVENT", title: "sixteen", whenAt: at(10, 16) });
+    const fifteen = it_({ title: "fifteen", whenAt: at(10, 15) });
+    const t = timeline([sixteen, day, fifteen, nine], now); // now = 14:00
+    expect(t.rows.map((r) => [r.time, r.item.title, r.past])).toEqual([
+      ["Cả ngày", "day", false], ["09:00", "nine", true], ["15:00", "fifteen", false], ["16:00", "sixteen", false],
+    ]);
+    expect(t.nowAt).toBe(2);
+  });
+});

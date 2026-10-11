@@ -7,6 +7,9 @@ ROOT="$(cd .. && pwd)"
 
 export ALLOWED_EMAILS="owner@example.com,member@example.com"
 node "$ROOT/scripts/configure.mjs"
+# Links in notifications point at the app; in the e2e run that is the local web server. Written to .env.local
+# (which overrides .env), so a value left there by an earlier emulator run cannot change the result.
+printf 'APP_URL=http://127.0.0.1:4173\n' > "$ROOT/functions/.env.local"
 (cd "$ROOT/functions" && npm run build >/dev/null)
 printf 'GEMINI_API_KEY=fake-e2e-key\nPUSHOVER_TOKEN=fake-pushover-token\n' > "$ROOT/functions/.secret.local"
 

@@ -1,4 +1,4 @@
-import { deleteItems, saveItem } from "../data";
+import { deleteItems, saveItem, setDone } from "../data";
 import { createStore, useStore } from "../lib/store";
 import type { Item } from "../lib/model";
 import { Capture } from "./Capture";
@@ -34,6 +34,11 @@ export function Hosts() {
           onSave={(item) => {
             editing.set(null);
             saveItem(uid, item).catch(fail);
+          }}
+          onDone={(item) => {
+            editing.set(null);
+            setDone(uid, item, true).catch(fail);
+            showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(fail) });
           }}
           onDelete={(item) => {
             editing.set(null);

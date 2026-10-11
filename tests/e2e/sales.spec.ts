@@ -344,7 +344,7 @@ test("deleting a customer says what goes with it, and can be undone", async ({ p
   await page.getByRole("button", { name: "Sửa thông tin khách" }).click();
   await page.getByRole("button", { name: "Xoá" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("Sẽ xoá luôn 2 license và 1 việc/ghi chú liên quan");
-  await page.getByRole("button", { name: "Xoá", exact: true }).last().click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Xoá", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Khách hàng" })).toBeVisible();
   await expect(page.getByText("Công ty ABC")).toHaveCount(0);
   await page.getByRole("button", { name: "Hoàn tác" }).click();

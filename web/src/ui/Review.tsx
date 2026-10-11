@@ -100,7 +100,7 @@ export function Review({ filter }: { filter?: ReviewFilter }) {
               <ul class="list">
                 {p.licenses.map((l) => (
                   <DraftRow key={l.id} icon="file" title={`${g.customerName(l.customerId)} · ${l.product}`}
-                    meta={`${KIND_LABEL[l.kind]} · hết hạn ${formatDate(l.endDate)}${l.value ? ` · ${formatVnd(l.value)}` : ""}`} dropLabel={`Bỏ ${l.product}`}
+                    meta={`${KIND_LABEL[l.kind]} · hết hạn ${formatDate(l.endDate)}${l.note?.includes("tạm tính") ? " (tạm tính, chạm để sửa)" : ""}${l.value ? ` · ${formatVnd(l.value)}` : ""}`} dropLabel={`Bỏ ${l.product}`}
                     onOpen={() => setEditLicense(l)} onDrop={() => void dropDraftLicense(uid, g, l).catch(fail)} />
                 ))}
               </ul>

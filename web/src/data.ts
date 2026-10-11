@@ -6,7 +6,7 @@ import { applyProposal, renew as renewLicense, type RenewalInput } from "./lib/f
 import { buildGraph, customerCascade, type Graph } from "./lib/graph";
 import { createStore } from "./lib/store";
 import { normalizePrefs, type Capture, type Customer, type Item, type ItemType, type License, type Prefs, type Proposal } from "./lib/model";
-import { nextInstance, rollForward } from "./lib/schedule";
+import { finishEvent, nextInstance, rollForward } from "./lib/schedule";
 
 export type SyncState = "connecting" | "ready" | "denied" | "error";
 
@@ -139,6 +139,7 @@ export function deleteItems(uid: string, ids: string[]): Promise<void> {
  * same batch, under an id derived from the date, so a double tap or a second device cannot duplicate it.
  */
 export function setDone(uid: string, item: Item, done: boolean, now = Date.now()): Promise<void> {
+  if (done && item.type === "EVENT") return commit(uid, { items: [finishEvent(item, now)] });
   if (done) {
     const finished: Item = { ...item, status: "DONE", doneAt: now };
     const probe = nextInstance(finished, "probe", now);

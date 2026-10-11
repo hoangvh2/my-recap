@@ -48,7 +48,7 @@ describe("reminders", () => {
   it("reminds an appointment once, `lead` minutes before, loud, with where/who/what", () => {
     expect(plan([meeting], "2026-10-12T14:44")).toHaveLength(0);
     const [m] = plan([meeting], "2026-10-12T14:45");
-    expect(m).toMatchObject({ key: `r-m1-${at("2026-10-12T15:00")}-lead`, priority: 1, url: "https://recap.example.com/#/viec" });
+    expect(m).toMatchObject({ key: `r-m1-${at("2026-10-12T15:00")}-lead`, priority: 1, url: "https://recap.example.com/#/" });
     expect(m.title).toBe("🟠 15 phút nữa · Họp anh Nam");
     expect(m.body).toContain("<b>15:00 – 16:00 · Hôm nay, Thứ Hai 12/10</b>");
     expect(m.body).toContain("📍 VP ABC");
@@ -180,6 +180,7 @@ describe("digest", () => {
 
 function memoryStore(items: Item[], settings: NotifySettings | null = S) {
   const logs = new Map<string, string>();
+  const receipts = new Map<string, { receipt: string; itemId: string; until: number }>();
   let count = 0;
   let saved: NotifySettings | null = settings;
   const store: NotifyStore = {
@@ -198,21 +199,26 @@ function memoryStore(items: Item[], settings: NotifySettings | null = S) {
       for (const k of keys) logs.set(k, "sending");
       return "ok";
     },
-    finish: async (_u, keys, state) => { for (const k of keys) logs.set(k, state); },
+    finish: async (_u, keys, state, r) => { for (const k of keys) { logs.set(k, state); if (r) receipts.set(k, r); } },
+    activeReceipts: async (_u, now) => [...receipts].filter(([, r]) => r.until > now).map(([key, r]) => ({ key, receipt: r.receipt, itemId: r.itemId })),
+    clearReceipt: async (_u, key) => { receipts.delete(key); },
+    itemsById: async (_u, ids) => new Map(items.filter((i) => ids.includes(i.id)).map((i) => [i.id, i])),
     release: async (_u, keys) => { for (const k of keys) logs.delete(k); count--; },
     saveSettings: async (_u, s) => { saved = s; },
     disable: async () => { saved = null; },
   };
-  return { store, logs, saved: () => saved, setCount: (c: number) => { count = c; } };
+  return { store, logs, receipts, saved: () => saved, setCount: (c: number) => { count = c; } };
 }
 
 function fakeSender(results: SendResult[] = []) {
   const sent: Message[] = [];
+  const cancelled: string[] = [];
   const sender: Sender = {
-    send: async (_u, _d, m) => { sent.push(m); return results.shift() ?? { ok: true }; },
+    send: async (_u, _d, m) => { sent.push(m); return results.shift() ?? (m.priority === 2 ? { ok: true, receipt: `rc${sent.length}` } : { ok: true }); },
+    cancel: async (r) => { cancelled.push(r); return { ok: true }; },
     validate: async (user) => (user === KEY ? { ok: true } : { ok: false, retry: false, status: 400 }),
   };
-  return { sender, sent };
+  return { sender, sent, cancelled };
 }
 
 describe("tick", () => {
@@ -260,6 +266,49 @@ describe("tick", () => {
     const m = memoryStore([call], null);
     const f = fakeSender();
     expect(await tick(m.store, f.sender, at("2026-10-12T10:00"))).toMatchObject({ users: 0, sent: 0 });
+  });
+});
+
+describe("emergencies stop by themselves", () => {
+  it("an important appointment stops repeating at its start; an important task after 30 minutes, with a one-tap Đã xong", () => {
+    const ev = item({ id: "ev", type: "EVENT", title: "Đón con", whenAt: at("2026-10-12T17:00"), important: true });
+    const [m] = plan([ev], "2026-10-12T16:45");
+    expect(m).toMatchObject({ priority: 2, itemId: "ev", expireSec: 20 * 60, url: "https://recap.example.com/#/" });
+    const task = item({ id: "tk", title: "Đóng tiền điện", whenAt: at("2026-10-12T10:00"), important: true });
+    const [t] = plan([task], "2026-10-12T10:00");
+    expect(t).toMatchObject({ priority: 2, expireSec: 30 * 60, url: "https://recap.example.com/#/xong/tk", urlTitle: "✅ Đã xong" });
+    // An ordinary task gets the same one-tap link.
+    const [n] = plan([{ ...task, important: false }], "2026-10-12T10:00");
+    expect(n.url).toBe("https://recap.example.com/#/xong/tk");
+  });
+
+  it("cancels a repeating emergency as soon as its item is done, unmarked or deleted", async () => {
+    const task = item({ id: "tk", title: "Đóng tiền điện", whenAt: at("2026-10-12T10:00"), important: true });
+    const items = [task];
+    const m = memoryStore(items);
+    const f = fakeSender();
+    await tick(m.store, f.sender, at("2026-10-12T10:00"));
+    expect(m.receipts.size).toBe(1);
+    // Still open and important: keeps ringing.
+    expect(await tick(m.store, f.sender, at("2026-10-12T10:01"))).toMatchObject({ cancelled: 0 });
+    items[0] = { ...task, status: "DONE" };
+    expect(await tick(m.store, f.sender, at("2026-10-12T10:02"))).toMatchObject({ cancelled: 1 });
+    expect(f.cancelled).toEqual(["rc1"]);
+    expect(m.receipts.size).toBe(0);
+  });
+
+  it("sends Pushover the shorter expiry and can cancel a receipt", async () => {
+    const calls: { url: string; form: URLSearchParams }[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      calls.push({ url, form: new URLSearchParams(String(init.body)) });
+      return new Response(JSON.stringify({ status: 1, receipt: "abc123" }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const c = new PushoverClient("app-token", "https://po.test", fetchImpl);
+    expect(await c.send(KEY, undefined, { key: "k", priority: 2, title: "t", body: "b", at: 0, expireSec: 900 })).toEqual({ ok: true, receipt: "abc123" });
+    expect(calls[0].form.get("expire")).toBe("900");
+    await c.cancel("abc123");
+    expect(calls[1].url).toBe("https://po.test/1/receipts/abc123/cancel.json");
+    expect(await c.cancel("../x")).toEqual({ ok: false, retry: false });
   });
 });
 

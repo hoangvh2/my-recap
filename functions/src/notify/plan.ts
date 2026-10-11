@@ -39,6 +39,10 @@ export interface Message {
   parts?: string[];
   /** This reminder as one line of a grouped message. */
   line?: string;
+  /** The item it is about (an emergency is cancelled when the item is done, no longer important, or deleted). */
+  itemId?: string;
+  /** Emergency only: seconds Pushover keeps repeating it if nobody acknowledges. */
+  expireSec?: number;
 }
 
 export interface PlanInput {
@@ -205,18 +209,26 @@ function reminderMessage(d: Due, input: PlanInput): Message {
         ? `${clock(d.occ, s.zone)} – ${clock(d.occ + HOUR_MS, s.zone)} · ${dayText(d.occ, nowMs, s.zone)}`
         : `${d.kind === "late" ? "Hạn " : ""}${clock(d.occ, s.zone)} · ${dayText(d.occ, nowMs, s.zone)}`;
   const lines = [`<b>${escapeHtml(when)}</b>`, ...itemLines(item, input.names)];
-  if (item.type === "TASK") lines.push(d.kind === "late" ? "<i>Quá hạn 2 giờ. Xong rồi thì mở app đánh dấu xong.</i>" : "<i>Xong thì mở app đánh dấu xong.</i>");
-  if (d.priority === 2) lines.push("<i>Bấm Xác nhận (Acknowledge) để ngừng nhắc.</i>");
+  const doneLink = item.type === "TASK" && input.appUrl;
+  if (item.type === "TASK") lines.push(doneLink ? "<i>Làm xong thì bấm “✅ Đã xong” bên dưới.</i>" : "<i>Xong thì mở app đánh dấu xong.</i>");
+  if (d.priority === 2) lines.push(item.type === "EVENT" ? "<i>Nhắc lại mỗi 5 phút đến khi bấm Xác nhận; tự dừng khi đến giờ hẹn.</i>" : "<i>Nhắc lại mỗi 5 phút đến khi bấm Xác nhận hoặc Đã xong (tối đa 30 phút).</i>");
   const msg: Message = {
     key: keyOf(d),
     priority: d.priority,
     title: titleOf(d.priority, headline(d, s), item.title),
     body: fit(lines),
     at: d.fireAt,
-    ...link(input.appUrl, "#/viec"),
+    itemId: item.id,
+    // A task: one tap in the notification ticks it off. An appointment: just open the app.
+    ...(doneLink ? { url: `${input.appUrl!.replace(/\/$/, "")}/#/xong/${item.id}`, urlTitle: "✅ Đã xong" } : link(input.appUrl, "#/")),
   };
   // An appointment reminder is useless once it has started: let it disappear on its own.
   if (d.priority !== 2 && (d.kind === "lead" || d.kind === "hour")) msg.ttlSec = Math.max(60, Math.round((d.occ + 15 * 60_000 - nowMs) / 1000));
+  // An emergency stops repeating by itself: at the start of the appointment (+5 min), or 30 minutes after a task's time.
+  if (d.priority === 2) {
+    const until = item.type === "EVENT" ? d.occ + 5 * 60_000 : d.occ + 30 * 60_000;
+    msg.expireSec = Math.min(3600, Math.max(60, Math.round((until - nowMs) / 1000)));
+  }
   return msg;
 }
 

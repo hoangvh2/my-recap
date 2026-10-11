@@ -1,4 +1,5 @@
 import type { Item } from "./model";
+import { clock } from "./format";
 import { startOfDay } from "./schedule";
 
 export interface Overview {
@@ -64,6 +65,29 @@ export function agenda(items: Item[], now: number): Agenda {
   out.ahead.sort(byWhen);
   out.past.sort((a, b) => b.whenAt! - a.whenAt!);
   return out;
+}
+
+export interface TimelineRow {
+  item: Item;
+  /** "09:30", or "Cả ngày". */
+  time: string;
+  /** An appointment that is already over. */
+  past: boolean;
+}
+
+/**
+ * Today as a timeline: all-day entries first, then by time; `nowAt` is where the "now" line goes
+ * (before the first entry still ahead).
+ */
+export function timeline(today: Item[], now: number): { rows: TimelineRow[]; nowAt: number } {
+  const allDay = today.filter((i) => i.allDay || i.whenAt === undefined).sort(byWhen);
+  const timed = today.filter((i) => !i.allDay && i.whenAt !== undefined).sort(byWhen);
+  const rows: TimelineRow[] = [
+    ...allDay.map((item) => ({ item, time: "Cả ngày", past: false })),
+    ...timed.map((item) => ({ item, time: clock(item.whenAt!), past: item.type === "EVENT" && item.whenAt! + 3_600_000 <= now })),
+  ];
+  const firstAhead = rows.findIndex((r, i) => i >= allDay.length && r.item.whenAt! >= now);
+  return { rows, nowAt: firstAhead < 0 ? rows.length : firstAhead };
 }
 
 export function monthKey(t: number): string {
