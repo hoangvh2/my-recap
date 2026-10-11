@@ -2,8 +2,10 @@ package com.vh.myrecap.ui
 
 import android.content.Intent
 import android.os.Build
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,7 +17,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
@@ -41,7 +45,21 @@ class MainActivity : ComponentActivity() {
                 vm.recorder.collect { setShowWhenLocked(it.active) }
             }
         }
-        setContent { MyRecapTheme { AppRoot(vm) } }
+        setContent {
+            val settings by vm.settings.collectAsStateWithLifecycle()
+            val mode = settings.themeMode
+            val systemDark = isSystemInDarkTheme()
+            // System bar icons must follow the chosen theme, not only the phone's setting.
+            DisposableEffect(mode, systemDark) {
+                val dark = mode.isDark(systemDark)
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark },
+                    navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark },
+                )
+                onDispose {}
+            }
+            MyRecapTheme(mode) { AppRoot(vm) }
+        }
     }
 
     override fun onResume() {
