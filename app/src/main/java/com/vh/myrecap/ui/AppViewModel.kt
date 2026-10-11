@@ -24,6 +24,7 @@ import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.core.TextSearch
+import com.vh.myrecap.core.Triage
 import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.StorageStats
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 sealed interface Screen {
     data object Home : Screen
@@ -366,6 +368,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 extractingActionsFor = null
             }
         }
+    }
+
+    /** One tap of the morning review: moves an overdue task to a new day, or off the calendar. */
+    fun triage(id: String, move: Triage.Move) = io {
+        app.items.update(id) { Triage.apply(it, move, System.currentTimeMillis(), ZoneId.systemDefault()) }
+            ?.let { Reminders.sync(app, it) }
     }
 
     /** Saves edits and completes (or reopens) in order, so the next instance of a repeating task carries the edits. */

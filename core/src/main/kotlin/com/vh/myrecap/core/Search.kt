@@ -89,6 +89,28 @@ object ReminderPolicy {
         return trigger(item, at, zone)
     }
 
+    /** Where "Hoãn" in a reminder notification pushes it to. */
+    enum class Snooze(val label: String) {
+        MINUTES_10("10 phút"),
+        HOUR_1("1 giờ"),
+        TOMORROW("Sáng mai"),
+    }
+
+    fun snoozeAt(choice: Snooze, now: Long, zone: java.time.ZoneId): Long = when (choice) {
+        Snooze.MINUTES_10 -> now + 10 * 60_000L
+        Snooze.HOUR_1 -> now + 60 * 60_000L
+        Snooze.TOMORROW -> java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().plusDays(1)
+            .atTime(ALL_DAY_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
+    }
+
+    /** An important item that nobody acknowledged is repeated this often, at most [MAX_NAGS] times. */
+    const val NAG_INTERVAL_MS = 10 * 60_000L
+    const val MAX_NAGS = 6
+
+    /** When the next repeat is due after [nagsSoFar] repeats, or null when the item is not important or the limit is reached. */
+    fun nextNagAt(item: Item, nagsSoFar: Int, now: Long): Long? =
+        if (item.important && item.status == ItemStatus.OPEN && nagsSoFar < MAX_NAGS) now + NAG_INTERVAL_MS else null
+
     private fun trigger(item: Item, at: Long, zone: java.time.ZoneId): Long = when {
         item.allDay -> java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
             .atTime(ALL_DAY_HOUR, 0).atZone(zone).toInstant().toEpochMilli()

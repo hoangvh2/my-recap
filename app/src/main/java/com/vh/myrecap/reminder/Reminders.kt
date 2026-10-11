@@ -17,6 +17,7 @@ import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.ui.MainActivity
 import com.vh.myrecap.core.ReminderPolicy
+import com.vh.myrecap.core.ReminderPolicy.Snooze
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 
@@ -36,8 +37,13 @@ object Reminders {
         val am = context.getSystemService(AlarmManager::class.java)
         val pending = alarmIntent(context, item.id)
         am.cancel(pending)
+        if (item.status != ItemStatus.OPEN) clearFollowUp(context, item.id)
         val at = triggerAt(item) ?: return
         if (at <= System.currentTimeMillis()) return
+        setAlarm(context, am, at, pending)
+    }
+
+    private fun setAlarm(context: Context, am: AlarmManager, at: Long, pending: PendingIntent) {
         try {
             if (canExact(context)) {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
@@ -51,20 +57,76 @@ object Reminders {
 
     fun cancel(context: Context, itemId: String) {
         context.getSystemService(AlarmManager::class.java).cancel(alarmIntent(context, itemId))
+        clearFollowUp(context, itemId)
         NotificationManagerCompat.from(context).cancel(notificationId(itemId))
+    }
+
+    // A follow-up is a second alarm per item: a snoozed reminder, or the next repeat of an important
+    // one nobody acknowledged. Kept in preferences ("itemId" -> "atMillis:repeatsSoFar") so it survives
+    // a reboot; the item itself is untouched.
+    private fun prefs(context: Context) = context.getSharedPreferences("reminder_followups", Context.MODE_PRIVATE)
+
+    private fun followUpIntent(context: Context, itemId: String): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        itemId.hashCode() + 2,
+        Intent(context, ReminderReceiver::class.java).setAction(ACTION_FOLLOW_UP).putExtra(EXTRA_ITEM, itemId),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    internal fun scheduleFollowUp(context: Context, itemId: String, at: Long, repeats: Int) {
+        prefs(context).edit().putString(itemId, "$at:$repeats").apply()
+        setAlarm(context, context.getSystemService(AlarmManager::class.java), at, followUpIntent(context, itemId))
+    }
+
+    internal fun clearFollowUp(context: Context, itemId: String) {
+        context.getSystemService(AlarmManager::class.java).cancel(followUpIntent(context, itemId))
+        prefs(context).edit().remove(itemId).apply()
+    }
+
+    /** Repeats so far for a pending follow-up, 0 when there is none. */
+    internal fun repeatsSoFar(context: Context, itemId: String): Int =
+        prefs(context).getString(itemId, null)?.substringAfter(':')?.toIntOrNull() ?: 0
+
+    /** The "Hoãn" button: hides the notification and brings it back later. */
+    internal fun snooze(context: Context, item: Item, choice: Snooze, now: Long = System.currentTimeMillis()) {
+        NotificationManagerCompat.from(context).cancel(notificationId(item.id))
+        scheduleFollowUp(context, item.id, ReminderPolicy.snoozeAt(choice, now, ZoneId.systemDefault()), repeats = 0)
+    }
+
+    /** Sets the alarms again after a reboot, for follow-ups that were still pending. */
+    private fun restoreFollowUps(context: Context, items: List<Item>) {
+        val open = items.filter { it.status == ItemStatus.OPEN }.associateBy { it.id }
+        val saved = prefs(context).all.keys.toList()
+        val now = System.currentTimeMillis()
+        for (id in saved) {
+            val state = prefs(context).getString(id, null)
+            val at = state?.substringBefore(':')?.toLongOrNull()
+            val repeats = state?.substringAfter(':')?.toIntOrNull() ?: 0
+            if (open[id] == null || at == null) clearFollowUp(context, id)
+            else scheduleFollowUp(context, id, maxOf(at, now + 5_000), repeats)
+        }
     }
 
     /** After boot, a time change or an app update, alarms are gone: set them again. */
     fun syncAll(context: Context) {
         val items = MyRecapApp.from(context).items
         items.rollRecurring()
-        items.list().forEach { sync(context, it) }
+        val all = items.list()
+        all.forEach { sync(context, it) }
+        restoreFollowUps(context, all)
     }
 
     private fun alarmIntent(context: Context, itemId: String): PendingIntent = PendingIntent.getBroadcast(
         context,
         itemId.hashCode(),
         Intent(context, ReminderReceiver::class.java).setAction(ACTION_FIRE).putExtra(EXTRA_ITEM, itemId),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    private fun snoozeIntent(context: Context, itemId: String, choice: Snooze): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        itemId.hashCode() + 10 + choice.ordinal,
+        Intent(context, ReminderReceiver::class.java).setAction(ACTION_SNOOZE).putExtra(EXTRA_ITEM, itemId).putExtra(EXTRA_SNOOZE, choice.name),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
@@ -105,6 +167,11 @@ object Reminders {
             )
             builder.addAction(0, "Xong", done)
         }
+        // Android shows three actions at most: Xong (tasks) plus two snoozes, or two snoozes for appointments.
+        val snoozes = if (item.type == ItemType.TASK) listOf(Snooze.HOUR_1, Snooze.TOMORROW) else listOf(Snooze.MINUTES_10, Snooze.HOUR_1)
+        for (choice in snoozes) {
+            builder.addAction(0, "Hoãn ${choice.label.replaceFirstChar { it.lowercase() }}", snoozeIntent(context, item.id, choice))
+        }
         try {
             NotificationManagerCompat.from(context).notify(notificationId(item.id), builder.build())
         } catch (_: SecurityException) {
@@ -114,7 +181,10 @@ object Reminders {
 
     const val ACTION_FIRE = "com.vh.myrecap.REMINDER"
     const val ACTION_DONE = "com.vh.myrecap.REMINDER_DONE"
+    const val ACTION_SNOOZE = "com.vh.myrecap.REMINDER_SNOOZE"
+    const val ACTION_FOLLOW_UP = "com.vh.myrecap.REMINDER_FOLLOW_UP"
     const val EXTRA_ITEM = "itemId"
+    const val EXTRA_SNOOZE = "snooze"
 }
 
 class ReminderReceiver : BroadcastReceiver() {
@@ -131,6 +201,11 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun nag(context: Context, item: Item, repeats: Int) {
+        val at = ReminderPolicy.nextNagAt(item, repeats, System.currentTimeMillis()) ?: return
+        Reminders.scheduleFollowUp(context, item.id, at, repeats)
+    }
+
     private fun handle(context: Context, intent: Intent) {
         val items = MyRecapApp.from(context).items
         when (intent.action) {
@@ -140,7 +215,25 @@ class ReminderReceiver : BroadcastReceiver() {
                     Reminders.notify(context, item)
                     // A repeating appointment chains to its next occurrence.
                     if (item.recurrence != null) Reminders.sync(context, item)
+                    // An important item comes back until it is done or snoozed.
+                    nag(context, item, repeats = 0)
                 }
+            }
+            Reminders.ACTION_FOLLOW_UP -> {
+                val id = intent.getStringExtra(Reminders.EXTRA_ITEM) ?: return
+                val repeats = Reminders.repeatsSoFar(context, id)
+                Reminders.clearFollowUp(context, id)
+                val item = items.get(id) ?: return
+                if (item.status == ItemStatus.OPEN) {
+                    Reminders.notify(context, item)
+                    nag(context, item, repeats + 1)
+                }
+            }
+            Reminders.ACTION_SNOOZE -> {
+                val id = intent.getStringExtra(Reminders.EXTRA_ITEM) ?: return
+                val item = items.get(id) ?: return
+                val choice = runCatching { Snooze.valueOf(intent.getStringExtra(Reminders.EXTRA_SNOOZE).orEmpty()) }.getOrNull() ?: return
+                if (item.status == ItemStatus.OPEN) Reminders.snooze(context, item, choice)
             }
             Reminders.ACTION_DONE -> {
                 val id = intent.getStringExtra(Reminders.EXTRA_ITEM) ?: return
