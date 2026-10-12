@@ -53,6 +53,8 @@ data class AppSettings(
 
     /** Keep the audio of quick captures after they were analysed (off: deleted right away). */
     val keepMemoAudio: Boolean = false,
+    /** After a phone call, offer to speak a short recap (nothing is sent unless the user records). */
+    val callFollowUp: Boolean = false,
     /** Delete folder audio this many days after its clip was transcribed; 0 = never. */
     val audioRetentionDays: Int = 30,
     /** Light/dark appearance: follow the phone or fixed. */
@@ -140,6 +142,7 @@ class SettingsRepository(context: Context) {
             vadSensitivity = enumPref("vadSensitivity", d.vadSensitivity),
             interviewerSpeech = enumPref("interviewerSpeech", d.interviewerSpeech),
             keepMemoAudio = prefs.getBoolean("keepMemoAudio", d.keepMemoAudio),
+            callFollowUp = prefs.getBoolean("callFollowUp", d.callFollowUp),
             audioRetentionDays = prefs.getInt("audioRetentionDays", d.audioRetentionDays),
             themeMode = enumPref("themeMode", d.themeMode),
             homeTab = prefs.getInt("homeTab", d.homeTab),
@@ -176,6 +179,7 @@ class SettingsRepository(context: Context) {
             .putString("vadSensitivity", s.vadSensitivity.name)
             .putString("interviewerSpeech", s.interviewerSpeech.name)
             .putBoolean("keepMemoAudio", s.keepMemoAudio)
+            .putBoolean("callFollowUp", s.callFollowUp)
             .putInt("audioRetentionDays", s.audioRetentionDays)
             .putString("themeMode", s.themeMode.name)
             .putInt("homeTab", s.homeTab)

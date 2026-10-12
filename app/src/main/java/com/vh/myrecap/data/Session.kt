@@ -61,6 +61,8 @@ data class Session(
     val error: String? = null,
     /** Quick captures only: AI analysis into items (null for folders). */
     val extract: TaskStatus? = null,
+    /** Quick captures only: where the note came from (e.g. a recap after a phone call), passed to the AI. */
+    val context: String? = null,
 ) {
     val isMemo: Boolean get() = mode == SessionMode.MEMO
     val extractBusy: Boolean get() = extract == TaskStatus.PENDING || extract == TaskStatus.RUNNING
@@ -116,6 +118,7 @@ data class Session(
         })
         .putOpt("error", error)
         .putOpt("extract", extract?.name)
+        .putOpt("context", context)
 
     companion object {
         fun fromJson(o: JSONObject): Session {
@@ -179,6 +182,7 @@ data class Session(
                 summaries = summaries,
                 error = o.optStringOrNull("error"),
                 extract = o.optStringOrNull("extract")?.let { enumOr(it, TaskStatus.PENDING) },
+                context = o.optStringOrNull("context"),
             )
         }
 

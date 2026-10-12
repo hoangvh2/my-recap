@@ -190,8 +190,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var quickCapturePending by mutableStateOf(false)
         private set
 
-    fun requestQuickCapture() {
+    /** Title and AI context for the next quick capture, set when it was started from an after-call prompt. */
+    private var pendingMemo: Pair<String, String>? = null
+
+    fun requestQuickCapture(title: String? = null, noteContext: String? = null) {
         if (RecorderState.ui.value.active) return // already recording: the recording screen is showing
+        pendingMemo = if (title != null && noteContext != null) title to noteContext else null
         stack.clear()
         stack.add(Screen.Home)
         setHomeTab(0)
@@ -223,7 +227,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Quick capture: one tap, speak, tap Xong; the AI proposes items afterwards. */
     fun startMemo() {
         RecorderState.clearError()
-        RecordingService.start(app, SessionMode.MEMO, "Ghi nhanh " + clock(System.currentTimeMillis()))
+        val call = pendingMemo
+        pendingMemo = null
+        RecordingService.start(
+            app,
+            SessionMode.MEMO,
+            call?.first ?: ("Ghi nhanh " + clock(System.currentTimeMillis())),
+            noteContext = call?.second,
+        )
     }
 
     fun discardRecording() = RecordingService.command(app, RecordingService.ACTION_DISCARD)

@@ -208,6 +208,34 @@ class Phase2FlowTest {
         }
     }
 
+    @Test
+    fun afterCallPromptStartsATitledCaptureWithCallContext() {
+        val intent = Intent(context, MainActivity::class.java)
+            .setAction(MainActivity.ACTION_CALL_NOTE)
+            .putExtra(MainActivity.EXTRA_NOTE_TITLE, "Gọi với Chị Lan · 14:05")
+            .putExtra(MainActivity.EXTRA_NOTE_CONTEXT, "Đây là lời người dùng tự tóm tắt ngay sau một cuộc gọi đi với Chị Lan")
+        launch(intent).use {
+            assertTrue("capture started from the after-call prompt", waitFor(10_000) { RecorderState.ui.value.active })
+            assertEquals(SessionMode.MEMO, RecorderState.ui.value.mode)
+            val id = RecorderState.ui.value.sessionId
+            assertNotNull(id)
+            val memo = app.store.get(id!!)
+            assertEquals("Gọi với Chị Lan · 14:05", memo?.title)
+            assertTrue(memo?.context.orEmpty().contains("Chị Lan"))
+            RecordingService.command(context, RecordingService.ACTION_DISCARD)
+            assertTrue(waitFor(10_000) { !RecorderState.ui.value.active })
+        }
+        // The next ordinary capture is not titled after the call any more.
+        launch(Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_QUICK_CAPTURE)).use {
+            assertTrue(waitFor(10_000) { RecorderState.ui.value.active })
+            val memo = app.store.get(RecorderState.ui.value.sessionId!!)
+            assertTrue(memo?.title.orEmpty().startsWith("Ghi nhanh"))
+            assertEquals(null, memo?.context)
+            RecordingService.command(context, RecordingService.ACTION_DISCARD)
+            assertTrue(waitFor(10_000) { !RecorderState.ui.value.active })
+        }
+    }
+
     private companion object {
         const val SHOTS = "/data/local/tmp/myrecap-shots"
     }
