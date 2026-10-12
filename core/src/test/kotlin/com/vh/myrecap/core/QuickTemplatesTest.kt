@@ -34,11 +34,12 @@ class QuickTemplatesTest {
 
     @Test
     fun encodeRoundTripsAndMissingMeansDefaults() {
-        val list = listOf(QuickTemplate("a …", pinned = true), QuickTemplate("b"))
+        val list = listOf(QuickTemplate("a …", uses = 3, lastUsed = 42), QuickTemplate("b"))
         assertEquals(list, QuickTemplates.decode(QuickTemplates.encode(list)))
         assertNull(QuickTemplates.decode(null))
         assertEquals(emptyList<QuickTemplate>(), QuickTemplates.decode("not json"))
-        assertEquals(listOf("b", "a"), QuickTemplates.ordered(listOf(QuickTemplate("a"), QuickTemplate("b", pinned = true))).map { it.text })
+        // An older value saved with "pinned" still reads.
+        assertEquals(listOf(QuickTemplate("x")), QuickTemplates.decode("""[{"text":"x","pinned":true}]"""))
     }
 
     @Test
@@ -75,5 +76,61 @@ class QuickTemplatesTest {
         assertTrue(QuickTemplates.suggest(history, listOf(QuickTemplate("cà phê …k")), now, zone).isEmpty())
         assertTrue(QuickTemplates.suggest(history, emptyList(), now + 90 * 86_400_000L, zone).isEmpty())
         assertTrue(QuickTemplates.suggest(history.map { it.copy(status = ItemStatus.DRAFT) }, emptyList(), now, zone).isEmpty())
+    }
+
+    @Test
+    fun kindOfALine() {
+        assertEquals(ItemType.EXPENSE, QuickTemplates.typeOf("ăn trưa …k", now, zone))
+        assertEquals(ItemType.EXPENSE, QuickTemplates.typeOf("cà phê 30k", now, zone))
+        assertEquals(ItemType.TASK, QuickTemplates.typeOf("gọi … mai 9h", now, zone))
+        assertEquals(ItemType.EVENT, QuickTemplates.typeOf("họp … thứ 2 9h", now, zone))
+    }
+
+    @Test
+    fun featuredIsTheMostUsedOfEachKind() {
+        val list = listOf(
+            QuickTemplate("cà phê 30k", uses = 2),
+            QuickTemplate("gọi … mai 9h"),
+            QuickTemplate("đổ xăng …k", uses = 5),
+            QuickTemplate("mua sữa", uses = 1),
+            QuickTemplate("họp … thứ 2 9h"),
+        )
+        assertEquals(listOf("mua sữa", "họp … thứ 2 9h", "đổ xăng …k"), QuickTemplates.featured(list, now, zone).map { it.text })
+        // No line of a kind: that kind is simply missing.
+        assertEquals(listOf("cà phê 30k"), QuickTemplates.featured(listOf(QuickTemplate("cà phê 30k")), now, zone).map { it.text })
+    }
+
+    @Test
+    fun usingALineCountsIt() {
+        val list = QuickTemplates.used(QuickTemplates.DEFAULTS, QuickTemplate("ăn trưa …k"), now)
+        assertEquals(1, list.single { it.text == "ăn trưa …k" }.uses)
+        assertEquals("ăn trưa …k", QuickTemplates.featured(list, now, zone).last().text)
+    }
+
+    @Test
+    fun matchingIsLikeSearchOverAllWords() {
+        val list = listOf(
+            QuickTemplate("cà phê 30k"),
+            QuickTemplate("ăn trưa cá kho …k", uses = 4),
+            QuickTemplate("gọi … mai 9h"),
+            QuickTemplate("cafe với khách …k"),
+        )
+        // Starts-with first, then most used; accents ignored.
+        assertEquals(listOf("cà phê 30k", "cafe với khách …k", "ăn trưa cá kho …k"), QuickTemplates.matching(list, "ca").map { it.text })
+        assertEquals(listOf("ăn trưa cá kho …k"), QuickTemplates.matching(list, "trua ca").map { it.text })
+        assertEquals(listOf("gọi … mai 9h"), QuickTemplates.matching(list, "goi mai").map { it.text })
+        assertTrue(QuickTemplates.matching(list, "  ").isEmpty())
+        assertTrue(QuickTemplates.matching(list, "xyz").isEmpty())
+        // The box already holds the whole line: nothing more to offer.
+        assertTrue(QuickTemplates.matching(list, "cà phê 30k").isEmpty())
+    }
+
+    @Test
+    fun editingKeepsUseCountsAndRefusesDuplicates() {
+        val list = listOf(QuickTemplate("cà phê 30k", uses = 3), QuickTemplate("phở 50k"))
+        assertEquals(QuickTemplate("cà phê 35k", uses = 3), QuickTemplates.edit(list, 0, "cà phê   35k")[0])
+        assertEquals(list, QuickTemplates.edit(list, 0, "Phở 50k"))
+        assertEquals(list, QuickTemplates.edit(list, 0, " "))
+        assertEquals(list, QuickTemplates.edit(list, 5, "x"))
     }
 }

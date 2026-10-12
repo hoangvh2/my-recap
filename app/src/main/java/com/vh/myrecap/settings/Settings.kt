@@ -63,7 +63,7 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Last home tab (0 = Thư ký, 1 = Ghi âm). */
     val homeTab: Int = 0,
-    /** Saved quick-add lines; pinned ones also go on the widget. */
+    /** Saved quick-add lines; the most used one of each kind is offered first and on the widget. */
     val quickTemplates: List<QuickTemplate> = QuickTemplates.DEFAULTS,
 
     /** Folder (SAF tree URI) for the weekly automatic backup; blank = off. */

@@ -61,7 +61,9 @@ class QuickAddActivity : ComponentActivity() {
         val text = intent.getStringExtra(EXTRA_TEXT)
         val addNow = intent.getBooleanExtra(EXTRA_ADD_NOW, false) && text != null
         // A recreated sheet (rotation, dark mode) must not add the line a second time.
-        if (addNow && savedInstanceState == null) vm.addFromTemplate(QuickTemplate(text!!))
+        if (savedInstanceState == null && text != null) {
+            if (addNow) vm.addFromTemplate(QuickTemplate(text)) else vm.templateUsed(QuickTemplate(text))
+        }
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
             MyRecapTheme(settings.themeMode) {

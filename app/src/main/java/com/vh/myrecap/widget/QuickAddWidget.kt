@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Home-screen quick add: a "type" button that opens the quick-add sheet, plus the first three saved
- * lines (pinned first). A line without a blank is added in one tap (the sheet shows it with Undo); a
+ * most used line of each kind (task, appointment, expense). A line without a blank is added in one tap (the sheet shows it with Undo); a
  * line with a blank opens the sheet with the cursor on the blank. Widgets cannot take typing themselves.
  */
 class QuickAddWidget : AppWidgetProvider() {
@@ -40,7 +40,8 @@ class QuickAddWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, QuickAddWidget::class.java))
             if (ids.isEmpty()) return
-            val templates = QuickTemplates.ordered(MyRecapApp.from(context).settings.current.quickTemplates).take(SLOTS)
+            val templates = QuickTemplates.featured(MyRecapApp.from(context).settings.current.quickTemplates, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+                .take(SLOTS)
             val views = render(context, templates)
             ids.forEach { manager.updateAppWidget(it, views) }
         }

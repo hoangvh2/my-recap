@@ -139,6 +139,7 @@ private fun AppRoot(vm: AppViewModel) {
             is Screen.Review -> ReviewScreen(vm, target.id)
             is Screen.ItemEdit -> ItemEditScreen(vm, target.id, target.type)
             Screen.Settings -> SettingsScreen(vm)
+            Screen.Templates -> TemplatesScreen(vm)
             Screen.Search -> SearchScreen(vm)
             Screen.Spending -> SpendingScreen(vm)
             Screen.Weekly -> WeeklyRecapScreen(vm)
