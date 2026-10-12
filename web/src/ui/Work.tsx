@@ -10,11 +10,12 @@ import { openEditor } from "./host";
 import { Icon } from "./icons";
 import { TYPE_ICON } from "./ItemRow";
 import { Events, Expenses, Notes, Overview, Tasks } from "./Lists";
+import { Weekly } from "./Weekly";
 import { showToast } from "./toast";
 
-type Tab = "ALL" | ItemType;
+type Tab = "ALL" | "WEEK" | ItemType;
 // "Lịch" shows every dated task and appointment (the calendar), not only appointments.
-const TABS: { key: Tab; label: string }[] = [{ key: "ALL", label: "Tất cả" }, ...TYPES.map((t) => ({ key: t as Tab, label: t === "EVENT" ? "Lịch" : TYPE_LABEL[t] }))];
+const TABS: { key: Tab; label: string }[] = [{ key: "ALL", label: "Tất cả" }, ...TYPES.map((t) => ({ key: t as Tab, label: t === "EVENT" ? "Lịch" : TYPE_LABEL[t] })), { key: "WEEK", label: "Tuần" }];
 
 /** Everything that is not a renewal: tasks, appointments, expenses and notes, wherever they belong. */
 export function Work() {
@@ -29,7 +30,7 @@ export function Work() {
     const now = Date.now();
     const ag = agenda(open, now);
     const today = ag.overdue.length + ag.ahead.filter((i) => i.whenAt! < startOfDay(now) + 86_400_000).length;
-    return { ALL: open.filter((i) => i.type === "TASK" || i.type === "EVENT").length, TASK: open.filter((i) => i.type === "TASK").length, EVENT: today, EXPENSE: 0, NOTE: 0 } as Record<Tab, number>;
+    return { ALL: open.filter((i) => i.type === "TASK" || i.type === "EVENT").length, TASK: open.filter((i) => i.type === "TASK").length, EVENT: today, EXPENSE: 0, NOTE: 0, WEEK: 0 } as Record<Tab, number>;
   }, [saved]);
 
   const fail = () => showToast("Chưa lưu được, kiểm tra mạng rồi thử lại");
@@ -56,6 +57,7 @@ export function Work() {
       {tab === "EVENT" && <Events items={saved} onOpen={open} onToggle={toggle} />}
       {tab === "EXPENSE" && <Expenses items={saved} onOpen={open} />}
       {tab === "NOTE" && <Notes items={saved} onOpen={open} onToggle={toggle} />}
+      {tab === "WEEK" && <Weekly items={saved} />}
       {adding && (
         <Sheet title="Thêm gì?" onClose={() => setAdding(false)}>
           <div class="add-grid">
