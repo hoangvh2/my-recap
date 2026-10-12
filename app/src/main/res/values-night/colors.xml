@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="background">#FF0A0E1F</color>
-    <color name="widget_bg_start">#FF0A1640</color>
-    <color name="widget_bg_end">#FF26389C</color>
+    <color name="widget_bg_start">#E60A1640</color>
+    <color name="widget_bg_end">#CC26389C</color>
     <color name="widget_text">#FFFFFFFF</color>
     <color name="widget_text_secondary">#C8FFFFFF</color>
     <color name="widget_text_tertiary">#9EFFFFFF</color>
     <color name="widget_chip_fill">#26FFFFFF</color>
     <color name="widget_chip_stroke">#40FFFFFF</color>
+    <color name="widget_glass_edge">#40FFFFFF</color>
+    <color name="widget_glass_shine">#26FFFFFF</color>
 </resources>
