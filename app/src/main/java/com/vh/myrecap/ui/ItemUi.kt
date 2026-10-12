@@ -171,7 +171,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, trailing: String? 
     }
 }
 
-/** Snackbar host that offers "Hoàn tác" after an item is deleted or a proposal discarded. */
+/** Snackbar host that offers "Hoàn tác" after an item is deleted, a proposal discarded or a quick add saved. */
 @Composable
 fun rememberItemUndo(vm: AppViewModel): SnackbarHostState {
     val host = remember { SnackbarHostState() }
@@ -181,6 +181,14 @@ fun rememberItemUndo(vm: AppViewModel): SnackbarHostState {
         val label = if (item.status == ItemStatus.DRAFT) "Đã bỏ “${item.title}”" else "Đã xoá “${item.title}”"
         val result = host.showSnackbar(label, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
         if (result == SnackbarResult.ActionPerformed) vm.undoDeleteItem(item) else vm.clearDeletedItem(item)
+    }
+    val added = vm.lastAddedItem
+    LaunchedEffect(added?.id) {
+        val item = added ?: return@LaunchedEffect
+        val amount = item.amount
+        val label = if (amount != null) "Đã ghi chi tiêu “${item.title}” · ${Money.format(amount)}" else "Đã thêm “${item.title}”"
+        val result = host.showSnackbar(label, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+        if (result == SnackbarResult.ActionPerformed) vm.undoAddItem(item) else vm.clearAddedItem(item)
     }
     return host
 }

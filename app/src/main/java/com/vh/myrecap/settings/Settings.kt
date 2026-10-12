@@ -5,6 +5,8 @@ import com.vh.myrecap.core.InterviewerSpeech
 import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
+import com.vh.myrecap.core.QuickTemplate
+import com.vh.myrecap.core.QuickTemplates
 import com.vh.myrecap.core.SegmenterConfig
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.ThemeMode
@@ -61,6 +63,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Last home tab (0 = Thư ký, 1 = Ghi âm). */
     val homeTab: Int = 0,
+    /** Saved quick-add lines; pinned ones also go on the widget. */
+    val quickTemplates: List<QuickTemplate> = QuickTemplates.DEFAULTS,
 
     /** Folder (SAF tree URI) for the weekly automatic backup; blank = off. */
     val autoBackupUri: String = "",
@@ -146,6 +150,7 @@ class SettingsRepository(context: Context) {
             audioRetentionDays = prefs.getInt("audioRetentionDays", d.audioRetentionDays),
             themeMode = enumPref("themeMode", d.themeMode),
             homeTab = prefs.getInt("homeTab", d.homeTab),
+            quickTemplates = QuickTemplates.decode(prefs.getString("quickTemplates", null)) ?: d.quickTemplates,
             autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
             autoBackupError = prefs.getString("autoBackupError", null) ?: d.autoBackupError,
             lastBackupAt = prefs.getLong("lastBackupAt", d.lastBackupAt),
@@ -183,6 +188,7 @@ class SettingsRepository(context: Context) {
             .putInt("audioRetentionDays", s.audioRetentionDays)
             .putString("themeMode", s.themeMode.name)
             .putInt("homeTab", s.homeTab)
+            .putString("quickTemplates", QuickTemplates.encode(s.quickTemplates))
             .putString("autoBackupUri", s.autoBackupUri)
             .putString("autoBackupError", s.autoBackupError)
             .putLong("lastBackupAt", s.lastBackupAt)

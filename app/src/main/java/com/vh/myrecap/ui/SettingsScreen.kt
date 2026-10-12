@@ -39,6 +39,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.rounded.PushPin
+import com.vh.myrecap.core.QuickTemplates
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -122,6 +126,9 @@ fun SettingsScreen(vm: AppViewModel) {
                 Hint("Tự động theo chế độ sáng/tối của điện thoại. Màu sắc giữ nguyên bảng màu của app.")
             }
 
+            Section("Mẫu nhập nhanh") {
+                TemplatesSection(vm, s)
+            }
             Section("1. Chuyển giọng nói → văn bản") {
                 ProviderChoice(s.sttProvider) { k -> update { it.copy(sttProvider = k) } }
                 Hint(
@@ -678,4 +685,49 @@ private fun BackupSection(vm: AppViewModel, s: AppSettings) {
             confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } },
         )
     }
+}
+
+/** Saved quick-add lines: add, pin (pinned ones come first and go on the widget), remove; plus lines worth saving. */
+@Composable
+private fun TemplatesSection(vm: AppViewModel, s: AppSettings) {
+    val items by vm.items.collectAsStateWithLifecycle()
+    var draft by remember { mutableStateOf("") }
+    val list = s.quickTemplates
+    val suggestions = remember(items, list) {
+        QuickTemplates.suggest(items, list, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
+    }
+    Hint("Bấm mẫu dưới ô gõ nhanh để thêm ngay (có Hoàn tác). Mẫu có dấu … sẽ điền vào ô với con trỏ ở chỗ trống, ví dụ \"ăn trưa …k\", \"gọi … mai 9h\". Gõ ... cũng được.")
+    list.forEach { t ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(t.text, Modifier.weight(1f))
+            IconButton(onClick = { vm.setTemplates(list.map { if (it == t) it.copy(pinned = !it.pinned) else it }) }) {
+                Icon(
+                    if (t.pinned) Icons.Rounded.PushPin else Icons.Outlined.PushPin,
+                    contentDescription = if (t.pinned) "Bỏ ghim" else "Ghim",
+                    tint = if (t.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = { vm.setTemplates(list - t) }) { Icon(Icons.Rounded.Close, contentDescription = "Xoá mẫu") }
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            placeholder = { Text("đổ xăng …k") },
+        )
+        FilledTonalButton(onClick = { vm.setTemplates(QuickTemplates.add(list, draft)); draft = "" }, enabled = draft.isNotBlank()) { Text("Thêm") }
+    }
+    if (suggestions.isNotEmpty()) {
+        Text("Gợi ý từ những gì bạn hay nhập", fontWeight = FontWeight.SemiBold)
+        suggestions.forEach { line ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(line, Modifier.weight(1f))
+                TextButton(onClick = { vm.setTemplates(QuickTemplates.add(list, line)) }) { Text("Thêm") }
+            }
+        }
+    }
+    Hint("Mẫu được ghim hiện trước, và sẽ là các nút trên widget.")
 }
