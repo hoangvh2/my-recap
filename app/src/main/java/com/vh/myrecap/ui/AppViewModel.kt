@@ -349,7 +349,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val item = parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis())
         app.items.upsert(item)
         Reminders.sync(app, item)
-        toast("Đã thêm “${item.title}”")
+        val amount = item.amount
+        toast(if (amount != null) "Đã ghi chi tiêu “${item.title}” · ${com.vh.myrecap.core.Money.format(amount)}" else "Đã thêm “${item.title}”")
     }
 
     /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */

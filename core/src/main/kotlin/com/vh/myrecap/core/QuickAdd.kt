@@ -14,7 +14,7 @@ import java.time.temporal.TemporalAdjusters
  * Each recognised phrase is reported so the screen can show it and let the user switch it off.
  */
 object QuickAdd {
-    enum class Part(val label: String) { DAY("Ngày"), TIME("Giờ"), REPEAT("Lặp lại"), IMPORTANT("Quan trọng") }
+    enum class Part(val label: String) { DAY("Ngày"), TIME("Giờ"), REPEAT("Lặp lại"), IMPORTANT("Quan trọng"), AMOUNT("Số tiền") }
 
     /** A recognised phrase: which part it set, the words as typed and a readable form such as "Mai". */
     data class Span(val part: Part, val text: String, val shown: String, val start: Int, val end: Int)
@@ -27,10 +27,13 @@ object QuickAdd {
         val recurrence: Recurrence?,
         val important: Boolean,
         val spans: List<Span>,
+        /** Whole VND; set only for expenses ("cà phê 45k"). */
+        val amount: Long? = null,
+        val category: String? = null,
     ) {
         fun toItem(id: String, now: Long) = Item(
             id = id, type = type, status = ItemStatus.OPEN, title = title, whenAt = whenAt, allDay = allDay,
-            createdAt = now, recurrence = recurrence, important = important,
+            createdAt = now, recurrence = recurrence, important = important, amount = amount, category = category,
         )
     }
 
@@ -39,7 +42,8 @@ object QuickAdd {
 
     private val DAYS = mapOf("hai" to 1, "2" to 1, "ba" to 2, "3" to 2, "tu" to 3, "4" to 3, "nam" to 4, "5" to 4, "sau" to 5, "6" to 5, "bay" to 6, "7" to 6)
 
-    fun parse(text: String, now: Long, zone: ZoneId, off: Set<Part> = emptySet()): Result {
+    /** [history]: earlier items, so an expense gets the category the user gave the same title before. */
+    fun parse(text: String, now: Long, zone: ZoneId, off: Set<Part> = emptySet(), history: List<Item> = emptyList()): Result {
         val typed = text.trim().replace(Regex("\\s+"), " ")
         val folded = TextSearch.fold(typed)
         // Positions are read on the folded text and applied to the typed text; only safe when they line up.
@@ -54,10 +58,23 @@ object QuickAdd {
             spans += Span(part, typed.substring(r.first, r.last + 1), shown, r.first, r.last + 1)
         }
 
+        // --- amount: makes it an expense -----------------------------------------------------------------
+        var amount: Long? = null
+        if (Part.AMOUNT !in off) {
+            val found = AMOUNTS.flatMap { (kind, re) -> re.findAll(folded).map { kind to it } }.sortedBy { it.second.range.first }
+            for ((kind, m) in found) {
+                if (!free(m.range)) continue
+                val value = parseAmount(kind, m.groupValues) ?: continue
+                amount = value
+                claim(Part.AMOUNT, m.range, Money.format(value))
+                break
+            }
+        }
+
         // --- repeat -------------------------------------------------------------------------------------
         var recurrence: Recurrence? = null
         var repeatWeekday: DayOfWeek? = null
-        if (Part.REPEAT !in off) {
+        if (Part.REPEAT !in off && amount == null) {
             REPEAT.find(folded)?.takeIf { free(it.range) }?.let { m ->
                 recurrence = when {
                     m.groupValues[1] == "ngay" -> Recurrence.DAILY
@@ -79,7 +96,9 @@ object QuickAdd {
         if (Part.DAY !in off) {
             date = repeatWeekday?.let { today.with(TemporalAdjusters.next(it)) }
             if (date == null) {
-                for (candidate in dayCandidates(folded, typed, today)) {
+                // Spending is logged after the fact, so "hôm qua" (yesterday) counts only for an expense.
+                val past = if (amount != null) YESTERDAY.findAll(folded).map { Candidate(it.range, today.minusDays(1)) }.toList() else emptyList()
+                for (candidate in (past + dayCandidates(folded, typed, today)).sortedBy { it.range.first }) {
                     if (free(candidate.range)) {
                         date = candidate.date
                         claim(Part.DAY, candidate.range, dayLabel(candidate.date, today))
@@ -104,7 +123,7 @@ object QuickAdd {
 
         // --- importance ---------------------------------------------------------------------------------
         var important = false
-        if (Part.IMPORTANT !in off) {
+        if (Part.IMPORTANT !in off && amount == null) {
             // "gấp" (urgent) folds to the same letters as "gặp" (meet): require the real accent.
             IMPORTANT.find(folded)?.takeIf { free(it.range) && (it.value != "gap" || typed.substring(it.range.first, it.range.last + 1).lowercase() == "gấp") }?.let {
                 important = true
@@ -114,6 +133,16 @@ object QuickAdd {
 
         val title = cleanTitle(typed, taken)
         if (title.isEmpty()) return plain(typed)
+
+        if (amount != null) {
+            // Spending happened on the day said, or today; it never repeats or reminds.
+            val day = date ?: today
+            val at = if (time != null) day.atTime(time).atZone(zone) else day.atStartOfDay(zone)
+            return Result(
+                title, ItemType.EXPENSE, at.toInstant().toEpochMilli(), time == null, null, false,
+                spans.sortedBy { it.start }, amount, Categories.guess(title, history),
+            )
+        }
 
         // A time with no day means today, or tomorrow once that time has passed.
         var whenAt: Long? = null
@@ -146,12 +175,35 @@ object QuickAdd {
     private val SLASH_DATE = Regex("\\b(\\d{1,2})/(\\d{1,2})(?:/(\\d{4}))?\\b")
     private val LONG_DATE = Regex("\\bngay (\\d{1,2}) thang (\\d{1,2})\\b")
     private val DAY_ONLY = Regex("\\bngay (\\d{1,2})\\b")
+    private val YESTERDAY = Regex("\\bhom qua\\b")
     private val RELATIVE = Regex("\\b(hom nay|ngay mai|ngay mot|mai)\\b")
     // 9h, 9h30, 9 giờ, 9 giờ 30, 9 giờ rưỡi, 09:30. "h" must end the word so "2 hộp" is not 2 o'clock.
     private val TIME = Regex("\\b(\\d{1,2})(?: ?h(?:(\\d{2})\\b|(?![a-z]))| ?gio\\b(?: (\\d{2}|ruoi)\\b)?|:(\\d{2}))(?![\\d/])")
     private val PERIOD_AFTER = Regex("^ (sang|trua|chieu|toi)\\b")
     private val PERIOD_BEFORE = Regex("\\b(sang|trua|chieu|toi) $")
     private val IMPORTANT = Regex("\\b(gap|quan trong)\\b")
+    // 45k, 45 nghìn, 1tr2, 1.5 triệu, 2 củ, 120.000đ, 50000 vnd. A bare number is never money ("gọi 3 người").
+    private val MILLIONS = Regex("\\b(\\d+)(?:[.,](\\d+))? ?(?:tr|trieu|cu)(?: ?(\\d{1,3}))?(?![\\d.,a-z])")
+    private val THOUSANDS = Regex("\\b(\\d+)(?:[.,](\\d+))? ?(?:k|nghin|ngan)(?![\\d.,a-z])")
+    private val GROUPED = Regex("\\b(\\d{1,3}(?:\\.\\d{3})+)(?: ?(?:d|vnd|dong))?(?![\\d.,a-z])")
+    private val WITH_UNIT = Regex("\\b(\\d{3,})(?: ?(?:d|vnd|dong))(?![\\d.,a-z])")
+    private enum class Unit { MILLIONS, THOUSANDS, GROUPED, WITH_UNIT }
+    private val AMOUNTS = listOf(Unit.MILLIONS to MILLIONS, Unit.THOUSANDS to THOUSANDS, Unit.GROUPED to GROUPED, Unit.WITH_UNIT to WITH_UNIT)
+
+    private fun parseAmount(unit: Unit, g: List<String>): Long? {
+        fun fraction(digits: String, scale: Long) = digits.takeIf { it.isNotEmpty() }?.let { ("0.$it".toDouble() * scale).toLong() } ?: 0L
+        val amount = when (unit) {
+            Unit.MILLIONS -> {
+                // "1tr2" = 1.2 triệu, "1tr25" = 1.25 triệu, "1 triệu 200" = 1.200.000.
+                val tail = g[3].takeIf { it.isNotEmpty() }?.let { t -> t.toLong() * when (t.length) { 1 -> 100_000L; 2 -> 10_000L; else -> 1_000L } } ?: 0L
+                g[1].toLong() * 1_000_000 + fraction(g[2], 1_000_000) + tail
+            }
+            Unit.THOUSANDS -> g[1].toLong() * 1_000 + fraction(g[2], 1_000)
+            Unit.GROUPED -> g[1].replace(".", "").toLong()
+            Unit.WITH_UNIT -> g[1].toLong()
+        }
+        return amount.takeIf { it in 1_000..10_000_000_000 }
+    }
 
     private class Candidate(val range: IntRange, val date: LocalDate)
 
@@ -242,6 +294,7 @@ object QuickAdd {
     private fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
         today -> "Hôm nay"
         today.plusDays(1) -> "Mai"
+        today.minusDays(1) -> "Hôm qua"
         else -> weekdayName(date.dayOfWeek) + " " + date.dayOfMonth + "/" + date.monthValue
     }
 }

@@ -27,19 +27,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.QuickAdd
 import java.time.ZoneId
 
 /**
  * Typed quick-add: parses "gọi anh Nam mai 3h chiều" on the phone (no AI call, works offline) and shows
- * what it understood as chips. Tapping a chip drops that part, which stays in the title instead.
+ * what it understood as chips. An amount ("cà phê 45k") makes it an expense with a guessed category.
+ * Tapping a chip drops that part, which stays in the title instead.
  */
 @Composable
 fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier) {
     var text by rememberSaveable { mutableStateOf("") }
     var off by remember { mutableStateOf(emptySet<QuickAdd.Part>()) }
-    val result = remember(text, off) { QuickAdd.parse(text, System.currentTimeMillis(), ZoneId.systemDefault(), off) }
+    // Past expenses teach the category: a title filed under "Công việc" once stays there.
+    val history by vm.items.collectAsStateWithLifecycle()
+    val result = remember(text, off, history) { QuickAdd.parse(text, System.currentTimeMillis(), ZoneId.systemDefault(), off, history) }
     fun submit() {
         if (text.isBlank()) return
         vm.quickAdd(result)
@@ -53,7 +57,7 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier) {
             onValueChange = { text = it },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            placeholder = { Text("Gõ nhanh: gọi anh Nam mai 3h chiều") },
+            placeholder = { Text("Gõ nhanh: gọi anh Nam mai 3h, cà phê 45k") },
             trailingIcon = {
                 IconButton(onClick = ::submit, enabled = text.isNotBlank()) {
                     Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Thêm")
@@ -65,6 +69,7 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier) {
         if (text.isNotBlank() && (result.spans.isNotEmpty() || off.isNotEmpty())) {
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (result.type == ItemType.EVENT) AssistChip(onClick = {}, label = { Text("Lịch hẹn") })
+                if (result.type == ItemType.EXPENSE) AssistChip(onClick = {}, label = { Text("Chi tiêu · ${result.category}") })
                 result.spans.forEach { span ->
                     AssistChip(onClick = { off = off + span.part }, label = { Text("${span.shown}  ✕") })
                 }
