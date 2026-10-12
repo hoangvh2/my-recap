@@ -2,6 +2,7 @@ package com.vh.myrecap.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -149,7 +151,7 @@ fun AgendaTab(vm: AppViewModel) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             item { CaptureHero(onCapture = capture, onAdd = vm::newItem) }
             item(key = "quick-add") { QuickAddBar(vm) }
@@ -198,43 +200,41 @@ fun AgendaTab(vm: AppViewModel) {
 @Composable
 private fun CaptureHero(onCapture: () -> Unit, onAdd: (ItemType) -> Unit) {
     var addMenu by remember { mutableStateOf(false) }
+    // One compact row: the mic is the only recording target, "+" holds the manual-add menu.
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(Brush.linearGradient(listOf(Brand.Navy, Brand.NavyRaised, Color(0xFF26389C))))
-            .padding(start = 20.dp, end = 12.dp, top = 20.dp, bottom = 12.dp),
+            .background(Brush.radialGradient(listOf(Brand.Record.copy(alpha = 0.22f), Color.Transparent), center = Offset(0f, 0f), radius = 420f))
+            .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RecordButton(onCapture, description = "Ghi nhanh")
-                Spacer(Modifier.width(18.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Ghi nhanh", style = MaterialTheme.typography.titleLarge, color = Color.White)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "“Mai 3 giờ chiều họp anh Nam, trưa nay ăn phở 65 nghìn”",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.72f),
-                    )
-                }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RecordButton(onCapture, description = "Ghi nhanh", size = 60.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Ghi nhanh", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(
+                    "“Mai 3 giờ họp anh Nam, trưa ăn phở 65k”",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
-                Box {
-                    TextButton(onClick = { addMenu = true }) {
-                        Icon(Icons.Rounded.Add, null, Modifier.size(18.dp), tint = Color.White)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Thêm bằng tay", color = Color.White)
-                    }
-                    DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
-                        ItemType.entries.forEach { t ->
-                            val style = typeStyle(t)
-                            DropdownMenuItem(
-                                text = { Text(t.label) },
-                                leadingIcon = { Icon(style.icon, null) },
-                                onClick = { addMenu = false; onAdd(t) },
-                            )
-                        }
+            Box {
+                IconButton(
+                    onClick = { addMenu = true },
+                    modifier = Modifier.size(40.dp).background(Color.White.copy(alpha = 0.14f), CircleShape),
+                ) { Icon(Icons.Rounded.Add, contentDescription = "Thêm bằng tay", tint = Color.White) }
+                DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
+                    ItemType.entries.forEach { t ->
+                        val style = typeStyle(t)
+                        DropdownMenuItem(
+                            text = { Text(t.label) },
+                            leadingIcon = { Icon(style.icon, null) },
+                            onClick = { addMenu = false; onAdd(t) },
+                        )
                     }
                 }
             }

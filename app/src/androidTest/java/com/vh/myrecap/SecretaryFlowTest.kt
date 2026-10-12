@@ -245,6 +245,7 @@ class SecretaryFlowTest {
         ActivityScenario.launch<MainActivity>(launch).use {
             assertTrue("capture button", device.wait(Until.hasObject(By.desc("Ghi nhanh")), 10_000))
             shot("22-agenda-empty")
+            assertNotNull("manual add stays reachable from the compact hero", device.findObject(By.desc("Thêm bằng tay")))
             device.findObject(By.desc("Ghi nhanh")).click()
             assertTrue("capture did not start", waitFor(10_000) { RecorderState.ui.value.active })
             assertTrue(device.wait(Until.hasObject(By.desc("Xong, phân tích ghi chú")), 5_000))
