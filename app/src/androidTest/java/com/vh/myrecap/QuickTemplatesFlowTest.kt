@@ -106,12 +106,16 @@ class QuickTemplatesFlowTest {
 
             device.findObject(By.desc("Mẫu câu")).click()
             assertTrue("templates screen", device.wait(Until.hasObject(By.text("Mẫu câu nhập nhanh")), 5_000))
-            assertTrue(device.wait(Until.hasObject(By.text("Hiện sẵn ở ô gõ · Dùng 13 lần")), 5_000))
+            assertTrue("task lines first", device.wait(Until.hasObject(By.text("gọi … mai 9h")), 5_000))
             shot("43-templates-screen")
+            // Expenses sit below the fold on a small screen: search for the line just used.
+            device.findObject(By.clazz("android.widget.EditText")).text = "phe"
+            assertTrue("use counted", device.wait(Until.hasObject(By.text("Hiện sẵn ở ô gõ · Dùng 13 lần")), 5_000))
+            shot("43b-templates-used")
 
             device.findObject(By.clazz("android.widget.EditText")).text = "goi"
-            assertTrue(device.wait(Until.hasObject(By.text("gọi … mai 9h")), 5_000))
-            assertFalse(device.hasObject(By.text("cà phê 30k")))
+            assertTrue("search finds", device.wait(Until.hasObject(By.text("gọi … mai 9h")), 5_000))
+            assertFalse("search hides others", device.hasObject(By.text("cà phê 30k")))
             shot("44-templates-search")
 
             device.findObject(By.clazz("android.widget.EditText")).text = "gửi xe 5k"
@@ -120,6 +124,8 @@ class QuickTemplatesFlowTest {
             device.findObject(By.text("Lưu mẫu")).click()
             assertTrue("saved", waitFor(5_000) { app.settings.current.quickTemplates.any { it.text == "gửi xe 5k" } })
 
+            device.findObject(By.clazz("android.widget.EditText")).text = "goi"
+            assertTrue(device.wait(Until.hasObject(By.text("gọi … mai 9h")), 5_000))
             device.findObject(By.text("gọi … mai 9h")).click()
             assertTrue("edit dialog", device.wait(Until.hasObject(By.text("Sửa mẫu")), 5_000))
             shot("46-template-edit")
