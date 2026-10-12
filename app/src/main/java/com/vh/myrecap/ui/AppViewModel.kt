@@ -344,13 +344,46 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDone(id: String, done: Boolean) = io { applyDone(id, done) }
 
+    /** Last item saved by quick add or a template; the screen offers Undo for a few seconds. */
+    var lastAddedItem by mutableStateOf<Item?>(null)
+        private set
+
     /** Saves a typed quick-add as a confirmed item (the user saw what was understood), with its reminder. */
     fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result) = io {
         val item = parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis())
         app.items.upsert(item)
         Reminders.sync(app, item)
-        val amount = item.amount
-        toast(if (amount != null) "Đã ghi chi tiêu “${item.title}” · ${com.vh.myrecap.core.Money.format(amount)}" else "Đã thêm “${item.title}”")
+        withContext(Dispatchers.Main) { lastAddedItem = item }
+    }
+
+    /** One tap on a saved line without a blank: parsed now, so "mai 9h" means tomorrow from today. */
+    fun addFromTemplate(template: com.vh.myrecap.core.QuickTemplate) {
+        val parsed = com.vh.myrecap.core.QuickAdd.parse(
+            com.vh.myrecap.core.QuickTemplates.normalize(template.text), System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+            history = items.value,
+        )
+        quickAdd(parsed)
+    }
+
+    fun undoAddItem(item: Item) {
+        if (lastAddedItem?.id == item.id) lastAddedItem = null
+        io {
+            app.items.delete(item.id)
+            Reminders.cancel(app, item.id)
+        }
+    }
+
+    fun clearAddedItem(item: Item) {
+        if (lastAddedItem?.id == item.id) lastAddedItem = null
+    }
+
+    fun setTemplates(list: List<com.vh.myrecap.core.QuickTemplate>) = updateSettings { it.copy(quickTemplates = list) }
+
+    fun saveTemplate(text: String) {
+        val before = settings.value.quickTemplates
+        val after = com.vh.myrecap.core.QuickTemplates.add(before, text)
+        setTemplates(after)
+        viewModelScope.launch { toast(if (after.size > before.size) "Đã lưu mẫu" else "Mẫu này đã có") }
     }
 
     /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */
