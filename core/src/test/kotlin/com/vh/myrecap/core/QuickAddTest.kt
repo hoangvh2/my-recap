@@ -128,4 +128,72 @@ class QuickAddTest {
         assertTrue(item.important)
         assertEquals(LocalDate.of(2026, 10, 15), java.time.Instant.ofEpochMilli(item.whenAt!!).atZone(zone).toLocalDate())
     }
+
+    @Test
+    fun amountsMakeAnExpense() {
+        val r = parse("cà phê 45k")
+        assertEquals(ItemType.EXPENSE, r.type)
+        assertEquals("cà phê", r.title)
+        assertEquals(45_000L, r.amount)
+        assertEquals("Ăn uống", r.category)
+        assertEquals(ms(2026, 10, 14), r.whenAt) // spent today
+        assertTrue(r.allDay)
+        assertEquals(listOf(QuickAdd.Part.AMOUNT), r.spans.map { it.part })
+        assertEquals("45.000 đ", r.spans.single().shown)
+    }
+
+    @Test
+    fun amountForms() {
+        assertEquals(1_200_000L, parse("tiền điện 1tr2").amount)
+        assertEquals(1_250_000L, parse("sửa xe 1tr25").amount)
+        assertEquals(1_200_000L, parse("học phí 1 triệu 200").amount)
+        assertEquals(1_500_000L, parse("quà 1,5 triệu").amount)
+        assertEquals(5_000_000L, parse("tiền nhà 5tr").amount)
+        assertEquals(2_000_000L, parse("điện thoại 2 củ").amount)
+        assertEquals(120_000L, parse("ăn trưa 120.000đ").amount)
+        assertEquals(50_000L, parse("gửi xe 50000 vnd").amount)
+        assertEquals(85_000L, parse("phở 85 nghìn").amount)
+        assertEquals(2_500L, parse("trà đá 2.5k").amount)
+    }
+
+    @Test
+    fun amountWithDayAndTime() {
+        val r = parse("grab 120k hôm qua 8h")
+        assertEquals(ItemType.EXPENSE, r.type)
+        assertEquals("grab", r.title)
+        assertEquals(ms(2026, 10, 13, 8), r.whenAt)
+        assertFalse(r.allDay)
+        assertEquals("Di chuyển", r.category)
+    }
+
+    @Test
+    fun bareNumbersAreNotMoney() {
+        val r = parse("gọi 3 người mai 9h")
+        assertNull(r.amount)
+        assertEquals(ItemType.TASK, r.type)
+        assertNull(parse("đọc 200 trang sách").amount)
+        assertNull(parse("phòng 1203").amount)
+        assertNull(parse("chạy 5km").amount)
+    }
+
+    @Test
+    fun amountOffKeepsItATask() {
+        val r = parse("cà phê 45k", off = setOf(QuickAdd.Part.AMOUNT))
+        assertEquals(ItemType.TASK, r.type)
+        assertEquals("cà phê 45k", r.title)
+        assertNull(r.amount)
+    }
+
+    @Test
+    fun categoryFollowsHistoryFirst() {
+        val earlier = Item(
+            id = "a", type = ItemType.EXPENSE, status = ItemStatus.DONE, title = "Cà phê", createdAt = now - 86_400_000,
+            amount = 40_000, category = "Công việc",
+        )
+        assertEquals("Công việc", QuickAdd.parse("cà phê 45k", now, zone, history = listOf(earlier)).category)
+        assertEquals("Mua sắm", Categories.guess("mua điện thoại", emptyList()))
+        assertEquals("Hoá đơn", Categories.guess("tiền điện", emptyList()))
+        assertEquals("Giải trí", Categories.guess("vé phim", emptyList()))
+        assertEquals("Khác", Categories.guess("quà", emptyList()))
+    }
 }
