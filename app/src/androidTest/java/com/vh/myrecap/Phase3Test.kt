@@ -227,7 +227,8 @@ class Phase3Test {
             shot("30-repeat-agenda")
 
             device.findObject(By.desc("Cài đặt")).click()
-            assertTrue("settings opened", device.wait(Until.hasObject(By.text("Chuyển giọng nói → văn bản")), 5_000))
+            // The quick-add templates section is the first one under Appearance.
+            assertTrue("settings opened", device.wait(Until.hasObject(By.text("Mẫu nhập nhanh")), 5_000))
             shot("31a-settings-top")
             // Settings is one long page: swipe until the backup section shows.
             var backup: UiObject2? = null
