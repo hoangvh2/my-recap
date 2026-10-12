@@ -69,10 +69,7 @@ class QuickTemplatesFlowTest {
         val launch = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launch).use {
             assertTrue("agenda", device.wait(Until.hasObject(By.text("Thư ký")), 10_000))
-            // Not focused: no extra row, the agenda keeps its place.
-            assertFalse(device.hasObject(By.text("cà phê 30k")))
-            device.findObject(By.clazz("android.widget.EditText")).click()
-            // The most used line of each kind, nothing else.
+            // Without touching the box: the most used line of each kind, nothing else.
             assertTrue("featured", device.wait(Until.hasObject(By.text("cà phê 30k")), 5_000))
             assertTrue(device.hasObject(By.text("gọi … mai 9h")))
             assertTrue(device.hasObject(By.text("họp … thứ 2 9h")))
