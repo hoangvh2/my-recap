@@ -89,6 +89,30 @@ object ReminderPolicy {
         return trigger(item, at, zone)
     }
 
+    /** Lead times offered for the advance reminder, in days. */
+    val ADVANCE_DAYS = listOf(1, 3, 7, 30)
+
+    /**
+     * The extra "còn N ngày" reminder: [Item.remindDaysBefore] days before the due date, at
+     * [ALL_DAY_HOUR]. For a repeating item it is the next occurrence whose advance time is still
+     * ahead of [now]. Null when the item has none or it would come after the normal reminder.
+     */
+    fun advanceAt(item: Item, zone: java.time.ZoneId, now: Long = System.currentTimeMillis()): Long? {
+        val days = item.remindDaysBefore?.takeIf { it in 1..366 } ?: return null
+        if (item.status != ItemStatus.OPEN) return null
+        if (item.type != ItemType.TASK && item.type != ItemType.EVENT) return null
+        var at = item.whenAt ?: return null
+        fun advance(t: Long) = java.time.Instant.ofEpochMilli(t).atZone(zone).toLocalDate().minusDays(days.toLong())
+            .atTime(ALL_DAY_HOUR, 0).atZone(zone).toInstant().toEpochMilli()
+        val rule = item.recurrence
+        if (rule != null) {
+            var steps = 0
+            while (advance(at) <= now && steps++ < 5_000) at = Schedule.next(at, rule, zone)
+        }
+        val result = advance(at)
+        return result.takeIf { it > now && it < trigger(item, at, zone) }
+    }
+
     /** Where "Hoãn" in a reminder notification pushes it to. */
     enum class Snooze(val label: String) {
         MINUTES_10("10 phút"),

@@ -24,6 +24,7 @@ enum class Recurrence(val label: String) {
     WEEKDAYS("Ngày làm việc"),
     WEEKLY("Hằng tuần"),
     MONTHLY("Hằng tháng"),
+    YEARLY("Hằng năm"),
 }
 
 /** DRAFT items were proposed by the AI and wait for the user's confirmation; nothing else counts them. */
@@ -57,6 +58,8 @@ data class Item(
     val recurrence: Recurrence? = null,
     /** Tasks and appointments only: must not be missed; highlighted in lists and reminded louder. */
     val important: Boolean = false,
+    /** Tasks and appointments only: an extra reminder this many days ahead (renewals, bills, documents). */
+    val remindDaysBefore: Int? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -76,6 +79,7 @@ data class Item(
         .putOpt("doneAt", doneAt)
         .putOpt("recurrence", recurrence?.name)
         .apply { if (important) put("important", true) }
+        .putOpt("remindDaysBefore", remindDaysBefore)
 
     companion object {
         fun fromJson(o: JSONObject) = Item(
@@ -96,6 +100,7 @@ data class Item(
             doneAt = o.optLongOrNull("doneAt"),
             recurrence = o.optStringOrNull("recurrence")?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
             important = o.optBoolean("important", false),
+            remindDaysBefore = o.optIntOrNull("remindDaysBefore"),
         )
     }
 }
@@ -138,7 +143,7 @@ object ItemExtraction {
         appendLine("Một ghi chú có thể chứa nhiều mục. Không tạo mục trùng nhau.")
         appendLine(
             "Việc/lịch lặp lại (\"mỗi sáng\", \"thứ 2 hằng tuần\", \"ngày 5 hằng tháng\"): repeat là daily, weekdays, " +
-                "weekly hoặc monthly, và date là lần gần nhất sắp tới; không lặp thì repeat null.",
+                "weekly, monthly hoặc yearly (\"gia hạn bảo hiểm hằng năm\"), và date là lần gần nhất sắp tới; không lặp thì repeat null.",
         )
         appendLine(
             "important: true khi ghi chú nói rõ là gấp, quan trọng, nhất định, đừng quên, không được quên (chỉ với task/event); còn lại false.",
@@ -252,6 +257,7 @@ object ItemExtraction {
         "weekdays", "workdays" -> Recurrence.WEEKDAYS
         "weekly" -> Recurrence.WEEKLY
         "monthly" -> Recurrence.MONTHLY
+        "yearly", "annually" -> Recurrence.YEARLY
         else -> null
     }
 
@@ -346,6 +352,9 @@ private fun JSONObject.optStringOrNull(key: String): String? =
 
 private fun JSONObject.optLongOrNull(key: String): Long? =
     if (has(key) && !isNull(key)) optLong(key) else null
+
+private fun JSONObject.optIntOrNull(key: String): Int? =
+    if (has(key) && !isNull(key)) optInt(key) else null
 
 /**
  * Turns a meeting or interview summary into proposed follow-ups ("ai làm gì, khi nào"). Answers use

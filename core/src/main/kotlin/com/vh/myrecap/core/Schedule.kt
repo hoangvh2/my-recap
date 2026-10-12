@@ -22,6 +22,7 @@ object Schedule {
             Recurrence.WEEKLY -> z.plusWeeks(1)
             // Day 31 becomes the month's last day (30, 28…) and stays there; acceptable for reminders.
             Recurrence.MONTHLY -> z.plusMonths(1)
+            Recurrence.YEARLY -> z.plusYears(1)
         }
         return n.toInstant().toEpochMilli()
     }
