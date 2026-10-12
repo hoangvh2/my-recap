@@ -79,12 +79,19 @@ class QuickTemplatesFlowTest {
             assertFalse("only one expense line", device.hasObject(By.text("ăn trưa …k")))
             shot("40-quickadd-featured")
 
-            // A tap on empty space below lets the box go: the lines fold away.
-            device.click(device.displayWidth / 2, device.displayHeight * 4 / 5)
+            // A tap outside the box (the keyboard covers the agenda here, so the title) lets it go.
+            device.findObject(By.text("Thư ký")).click()
             assertTrue("folded on tap outside", device.wait(Until.gone(By.text("cà phê 30k")), 5_000))
             shot("40b-quickadd-tap-outside")
+            // Hiding the keyboard with Back does the same.
             device.findObject(By.clazz("android.widget.EditText")).click()
             assertTrue("featured again", device.wait(Until.hasObject(By.text("cà phê 30k")), 5_000))
+            Thread.sleep(800) // let the keyboard come up first
+            device.pressBack()
+            assertTrue("folded with the keyboard", device.wait(Until.gone(By.text("cà phê 30k")), 5_000))
+            assertTrue("still on the agenda", device.hasObject(By.text("Thư ký")))
+            device.findObject(By.clazz("android.widget.EditText")).click()
+            assertTrue("featured once more", device.wait(Until.hasObject(By.text("cà phê 30k")), 5_000))
 
             device.findObject(By.clazz("android.widget.EditText")).text = "ca"
             assertTrue("matches", device.wait(Until.hasObject(By.text("cafe với khách …k")), 5_000))

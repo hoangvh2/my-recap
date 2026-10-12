@@ -122,7 +122,7 @@ fun AgendaTab(vm: AppViewModel) {
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection).clearFocusOnTapOutside(),
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(undo) },
@@ -147,7 +147,7 @@ fun AgendaTab(vm: AppViewModel) {
         },
     ) { padding ->
         LazyColumn(
-            Modifier.fillMaxSize().clearFocusOnTapOutside(),
+            Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
