@@ -16,6 +16,8 @@ import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.BackupException
 import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Item
+import com.vh.myrecap.core.QuickTemplate
+import com.vh.myrecap.core.QuickTemplates
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Prompts
@@ -57,6 +59,8 @@ sealed interface Screen {
     /** An item, or a new one of [type] when [id] is null. */
     data class ItemEdit(val id: String?, val type: ItemType = ItemType.TASK) : Screen
     data object Settings : Screen
+    /** Saved quick-add lines: list, search, add, edit. */
+    data object Templates : Screen
     data object Search : Screen
     data object Spending : Screen
     data object Weekly : Screen
@@ -167,6 +171,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openSettings() = push(Screen.Settings)
+    fun openTemplates() = push(Screen.Templates)
     fun openSearch() = push(Screen.Search)
     fun openSpending() = push(Screen.Spending)
     fun openWeekly() = push(Screen.Weekly)
@@ -357,13 +362,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** One tap on a saved line without a blank: parsed now, so "mai 9h" means tomorrow from today. */
-    fun addFromTemplate(template: com.vh.myrecap.core.QuickTemplate) {
+    fun addFromTemplate(template: QuickTemplate) {
         val parsed = com.vh.myrecap.core.QuickAdd.parse(
-            com.vh.myrecap.core.QuickTemplates.normalize(template.text), System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
+            QuickTemplates.normalize(template.text), System.currentTimeMillis(), java.time.ZoneId.systemDefault(),
             history = items.value,
         )
         quickAdd(parsed)
+        templateUsed(template)
     }
+
+    /** Counts a use, so the most used line of each kind is the one the empty box and the widget offer. */
+    fun templateUsed(template: QuickTemplate) =
+        updateSettings { it.copy(quickTemplates = QuickTemplates.used(it.quickTemplates, template, System.currentTimeMillis())) }
 
     fun undoAddItem(item: Item) {
         if (lastAddedItem?.id == item.id) lastAddedItem = null
@@ -377,14 +387,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (lastAddedItem?.id == item.id) lastAddedItem = null
     }
 
-    fun setTemplates(list: List<com.vh.myrecap.core.QuickTemplate>) = updateSettings { it.copy(quickTemplates = list) }
-
-    fun saveTemplate(text: String) {
+    /** Saves a new line; false when it is empty or already saved. */
+    fun addTemplate(text: String): Boolean {
         val before = settings.value.quickTemplates
-        val after = com.vh.myrecap.core.QuickTemplates.add(before, text)
-        setTemplates(after)
-        viewModelScope.launch { toast(if (after.size > before.size) "Đã lưu mẫu" else "Mẫu này đã có") }
+        val after = QuickTemplates.add(before, text)
+        updateSettings { it.copy(quickTemplates = after) }
+        return after.size > before.size
     }
+
+    /** From the quick-add box: saves what is typed, with a toast either way. */
+    fun saveTemplate(text: String) {
+        val added = addTemplate(text)
+        viewModelScope.launch { toast(if (added) "Đã lưu mẫu" else "Mẫu này đã có") }
+    }
+
+    /** False when the new text is empty or repeats another line. */
+    fun editTemplate(index: Int, text: String): Boolean {
+        val before = settings.value.quickTemplates
+        val after = QuickTemplates.edit(before, index, text)
+        updateSettings { it.copy(quickTemplates = after) }
+        return after != before || QuickTemplates.normalize(text) == before.getOrNull(index)?.text
+    }
+
+    /** Puts a deleted line back where it was (Undo). */
+    fun restoreTemplate(index: Int, template: QuickTemplate) = updateSettings { s ->
+        if (s.quickTemplates.any { it.text == template.text }) s
+        else s.copy(quickTemplates = s.quickTemplates.toMutableList().also { it.add(index.coerceIn(0, it.size), template) })
+    }
+
+    fun removeTemplate(index: Int) =
+        updateSettings { s -> s.copy(quickTemplates = s.quickTemplates.filterIndexed { i, _ -> i != index }) }
 
     /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */
     var extractingActionsFor by mutableStateOf<String?>(null)

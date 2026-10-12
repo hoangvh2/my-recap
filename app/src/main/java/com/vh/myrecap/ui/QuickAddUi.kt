@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.QuickAdd
+import com.vh.myrecap.core.QuickTemplate
 import com.vh.myrecap.core.QuickTemplates
 import java.time.ZoneId
 
@@ -47,8 +51,9 @@ import java.time.ZoneId
  * what it understood as chips. An amount ("cà phê 45k") makes it an expense with a guessed category.
  * Tapping a chip drops that part, which stays in the title instead.
  *
- * While the box is focused, saved lines (Cài đặt → Mẫu nhập nhanh): one without a blank is added in one tap (with
- * Undo); one with a blank ("ăn trưa …k") fills the box with the cursor on the blank.
+ * Saved lines (màn hình Mẫu): the focused empty box offers the most used one of each kind; typing offers
+ * every line containing the words typed. One without a blank is added in one tap (with Undo); one with a
+ * blank ("ăn trưa …k") fills the box with the cursor on the blank.
  */
 @Composable
 fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String? = null, autoFocus: Boolean = false) {
@@ -79,6 +84,9 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
             onValueChange = { field = it },
             modifier = Modifier.fillMaxWidth().focusRequester(focus).onFocusChanged { focused = it.isFocused },
             singleLine = true,
+            leadingIcon = {
+                IconButton(onClick = vm::openTemplates) { Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Mẫu câu") }
+            },
             placeholder = { Text("Gõ nhanh: gọi anh Nam mai 3h, cà phê 45k", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             trailingIcon = {
                 IconButton(onClick = ::submit, enabled = text.isNotBlank()) {
@@ -88,28 +96,43 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { submit() }),
         )
+        // A saved line: one without a blank is added at once, one with a blank fills the box.
+        fun use(t: QuickTemplate) {
+            if (QuickTemplates.hasBlank(t.text)) {
+                val (filled, cursor) = QuickTemplates.fill(t.text)
+                field = TextFieldValue(filled, TextRange(cursor))
+                off = emptySet()
+                vm.templateUsed(t)
+                focus.requestFocus()
+            } else {
+                vm.addFromTemplate(t)
+                field = TextFieldValue("")
+                off = emptySet()
+                focusManager.clearFocus()
+            }
+        }
         if (text.isBlank() && focused) {
-            val templates = QuickTemplates.ordered(settings.quickTemplates)
+            // Only the most used line of each kind; the rest come up as the user types.
+            val featured = remember(settings.quickTemplates) {
+                QuickTemplates.featured(settings.quickTemplates, System.currentTimeMillis(), ZoneId.systemDefault())
+            }
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                templates.forEach { t ->
-                    SuggestionChip(
-                        onClick = {
-                            if (QuickTemplates.hasBlank(t.text)) {
-                                val (filled, cursor) = QuickTemplates.fill(t.text)
-                                field = TextFieldValue(filled, TextRange(cursor))
-                                off = emptySet()
-                                focus.requestFocus()
-                            } else {
-                                vm.addFromTemplate(t)
-                                focusManager.clearFocus()
-                            }
-                        },
-                        label = { Text(QuickTemplates.normalize(t.text)) },
-                    )
-                }
-                TextButton(onClick = vm::openSettings) { Text(if (templates.isEmpty()) "Thêm mẫu" else "Sửa mẫu", style = MaterialTheme.typography.labelLarge) }
+                featured.forEach { t -> SuggestionChip(onClick = { use(t) }, label = { Text(QuickTemplates.normalize(t.text)) }) }
+                if (featured.isEmpty()) TextButton(onClick = vm::openTemplates) { Text("Thêm mẫu", style = MaterialTheme.typography.labelLarge) }
             }
         } else if (text.isNotBlank()) {
+            val matches = remember(text, settings.quickTemplates) { QuickTemplates.matching(settings.quickTemplates, text) }
+            if (matches.isNotEmpty()) {
+                Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    matches.forEach { t ->
+                        SuggestionChip(
+                            onClick = { use(t) },
+                            label = { Text(QuickTemplates.normalize(t.text)) },
+                            icon = { Icon(Icons.Rounded.Bolt, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        )
+                    }
+                }
+            }
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (result.type == ItemType.EVENT) AssistChip(onClick = {}, label = { Text("Lịch hẹn") })
                 if (result.type == ItemType.EXPENSE) AssistChip(onClick = {}, label = { Text("Chi tiêu · ${result.category}") })
@@ -117,7 +140,7 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
                     AssistChip(onClick = { off = off + span.part }, label = { Text("${span.shown}  ✕") })
                 }
                 if (off.isNotEmpty()) TextButton(onClick = { off = emptySet() }) { Text("Hiểu lại", style = MaterialTheme.typography.labelLarge) }
-                TextButton(onClick = { vm.saveTemplate(text) }) { Text("Lưu làm mẫu", style = MaterialTheme.typography.labelLarge) }
+                if (matches.isEmpty()) TextButton(onClick = { vm.saveTemplate(text) }) { Text("Lưu làm mẫu", style = MaterialTheme.typography.labelLarge) }
             }
         }
     }
