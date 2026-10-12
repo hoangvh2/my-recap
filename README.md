@@ -1,4 +1,4 @@
-# My Recap
+# Vhub Desk (My Recap)
 
 App Android dùng để ghi âm phỏng vấn và cuộc họp, sau đó chuyển âm thanh thành văn bản (STT) và dùng AI tóm tắt. Ngôn ngữ hỗ trợ: tiếng Việt, tiếng Anh, tiếng Nhật.
 
@@ -18,7 +18,7 @@ APK do GitHub Actions build tự động mỗi khi có push (xem `.github/workfl
 |---|---|
 | Cấp quyền Micro và Thông báo | Để ghi âm và hiển thị nút điều khiển trên màn hình khoá |
 | Cho phép "Không giới hạn pin" | Tránh Android dừng ghi âm khi tắt màn hình |
-| Tecno/HiOS: Phone Master → Auto-start → bật My Recap; Cài đặt → Pin → tắt tiết kiệm pin cho app; khoá app trong đa nhiệm | HiOS tự kill app chạy nền rất mạnh tay |
+| Tecno/HiOS: Phone Master → Auto-start → bật Vhub Desk; Cài đặt → Pin → tắt tiết kiệm pin cho app; khoá app trong đa nhiệm | HiOS tự kill app chạy nền rất mạnh tay |
 | Nhập Gemini API key (miễn phí tại https://aistudio.google.com) hoặc Groq key | Cần cho bước chuyển giọng nói thành văn bản và tóm tắt |
 
 ## Cách dùng

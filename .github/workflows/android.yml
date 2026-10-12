@@ -120,7 +120,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION_NAME }}
           target_commitish: ${{ github.sha }}
-          name: My Recap ${{ env.VERSION_NAME }}
+          name: Vhub Desk ${{ env.VERSION_NAME }}
           make_latest: true
           files: |
             MyRecap.apk
