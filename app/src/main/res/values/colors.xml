@@ -2,11 +2,13 @@
 <resources>
     <color name="background">#FFF6F7FB</color>
     <!-- Home widget surface: light card by day, the navy gradient at night. -->
-    <color name="widget_bg_start">#FFFFFFFF</color>
-    <color name="widget_bg_end">#FFE8ECFF</color>
+    <color name="widget_bg_start">#D9FFFFFF</color>
+    <color name="widget_bg_end">#B8E6EBFF</color>
     <color name="widget_text">#FF0A1640</color>
     <color name="widget_text_secondary">#CC0A1640</color>
     <color name="widget_text_tertiary">#990A1640</color>
     <color name="widget_chip_fill">#1F26389C</color>
     <color name="widget_chip_stroke">#4026389C</color>
+    <color name="widget_glass_edge">#B3FFFFFF</color>
+    <color name="widget_glass_shine">#59FFFFFF</color>
 </resources>
