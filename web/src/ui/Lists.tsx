@@ -5,6 +5,7 @@ import type { Item } from "../lib/model";
 import { agenda, expensesOfMonth, monthKey, overview, shiftMonth } from "../lib/views";
 import { Icon } from "./icons";
 import { ItemRow } from "./ItemRow";
+import { SpendingPanel } from "./Spending";
 
 interface Handlers {
   onOpen: (i: Item) => void;
@@ -114,6 +115,7 @@ export function Expenses({ items, onOpen }: { items: Item[]; onOpen: (i: Item) =
         </div>
         <button class="icon-btn" aria-label="Tháng sau" disabled={thisMonth} onClick={() => setKey(shiftMonth(key, 1))}><Icon name="chevronRight" /></button>
       </div>
+      <SpendingPanel items={items} month={key} onOpen={onOpen} />
       {s.byCategory.length > 0 && (
         <ul class="bars">
           {s.byCategory.map((c) => (

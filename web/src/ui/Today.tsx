@@ -10,6 +10,8 @@ import { useStore } from "../lib/store";
 import { overview, timeline } from "../lib/views";
 import { NudgeRow, useLicenseActions } from "./actions";
 import { Capture } from "./Capture";
+import { QuickAdd } from "./QuickAdd";
+import { TriageCard } from "./Triage";
 import { Empty, Link, Section, TopBar } from "./common";
 import { useCtx, useGraph, useNow, useUid } from "./hooks";
 import { Icon } from "./icons";
@@ -46,6 +48,7 @@ export function Today() {
     <>
       <TopBar title="Hôm nay" sub={todayLabel()} right={<><button class="icon-btn" aria-label="Tìm kiếm" onClick={openSearch}><Icon name="search" /></button><Link to={to.settings} class="icon-btn" label="Cài đặt"><Icon name="cog" /></Link></>} />
       <Capture />
+      <QuickAdd />
       <Review />
 
       {due.length > 0 && (
@@ -56,6 +59,7 @@ export function Today() {
 
       {o.overdue.length > 0 && (
         <Section title="Việc quá hạn" count={o.overdue.length} tone="warn">
+          <TriageCard items={all} now={now} />
           <ul class="list">{o.overdue.map((i) => <ItemRow key={i.id} item={i} onOpen={openItem} onToggle={toggle} />)}</ul>
         </Section>
       )}

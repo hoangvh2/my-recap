@@ -399,3 +399,50 @@ details summary { cursor: pointer; font-weight: 600; min-height: 36px; display: 
 .signature .mark { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: var(--brand); color: #2dd4bf; font-weight: 800; font-size: 13px; margin-bottom: 4px; }
 .center .signature { margin-top: 18px; }
 .center { align-content: center; }
+
+/* Gõ nhanh: a typed line becomes a task, appointment or expense on this device. */
+.quick { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin: -6px 0 18px; display: grid; gap: 8px; }
+.quick-row { display: flex; gap: 8px; min-width: 0; }
+.quick-row .btn { flex: none; }
+.quick-row input { flex: 1; width: 0; min-width: 0; min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; }
+.quick-read { display: grid; gap: 4px; font-size: 13px; }
+.chips-inline { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { min-height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface2); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.pill.on { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--accent); }
+.pill.off { text-decoration: line-through; color: var(--muted); }
+.pill.tpl { font-weight: 500; }
+.pill.ghost { background: transparent; color: var(--accent); }
+.small-caps { font-size: 13px; letter-spacing: 0.4px; text-transform: uppercase; margin: 4px 0 0; }
+
+/* Rà soát: one overdue task at a time, a tap to move it. */
+.triage { background: var(--surface); border: 1px solid var(--warn); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; display: grid; gap: 4px; }
+.triage .muted { font-size: 13px; }
+.triage .chips-inline { margin-top: 6px; }
+
+/* Thống kê chi tiêu và tổng kết tuần: computed on the device. */
+.spending { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; display: grid; gap: 10px; }
+.spending .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.spending .stat-row p { display: grid; gap: 2px; font-size: 13px; }
+.spending .stat-row strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.spending .stat-row .up { color: var(--danger); }
+.spending .stat-row .down { color: var(--ok); }
+.spending .small, .month .small { font-size: 13px; }
+.month .big.small { font-size: 20px; }
+.chart { width: 100%; height: auto; }
+.chart path { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart .cur { stroke: var(--accent); }
+.chart .prev { stroke: var(--muted); stroke-dasharray: 4 4; stroke-width: 1.8; }
+.chart .dot-now { fill: var(--accent); }
+.legend { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.legend .key { width: 18px; height: 0; border-top: 3px solid var(--accent); display: inline-block; }
+.legend .key.prev { border-top: 2px dashed var(--muted); margin-left: 8px; }
+.trend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; height: 112px; }
+.trend li { display: grid; grid-template-rows: 14px 1fr 16px; gap: 2px; text-align: center; font-size: 11px; color: var(--muted); min-width: 0; }
+.trend .col { background: var(--surface2); border-radius: 6px; display: flex; align-items: flex-end; overflow: hidden; }
+.trend .col i { display: block; width: 100%; background: color-mix(in srgb, var(--accent) 45%, var(--surface2)); border-radius: 6px 6px 0 0; }
+.trend li.on .col i { background: var(--accent); }
+.trend li.on { color: var(--text); font-weight: 700; }
+.trend.week { height: 88px; }
+.alerts { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.alerts li { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); border-radius: 14px; padding: 10px 12px; font-size: 14px; }
+.alerts button { text-align: left; font: inherit; color: inherit; text-decoration: underline; }
