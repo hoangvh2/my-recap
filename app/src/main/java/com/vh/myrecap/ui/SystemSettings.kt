@@ -47,7 +47,7 @@ fun isTranssion(): Boolean = Build.MANUFACTURER.lowercase(Locale.ROOT) in setOf(
 fun vendorName(): String = if (isTranssion()) "Tecno (HiOS)" else Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
 
 fun vendorGuide(): String = if (isTranssion()) {
-    "Phone Master → Tự khởi chạy: bật My Recap. Cài đặt → Pin: tắt tiết kiệm pin cho app. Trong đa nhiệm, khoá thẻ My Recap."
+    "Phone Master → Tự khởi chạy: bật Vhub Desk. Cài đặt → Pin: tắt tiết kiệm pin cho app. Trong đa nhiệm, khoá thẻ Vhub Desk."
 } else {
     "Cho phép tự khởi chạy/chạy nền và khoá app trong màn hình đa nhiệm (tên mục tuỳ hãng)."
 }
