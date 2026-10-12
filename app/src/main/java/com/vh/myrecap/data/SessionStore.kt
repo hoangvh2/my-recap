@@ -42,7 +42,7 @@ class SessionStore(val root: File) {
         _version.value++
     }
 
-    fun create(mode: SessionMode, title: String): Session {
+    fun create(mode: SessionMode, title: String, context: String? = null): Session {
         val now = System.currentTimeMillis()
         val id = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(now)) + "-" +
             UUID.randomUUID().toString().take(4)
@@ -53,6 +53,7 @@ class SessionStore(val root: File) {
             createdAt = now,
             state = RecState.RECORDING,
             extract = if (mode == SessionMode.MEMO) TaskStatus.PENDING else null,
+            context = context,
         )
         synchronized(lock) {
             dir(id).mkdirs()

@@ -126,8 +126,10 @@ object ItemExtraction {
         }
     }
 
-    fun userMessage(transcript: String, now: ZonedDateTime): String = buildString {
+    /** [context]: where the note came from (e.g. a recap right after a phone call), when the app knows. */
+    fun userMessage(transcript: String, now: ZonedDateTime, context: String? = null): String = buildString {
         append(calendar(now))
+        if (!context.isNullOrBlank()) appendLine("Bối cảnh: ${context.trim()}")
         appendLine()
         appendLine("Loại mục:")
         appendLine("- task: việc cần làm (có thể có hạn).")

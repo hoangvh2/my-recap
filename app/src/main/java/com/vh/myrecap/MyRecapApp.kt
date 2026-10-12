@@ -92,6 +92,12 @@ class MyRecapApp : Application() {
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             },
         )
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_CALLS, "Sau cuộc gọi", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Gợi ý ghi tóm tắt sau cuộc gọi để tạo việc, lịch hẹn"
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            },
+        )
     }
 
     /** Long-press the launcher icon → "Ghi nhanh" opens straight into a quick capture. */
@@ -151,6 +157,7 @@ class MyRecapApp : Application() {
         const val CHANNEL_RECORDING = "recording"
         const val CHANNEL_RESULTS = "results"
         const val CHANNEL_REMINDERS = "reminders"
+        const val CHANNEL_CALLS = "calls"
 
         fun from(context: Context): MyRecapApp = context.applicationContext as MyRecapApp
     }

@@ -1,6 +1,8 @@
 package com.vh.myrecap.ui
 
+import android.Manifest
 import android.app.StatusBarManager
+import com.vh.myrecap.calls.CallReceiver
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
@@ -196,6 +198,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     if (s.keepMemoAudio) "Ghi âm được giữ để nghe lại; xoá từng cái trong màn hình ghi chú."
                     else "Khuyên dùng: xoá ngay sau khi đã chuyển thành chữ, chỉ giữ văn bản (vài KB).",
                 )
+                CallFollowUpRow(vm, s)
                 Text("Tự xoá ghi âm phỏng vấn/họp đã có transcript sau", fontWeight = FontWeight.SemiBold)
                 ChoiceRow(listOf(7, 30, 90, 0), s.audioRetentionDays, { if (it == 0) "Không xoá" else "$it ngày" }) { v ->
                     update { it.copy(audioRetentionDays = v) }
@@ -453,6 +456,45 @@ private fun StorageCard(vm: AppViewModel) {
             },
             onDismiss = { confirm = false },
         )
+    }
+}
+
+/**
+ * After-call prompt. Turning it on asks for the phone-state permission (required) and the call log
+ * (optional, only to name the caller). Off again simply stops the prompts.
+ */
+@Composable
+private fun CallFollowUpRow(vm: AppViewModel, s: AppSettings) {
+    val context = LocalContext.current
+    val tick by vm.resumeTick.collectAsStateWithLifecycle()
+    val allowed = remember(tick) { CallReceiver.canWatchCalls(context) }
+    var denied by remember { mutableStateOf(false) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        val ok = result[Manifest.permission.READ_PHONE_STATE] == true
+        denied = !ok
+        if (ok) vm.updateSettings { it.copy(callFollowUp = true) }
+    }
+    val on = s.callFollowUp && allowed
+    SwitchRow("Gợi ý ghi tóm tắt sau cuộc gọi", on) { v ->
+        if (!v) vm.updateSettings { it.copy(callFollowUp = false) }
+        else if (allowed) vm.updateSettings { it.copy(callFollowUp = true) }
+        else ask.launch(CallReceiver.PERMISSIONS)
+    }
+    Hint(
+        "Sau cuộc gọi điện thoại từ 30 giây, app hiện thông báo. Bấm \"Ghi tóm tắt\" và nói nhanh nội dung chính, " +
+            "AI tách việc, lịch hẹn để bạn xác nhận. Không bấm thì không gửi gì, không tốn phí. " +
+            "App không nghe được cuộc gọi (Android chặn) và không nhận cuộc gọi Zalo, Messenger.",
+    )
+    if (denied || (s.callFollowUp && !allowed)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Cần quyền Điện thoại để biết khi cuộc gọi kết thúc.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { openAppSettings(context) }) { Text("Mở cài đặt") }
+        }
     }
 }
 

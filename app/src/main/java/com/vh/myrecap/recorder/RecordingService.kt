@@ -50,6 +50,7 @@ class RecordingService : Service() {
                 SessionMode.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_MODE) } ?: SessionMode.INTERVIEW,
                 intent.getStringExtra(EXTRA_TITLE).orEmpty(),
                 intent.getStringExtra(EXTRA_FOLDER),
+                intent.getStringExtra(EXTRA_CONTEXT),
             )
             ACTION_TOGGLE_PAUSE -> togglePause()
             ACTION_BOOKMARK -> bookmark()
@@ -60,7 +61,7 @@ class RecordingService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startRecording(requestedMode: SessionMode, title: String, folderId: String?) {
+    private fun startRecording(requestedMode: SessionMode, title: String, folderId: String?, noteContext: String?) {
         if (recorder != null) return
         val existing = folderId?.let { app.store.get(it) }
         this.mode = existing?.mode ?: requestedMode
@@ -82,7 +83,7 @@ class RecordingService : Service() {
         val settings = app.settings.current
         // Recording more into an existing folder continues its timeline and clip numbering.
         val session = existing?.let { f -> app.store.update(f.id) { it.copy(state = RecState.RECORDING, error = null) } }
-            ?: app.store.create(mode, title)
+            ?: app.store.create(mode, title, noteContext)
         createdFolder = existing == null
         clipCount = session.segments.size
         sessionId = session.id
@@ -324,17 +325,19 @@ class RecordingService : Service() {
         private const val EXTRA_MODE = "mode"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_FOLDER = "folder"
+        private const val EXTRA_CONTEXT = "context"
 
         /**
          * Starts recording into a new folder, or into [folderId] to continue an existing one.
          * Must be called while the app is in the foreground (Android 14+ microphone FGS rule).
          */
-        fun start(context: Context, mode: SessionMode, title: String, folderId: String? = null) {
+        fun start(context: Context, mode: SessionMode, title: String, folderId: String? = null, noteContext: String? = null) {
             val intent = Intent(context, RecordingService::class.java)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_MODE, mode.name)
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_FOLDER, folderId)
+                .putExtra(EXTRA_CONTEXT, noteContext)
             ContextCompat.startForegroundService(context, intent)
         }
 

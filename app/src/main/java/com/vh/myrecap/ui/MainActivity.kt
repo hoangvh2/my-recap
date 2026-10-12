@@ -10,6 +10,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.app.NotificationManagerCompat
+import com.vh.myrecap.calls.CallReceiver
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -76,6 +78,10 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra(EXTRA_SESSION_ID)?.let { vm.openSession(it) }
         intent?.getStringExtra(EXTRA_ITEM_ID)?.let { vm.openItem(it) }
         if (intent?.action == ACTION_QUICK_CAPTURE) vm.requestQuickCapture()
+        if (intent?.action == ACTION_CALL_NOTE) {
+            NotificationManagerCompat.from(this).cancel(CallReceiver.NOTIFICATION_ID)
+            vm.requestQuickCapture(intent.getStringExtra(EXTRA_NOTE_TITLE), intent.getStringExtra(EXTRA_NOTE_CONTEXT))
+        }
     }
 
     companion object {
@@ -83,6 +89,10 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_ITEM_ID = "itemId"
         /** Launcher shortcut: open straight into a quick capture. */
         const val ACTION_QUICK_CAPTURE = "com.vh.myrecap.QUICK_CAPTURE"
+        /** After-call prompt: a quick capture titled after the call, with the call as context for the AI. */
+        const val ACTION_CALL_NOTE = "com.vh.myrecap.CALL_NOTE"
+        const val EXTRA_NOTE_TITLE = "noteTitle"
+        const val EXTRA_NOTE_CONTEXT = "noteContext"
     }
 }
 

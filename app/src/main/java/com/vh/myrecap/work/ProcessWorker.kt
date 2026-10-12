@@ -264,7 +264,7 @@ class ProcessWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             val raw = try {
                 Providers.textGenerator(config).generate(
                     ItemExtraction.system(),
-                    ItemExtraction.userMessage(text, ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), zone)),
+                    ItemExtraction.userMessage(text, ZonedDateTime.ofInstant(Instant.ofEpochMilli(now), zone), memo.context),
                 )
             } catch (e: ApiException) {
                 if (e.emptyResult) "" else throw e
