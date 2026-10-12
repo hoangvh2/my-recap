@@ -20,6 +20,7 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,8 +51,10 @@ import java.time.ZoneId
  * Undo); one with a blank ("ăn trưa …k") fills the box with the cursor on the blank.
  */
 @Composable
-fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier) {
-    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String? = null, autoFocus: Boolean = false) {
+    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(initial?.let { QuickTemplates.fill(it) }?.let { (t, c) -> TextFieldValue(t, TextRange(c)) } ?: TextFieldValue(""))
+    }
     val text = field.text
     var off by remember { mutableStateOf(emptySet<QuickAdd.Part>()) }
     // Past expenses teach the category: a title filed under "Công việc" once stays there.
@@ -61,6 +64,7 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier) {
     val focusManager = LocalFocusManager.current
     // Saved lines show while the box is focused, so the agenda below keeps its place on small screens.
     var focused by remember { mutableStateOf(false) }
+    if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus() }
     val result = remember(text, off, history) { QuickAdd.parse(text, System.currentTimeMillis(), ZoneId.systemDefault(), off, history) }
     fun submit() {
         if (text.isBlank()) return

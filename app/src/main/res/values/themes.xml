@@ -5,4 +5,11 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/background</item>
     </style>
+
+    <!-- Quick-add sheet over whatever is on screen (widget, launcher shortcut): the app draws its own scrim. -->
+    <style name="Theme.MyRecap.QuickAdd" parent="Theme.MyRecap">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Translucent</item>
+    </style>
 </resources>

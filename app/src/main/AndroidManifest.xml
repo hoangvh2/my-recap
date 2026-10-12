@@ -44,6 +44,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Quick-add sheet from the widget and launcher shortcut; its own task so the app's screens stay as they were. -->
+        <activity
+            android:name=".ui.QuickAddActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.MyRecap.QuickAdd"
+            android:windowSoftInputMode="adjustResize|stateVisible" />
+
         <service
             android:name=".recorder.RecordingService"
             android:exported="false"
@@ -80,6 +89,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_capture_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickAddWidget"
+            android:exported="true"
+            android:label="@string/quick_add">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_add_info" />
         </receiver>
 
         <service

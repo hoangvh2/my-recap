@@ -15,6 +15,8 @@ import com.vh.myrecap.core.TimeFormat
 import com.vh.myrecap.data.AppDatabase
 import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.widget.CaptureWidget
+import com.vh.myrecap.widget.QuickAddWidget
+import com.vh.myrecap.ui.QuickAddActivity
 import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +24,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.vh.myrecap.data.RecState
 import com.vh.myrecap.data.Segment
@@ -68,6 +72,9 @@ class MyRecapApp : Application() {
         appScope.launch {
             items.items.drop(1).debounce(500).collect { CaptureWidget.refresh(this@MyRecapApp) }
         }
+        appScope.launch {
+            settings.settings.map { it.quickTemplates }.distinctUntilChanged().collect { QuickAddWidget.refresh(this@MyRecapApp) }
+        }
     }
 
     private fun createChannels() {
@@ -108,8 +115,14 @@ class MyRecapApp : Application() {
             .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_mic))
             .setIntent(Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_QUICK_CAPTURE))
             .build()
+        val type = ShortcutInfoCompat.Builder(this, "quick-add")
+            .setShortLabel("Gõ nhanh")
+            .setLongLabel("Gõ nhanh việc, lịch, chi tiêu")
+            .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_edit))
+            .setIntent(QuickAddActivity.intent(this, null, addNow = false).setAction(Intent.ACTION_VIEW))
+            .build()
         try {
-            ShortcutManagerCompat.setDynamicShortcuts(this, listOf(capture))
+            ShortcutManagerCompat.setDynamicShortcuts(this, listOf(capture, type))
         } catch (_: Exception) {
             // Launchers without shortcut support: the in-app button remains.
         }
