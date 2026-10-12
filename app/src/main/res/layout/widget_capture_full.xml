@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Unified widget, full (2 rows): record, today at a glance, type, plus pinned quick lines. RemoteViews-safe views only. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_surface"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="12dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/widget_mic"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/widget_mic_bg"
+            android:contentDescription="@string/quick_capture">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_stat_mic" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_info"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/quick_capture"
+                android:textColor="@color/widget_text"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/widget_summary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_loading"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/widget_next"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/widget_text_tertiary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_type"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/widget_type_bg"
+            android:contentDescription="@string/quick_add">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_edit" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_template_0"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_surface_chip"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/widget_text"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/widget_template_1"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_surface_chip"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/widget_text"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/widget_template_2"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_surface_chip"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/widget_text"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/widget_template_hint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/quick_add_widget_empty"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

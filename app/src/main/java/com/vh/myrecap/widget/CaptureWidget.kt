@@ -15,15 +15,32 @@ import com.vh.myrecap.R
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.QuickTemplate
+import com.vh.myrecap.core.QuickTemplates
 import com.vh.myrecap.ui.MainActivity
+import com.vh.myrecap.ui.QuickAddActivity
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** Home-screen widget: one tap to capture, plus today's agenda in one line. */
+/**
+ * The one home-screen widget: record, type, today's agenda, and (when tall enough) the pinned quick lines.
+ * [QuickAddWidget] stays registered only so widgets already placed keep working; it is hidden from the picker.
+ */
 class CaptureWidget : AppWidgetProvider() {
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, newOptions: android.os.Bundle) {
+        val pending = goAsync()
+        MyRecapApp.from(context).appScope.launch {
+            try {
+                refresh(context)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         val pending = goAsync()
         MyRecapApp.from(context).appScope.launch {
@@ -43,11 +60,21 @@ class CaptureWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, CaptureWidget::class.java))
             if (ids.isEmpty()) return
-            val views = render(context, MyRecapApp.from(context).items.list())
-            ids.forEach { manager.updateAppWidget(it, views) }
+            val items = MyRecapApp.from(context).items.list()
+            val templates = QuickTemplates.featured(MyRecapApp.from(context).settings.current.quickTemplates, System.currentTimeMillis(), ZoneId.systemDefault())
+                .take(SLOT_IDS.size)
+            ids.forEach { id ->
+                val height = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+                manager.updateAppWidget(id, render(context, items, templates, full = isFull(height)))
+            }
         }
 
-        private fun render(context: Context, items: List<Item>): RemoteViews {
+        private val SLOT_IDS = intArrayOf(R.id.widget_template_0, R.id.widget_template_1, R.id.widget_template_2)
+
+        /** Two rows (with the quick lines) only when the placed widget is at least about two cells tall; unknown height counts as compact. */
+        internal fun isFull(minHeightDp: Int) = minHeightDp >= 110
+
+        internal fun render(context: Context, items: List<Item>, templates: List<QuickTemplate>, full: Boolean): RemoteViews {
             val zone = ZoneId.systemDefault()
             val today = LocalDate.now(zone)
             val now = System.currentTimeMillis()
@@ -63,7 +90,7 @@ class CaptureWidget : AppWidgetProvider() {
                 drafts.takeIf { it > 0 }?.let { "$it chờ xác nhận" },
             ).joinToString(" · ")
 
-            return RemoteViews(context.packageName, R.layout.widget_capture).apply {
+            return RemoteViews(context.packageName, if (full) R.layout.widget_capture_full else R.layout.widget_capture).apply {
                 setTextViewText(R.id.widget_summary, summary)
                 if (next != null) {
                     setTextViewText(R.id.widget_next, "Tiếp theo ${Instant.ofEpochMilli(next.whenAt!!).atZone(zone).format(HM)} · ${next.title}")
@@ -73,6 +100,21 @@ class CaptureWidget : AppWidgetProvider() {
                 }
                 setOnClickPendingIntent(R.id.widget_mic, captureIntent(context, 10))
                 setOnClickPendingIntent(R.id.widget_info, openIntent(context))
+                setOnClickPendingIntent(R.id.widget_type, quickAddIntent(context, 30, null, addNow = false))
+                if (full) {
+                    SLOT_IDS.forEachIndexed { i, id ->
+                        val t = templates.getOrNull(i)
+                        if (t == null) {
+                            setViewVisibility(id, View.GONE)
+                        } else {
+                            val text = QuickTemplates.normalize(t.text)
+                            setTextViewText(id, text)
+                            setViewVisibility(id, View.VISIBLE)
+                            setOnClickPendingIntent(id, quickAddIntent(context, 31 + i, text, addNow = !QuickTemplates.hasBlank(text)))
+                        }
+                    }
+                    setViewVisibility(R.id.widget_template_hint, if (templates.isEmpty()) View.VISIBLE else View.GONE)
+                }
             }
         }
 
@@ -84,6 +126,15 @@ class CaptureWidget : AppWidgetProvider() {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+
+        /** A line without a blank is added in one tap (the sheet shows Undo); one with a blank opens the sheet on it. */
+        private fun quickAddIntent(context: Context, requestCode: Int, text: String?, addNow: Boolean): PendingIntent =
+            PendingIntent.getActivity(
+                context,
+                requestCode,
+                QuickAddActivity.intent(context, text, addNow),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
 
         private fun openIntent(context: Context): PendingIntent = PendingIntent.getActivity(
             context,
