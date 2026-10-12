@@ -16,7 +16,6 @@ import androidx.documentfile.provider.DocumentFile
 import com.vh.myrecap.backup.BackupManager
 import android.graphics.drawable.Icon as SystemIcon
 import com.vh.myrecap.widget.CaptureWidget
-import com.vh.myrecap.widget.QuickAddWidget
 import com.vh.myrecap.widget.QuickCaptureTile
 import android.net.Uri
 import android.os.Build
@@ -539,7 +538,7 @@ private fun ShortcutRow() {
     val canAddTile = Build.VERSION.SDK_INT >= 33
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Lối tắt Ghi nhanh", fontWeight = FontWeight.SemiBold)
-        Hint("Ghi nhanh không cần mở app: widget ngoài màn hình chính, nút trong thanh cài đặt nhanh, hoặc giữ icon app.")
+        Hint("Ghi nhanh không cần mở app: một widget ngoài màn hình chính (ghi âm, gõ nhanh, mẫu câu; kéo cao 2 ô để hiện mẫu), nút trong thanh cài đặt nhanh, hoặc giữ icon app.")
         // Stacked full width: the labels stay whole on narrow phones.
         if (canPinWidget) {
             OutlinedButton(onClick = {
@@ -689,11 +688,4 @@ private fun BackupSection(vm: AppViewModel, s: AppSettings) {
 private fun TemplatesSection(vm: AppViewModel, s: AppSettings) {
     Hint("Câu mẫu để thêm việc, lịch hẹn, chi tiêu nhanh. Ô gõ nhanh hiện mẫu hay dùng nhất của mỗi loại; gõ chữ thì hiện các mẫu khớp.")
     FilledTonalButton(onClick = vm::openTemplates, modifier = Modifier.fillMaxWidth()) { Text("Quản lý mẫu câu (${s.quickTemplates.size})") }
-    val context = LocalContext.current
-    val widgets = context.getSystemService(AppWidgetManager::class.java)
-    if (widgets?.isRequestPinAppWidgetSupported == true) {
-        OutlinedButton(onClick = {
-            widgets.requestPinAppWidget(ComponentName(context, QuickAddWidget::class.java), null, null)
-        }, modifier = Modifier.fillMaxWidth()) { Text("Thêm widget Gõ nhanh ra màn hình chính") }
-    }
 }

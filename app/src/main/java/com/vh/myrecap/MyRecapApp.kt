@@ -73,7 +73,10 @@ class MyRecapApp : Application() {
             items.items.drop(1).debounce(500).collect { CaptureWidget.refresh(this@MyRecapApp) }
         }
         appScope.launch {
-            settings.settings.map { it.quickTemplates }.distinctUntilChanged().collect { QuickAddWidget.refresh(this@MyRecapApp) }
+            settings.settings.map { it.quickTemplates }.distinctUntilChanged().collect {
+                QuickAddWidget.refresh(this@MyRecapApp)
+                CaptureWidget.refresh(this@MyRecapApp)
+            }
         }
     }
 
