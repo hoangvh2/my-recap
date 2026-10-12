@@ -349,7 +349,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     /** Saves a typed quick-add as a confirmed item (the user saw what was understood), with its reminder. */
-    fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result) = io {
+    fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result) = lasting {
         val item = parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis())
         app.items.upsert(item)
         Reminders.sync(app, item)
@@ -367,7 +367,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun undoAddItem(item: Item) {
         if (lastAddedItem?.id == item.id) lastAddedItem = null
-        io {
+        lasting {
             app.items.delete(item.id)
             Reminders.cancel(app, item.id)
         }
@@ -639,5 +639,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun io(block: suspend () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) { block() }
+    }
+
+    /** For writes that must finish even when the screen closes right away (the quick-add sheet does). */
+    private fun lasting(block: suspend () -> Unit) {
+        app.appScope.launch(Dispatchers.IO) { block() }
     }
 }

@@ -16,6 +16,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.vh.myrecap.backup.BackupManager
 import android.graphics.drawable.Icon as SystemIcon
 import com.vh.myrecap.widget.CaptureWidget
+import com.vh.myrecap.widget.QuickAddWidget
 import com.vh.myrecap.widget.QuickCaptureTile
 import android.net.Uri
 import android.os.Build
@@ -729,5 +730,12 @@ private fun TemplatesSection(vm: AppViewModel, s: AppSettings) {
             }
         }
     }
-    Hint("Mẫu được ghim hiện trước, và sẽ là các nút trên widget.")
+    Hint("Mẫu được ghim hiện trước. Widget \"Gõ nhanh\" hiện 3 mẫu đầu; giữ icon app → Gõ nhanh để mở ô gõ từ màn hình chính.")
+    val context = LocalContext.current
+    val widgets = context.getSystemService(AppWidgetManager::class.java)
+    if (widgets?.isRequestPinAppWidgetSupported == true) {
+        OutlinedButton(onClick = {
+            widgets.requestPinAppWidget(ComponentName(context, QuickAddWidget::class.java), null, null)
+        }, modifier = Modifier.fillMaxWidth()) { Text("Thêm widget Gõ nhanh ra màn hình chính") }
+    }
 }
