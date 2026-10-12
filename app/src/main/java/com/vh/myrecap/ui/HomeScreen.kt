@@ -93,6 +93,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -332,21 +333,21 @@ private fun ModeSwitch(mode: SessionMode, onMode: (SessionMode) -> Unit) {
 }
 
 @Composable
-fun RecordButton(onClick: () -> Unit, description: String = "Bắt đầu ghi âm") {
+fun RecordButton(onClick: () -> Unit, description: String = "Bắt đầu ghi âm", size: Dp = 84.dp) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "press")
     Box(
         Modifier
-            .size(84.dp)
+            .size(size)
             .scale(scale)
             .clip(CircleShape)
-            .border(3.dp, Color.White.copy(alpha = 0.22f), CircleShape)
+            .border(size / 28, Color.White.copy(alpha = 0.22f), CircleShape)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.size(66.dp).clip(CircleShape).background(Brand.Record), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(size * 0.79f).clip(CircleShape).background(Brand.Record), contentAlignment = Alignment.Center) {
             Icon(Icons.Rounded.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
         }
     }
