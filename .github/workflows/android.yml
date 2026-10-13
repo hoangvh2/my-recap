@@ -109,7 +109,8 @@ jobs:
   release:
     name: Publish APK
     needs: [build, device-test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/meeting-notes-stt-app-ce4wp7')
+    # A push to main publishes; so does "Run workflow" on main (e.g. after changing the repository variables).
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/meeting-notes-stt-app-ce4wp7')
     runs-on: ubuntu-latest
     permissions:
       contents: write
