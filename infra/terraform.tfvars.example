@@ -22,3 +22,12 @@ allowed_emails = [
 # Optional: phone notifications through Pushover. Create an application at https://pushover.net/apps/build
 # (name "VHub Desk"), paste its API token here, deploy, then each person enters their User Key in Settings.
 # pushover_app_token = "<30-character application token>"
+
+# Optional: sharing pushes in the browser. Firebase console > Project settings > Cloud Messaging > Web Push certificates
+# > Generate key pair, then paste the public key. Without it, sharing pushes go to Pushover only.
+# fcm_vapid_key = "B..."
+
+# Android app with sync and sharing (see infra/README.md section 14). The SHA-1 below is the committed sideload key
+# that CI signs the APK with; a sideloaded APK cannot get App Check, so Firestore must not require it.
+# android_sha1      = ["F4:DC:BF:F6:8C:44:2A:87:AA:10:59:58:49:92:19:5C:73:CA:F7:F6"]
+# enforce_app_check = false
