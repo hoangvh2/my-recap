@@ -68,6 +68,7 @@ test("two people link with a code, share one appointment, the edit reaches the o
   await tab(page, "Hôm nay");
   await expect(page.locator(".notice.linked")).toContainText("member đã liên kết với bạn");
   await page.locator(".notice.linked").getByRole("button", { name: "Đặt tên" }).click();
+  await expect(page.getByLabel(/Tên gợi nhớ/)).toHaveValue("member"); // the contact has loaded
   await page.getByLabel(/Tên gợi nhớ/).fill("Em Lan");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByText("Đã đổi tên gợi nhớ")).toBeVisible();
