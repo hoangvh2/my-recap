@@ -61,6 +61,41 @@ iPhone (PWA, Preact)
 
 **Khách cần/mua license → luôn ra license nháp trong Gia hạn:** "cần", "muốn", "lấy thêm", "báo giá", "chốt", "mua"… cùng chữ license/bản quyền/phần mềm/bảo hành → mỗi sản phẩm một license ("SIM và CheckPoint" = 2). Ngày tính từ ngày giao/hạn của việc, không có thì từ hôm nay, thời hạn tạm 12 tháng, ghi rõ "tạm tính" trên thẻ nháp để kiểm tra lại.
 
+## Chia sẻ giữa người dùng (web và Android)
+
+- **Liên kết:** cả hai bên phải đồng ý.
+  - Một người tạo mã 8 ký tự, hết hạn sau 10 phút, dùng một lần. Mã mới thay mã cũ.
+  - Người kia nhập mã, xem trước tên và email (đã che bớt), rồi đặt tên gợi nhớ (sửa lại được).
+  - Nhập sai 5 lần trong 1 giờ thì bị khoá tạm.
+- **Chia sẻ từng mục:** trong trình sửa của việc, lịch hẹn hoặc ghi chú → **Chia sẻ** → chọn người.
+  - Mục khác vẫn riêng tư.
+  - Chi tiêu không chia sẻ được.
+  - Người nhận chỉ xem tiêu đề, giờ, địa điểm, ghi chú và số người cùng xem. Không thấy khách hàng, license hay tiền.
+  - Chỉ người tạo sửa được.
+  - Việc lặp lại thì lần kế tiếp vẫn chia sẻ với đúng những người đó.
+- **Hiển thị:**
+  - Mục của người khác có viền tím và nhãn 🔒 tên người chia sẻ, không có ô đánh dấu xong.
+  - Bộ lọc **Tất cả / Của tôi / Được chia sẻ (n)** hiện khi có mục được chia sẻ.
+  - Mục của người khác đã quá ngày thì tự ẩn, không tính là quá hạn của mình.
+- **Thông báo:**
+  - Có push khi được chia sẻ mục mới, khi người tạo sửa (kèm nội dung đổi, ví dụ "Đổi thời gian…"), khi xoá, và khi liên kết hoặc huỷ liên kết.
+  - Đánh dấu xong và tự lùi lịch lặp thì không gửi push.
+  - Push đi qua FCM (Android và trình duyệt) và/hoặc Pushover.
+  - Tắt được theo từng người trong **Liên hệ chia sẻ → tên người → Báo cho tôi**.
+- **Huỷ liên kết:** bên nào cũng huỷ được, không cần bên kia xác nhận. Bên kia nhận thông báo, và các mục hai bên chia sẻ cho nhau biến mất ngay.
+- **Dữ liệu:**
+  - `links/{a_b}`
+  - `users/{uid}/contacts`, `notices`, `devices`
+  - `shares/{owner_item}`: bản chỉ đọc, do Function `sharesync` ghi khi mục gốc thay đổi
+  - `shareCodes/{sha256}`
+  - `members/{email}`: người quản trị thêm người dùng trong Cài đặt
+- **Android:**
+  - Đăng nhập Google trong **Cài đặt → Đồng bộ & chia sẻ**.
+  - Việc, lịch, ghi chú, chi tiêu được đồng bộ hai chiều với bản web trên cùng tài khoản.
+  - Lần đầu, mục chỉ có trên máy được tải lên. Mục có ở cả hai nơi thì bản trên mây thắng.
+  - Bản build không có cấu hình Firebase chạy như cũ, chỉ trên máy.
+  - Cách cấu hình: xem [infra/README.md, Phần 14](../infra/README.md#14-chia-sẻ-giữa-người-dùng-và-app-android).
+
 ## Thông báo (Pushover)
 
 **Vì sao Pushover chứ không phải Web Push:** Web Push trên iPhone chỉ chạy khi app đã thêm vào Màn hình chính (iOS 16.4+), không có mức ưu tiên, không nhắc lặp đến khi xác nhận. Pushover (app iOS, trả một lần ~5 USD sau 30 ngày dùng thử) có 4 mức ưu tiên, mức khẩn lặp lại đến khi bấm xác nhận, và vượt được giờ yên lặng.
