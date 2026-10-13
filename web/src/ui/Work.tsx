@@ -12,6 +12,9 @@ import { TYPE_ICON } from "./ItemRow";
 import { Events, Expenses, Notes, Overview, Tasks } from "./Lists";
 import { Weekly } from "./Weekly";
 import { showToast } from "./toast";
+import { withReceived } from "../lib/sharing";
+import { received as receivedStore } from "../share";
+import { OwnerFilterBar, useOwnerFilter } from "./Sharing";
 
 type Tab = "ALL" | "WEEK" | ItemType;
 // "Lịch" shows every dated task and appointment (the calendar), not only appointments.
@@ -23,15 +26,19 @@ export function Work() {
   const all = useStore(itemsStore);
   const [tab, setTab] = useState<Tab>("ALL");
   const [adding, setAdding] = useState(false);
-  const saved = useMemo(() => all.filter((i) => i.status !== "DRAFT"), [all]);
+  const rec = useStore(receivedStore);
+  const [who, setWho] = useOwnerFilter();
+  const mine = useMemo(() => all.filter((i) => i.status !== "DRAFT"), [all]);
+  // Expenses and the week view are mine only; the other lists also show what others shared with me.
+  const saved = useMemo(() => withReceived(mine, rec, who), [mine, rec, who]);
   const counts = useMemo(() => {
-    const open = saved.filter((i) => i.status === "OPEN");
+    const open = mine.filter((i) => i.status === "OPEN");
     // The calendar chip counts what is on it today: overdue tasks and today's entries.
     const now = Date.now();
     const ag = agenda(open, now);
     const today = ag.overdue.length + ag.ahead.filter((i) => i.whenAt! < startOfDay(now) + 86_400_000).length;
     return { ALL: open.filter((i) => i.type === "TASK" || i.type === "EVENT").length, TASK: open.filter((i) => i.type === "TASK").length, EVENT: today, EXPENSE: 0, NOTE: 0, WEEK: 0 } as Record<Tab, number>;
-  }, [saved]);
+  }, [mine]);
 
   const fail = () => showToast("Chưa lưu được, kiểm tra mạng rồi thử lại");
   const open = (item: Item) => openEditor(item);
@@ -52,12 +59,13 @@ export function Work() {
           </button>
         ))}
       </nav>
+      {tab !== "EXPENSE" && tab !== "WEEK" && <OwnerFilterBar value={who} onChange={setWho} />}
       {tab === "ALL" && <Overview items={saved} onOpen={open} onToggle={toggle} />}
       {tab === "TASK" && <Tasks items={saved} onOpen={open} onToggle={toggle} />}
       {tab === "EVENT" && <Events items={saved} onOpen={open} onToggle={toggle} />}
-      {tab === "EXPENSE" && <Expenses items={saved} onOpen={open} />}
+      {tab === "EXPENSE" && <Expenses items={mine} onOpen={open} />}
       {tab === "NOTE" && <Notes items={saved} onOpen={open} onToggle={toggle} />}
-      {tab === "WEEK" && <Weekly items={saved} />}
+      {tab === "WEEK" && <Weekly items={mine} />}
       {adding && (
         <Sheet title="Thêm gì?" onClose={() => setAdding(false)}>
           <div class="add-grid">

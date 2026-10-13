@@ -8,6 +8,9 @@ import type { Item } from "../lib/model";
 import { go, to } from "../lib/router";
 import { useStore } from "../lib/store";
 import { overview, timeline } from "../lib/views";
+import { withReceived } from "../lib/sharing";
+import { received as receivedStore } from "../share";
+import { NoticeBanner, OwnerFilterBar, useOwnerFilter } from "./Sharing";
 import { NudgeRow, useLicenseActions } from "./actions";
 import { Capture } from "./Capture";
 import { QuickAdd } from "./QuickAdd";
@@ -32,7 +35,12 @@ export function Today() {
   const due = useMemo(() => dueNudges(open, ctx), [open, ctx]);
   const soon = useMemo(() => upcomingNudges(open, ctx, 14), [open, ctx]);
   const now = useNow();
-  const o = useMemo(() => overview(all.filter((i) => i.status !== "DRAFT"), now), [all, now]);
+  const rec = useStore(receivedStore);
+  const [who, setWho] = useOwnerFilter();
+  const recIds = useMemo(() => new Set(rec.map((d) => d.id)), [rec]);
+  // My saved items plus what others shared with me (filtered by whose); theirs never count as overdue for me.
+  const shown = useMemo(() => withReceived(all.filter((i) => i.status !== "DRAFT"), rec, who), [all, rec, who]);
+  const o = useMemo(() => overview(shown, now, (i) => recIds.has(i.id)), [shown, now, recIds]);
   const tl = useMemo(() => timeline(o.today, now), [o.today, now]);
 
   const openItem = (i: Item) => openEditor(i);
@@ -42,11 +50,12 @@ export function Today() {
     if (done) showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(fail) });
   };
   const nothing = due.length === 0 && o.overdue.length === 0 && o.today.length === 0;
-  const hasData = g.customers.some((c) => c.status === "OPEN") || all.length > 0;
+  const hasData = g.customers.some((c) => c.status === "OPEN") || all.length > 0 || rec.length > 0;
 
   return (
     <>
       <TopBar title="Hôm nay" sub={todayLabel()} right={<><button class="icon-btn" aria-label="Tìm kiếm" onClick={openSearch}><Icon name="search" /></button><Link to={to.settings} class="icon-btn" label="Cài đặt"><Icon name="cog" /></Link></>} />
+      <NoticeBanner />
       <Capture />
       <QuickAdd />
       <Review />
@@ -56,6 +65,8 @@ export function Today() {
           <ul class="nudges">{due.map((n) => <NudgeRow key={n.licenseId} nudge={n} actions={actions} />)}</ul>
         </Section>
       )}
+
+      <OwnerFilterBar value={who} onChange={setWho} />
 
       {o.overdue.length > 0 && (
         <Section title="Việc quá hạn" count={o.overdue.length} tone="warn">

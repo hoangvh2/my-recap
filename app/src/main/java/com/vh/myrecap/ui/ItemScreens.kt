@@ -90,7 +90,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vh.myrecap.core.EXPENSE_CATEGORIES
+import com.vh.myrecap.cloud.Account
 import com.vh.myrecap.core.Item
+import com.vh.myrecap.core.Share
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
@@ -436,16 +438,30 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     var pickTime by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
 
+    // Who sees this item (sharing). Only for my saved tasks, appointments and notes while signed in.
+    val account by vm.account.collectAsStateWithLifecycle()
+    val contacts by vm.contacts.collectAsStateWithLifecycle()
+    val audiences by vm.audiences.collectAsStateWithLifecycle()
+    val sharedWith = audiences[original.id].orEmpty()
+    var audience by remember(original.id, sharedWith) { mutableStateOf(sharedWith) }
+    var picking by remember { mutableStateOf(false) }
+
     val parsedAmount = Money.parseVnd(amountText)
     val current = edit.copy(amount = if (edit.type == ItemType.EXPENSE) parsedAmount else null, title = edit.title.trim())
     val isNew = id == null
     val isDraft = original.status == ItemStatus.DRAFT
-    val dirty = current != original.copy(title = original.title.trim())
+    val canShare = account is Account.SignedIn && !isDraft && Share.isShareable(current.copy(status = ItemStatus.OPEN))
+    val audienceChanged = canShare && audience.toSet() != sharedWith.toSet()
+    val dirty = current != original.copy(title = original.title.trim()) || audienceChanged
     val valid = current.title.isNotBlank() && (current.type != ItemType.EXPENSE || parsedAmount != null)
 
     fun save(status: ItemStatus = if (isDraft) ItemStatus.OPEN else current.status) {
         // Completing goes through the store so a repeating task schedules its next instance.
-        if (status != current.status && !isDraft) vm.saveAndSetDone(current, status == ItemStatus.DONE) else vm.saveItem(current.copy(status = status))
+        when {
+            status != current.status && !isDraft -> vm.saveAndSetDone(current, status == ItemStatus.DONE)
+            audienceChanged -> vm.saveItemAndShare(current.copy(status = status), audience)
+            else -> vm.saveItem(current.copy(status = status))
+        }
         vm.back()
     }
     if (dirty) BackHandler { confirmLeave = true }
@@ -589,9 +605,28 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     Text("Thêm vào ứng dụng Lịch")
                 }
             }
+            if (canShare) {
+                EditorShareRow(names = audience.mapNotNull { u -> contacts.firstOrNull { it.uid == u }?.alias }) { picking = true }
+            }
             original.sourceId?.let { source -> SourceCard(vm, source, original.quote) }
             Spacer(Modifier.height(8.dp))
         }
+    }
+
+    if (picking) {
+        SharePickerDialog(
+            contacts = contacts,
+            initial = audience,
+            onOpenContacts = {
+                picking = false
+                vm.openContacts()
+            },
+            onDone = {
+                audience = it
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
     }
 
     if (pickDate) {
@@ -755,7 +790,7 @@ private fun SourceCard(vm: AppViewModel, sourceId: String, quote: String?) {
 }
 
 /** Opens the phone's calendar app with the event filled in; the user saves it there. */
-private fun addToCalendar(context: Context, item: Item) {
+internal fun addToCalendar(context: Context, item: Item) {
     val at = item.whenAt ?: return
     val begin = if (item.allDay) localDate(at).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() else at
     val end = if (item.allDay) begin + 24 * 3600_000L else begin + 3600_000L

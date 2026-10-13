@@ -11,8 +11,12 @@ export interface Overview {
 
 const byWhen = (a: Item, b: Item) => (a.whenAt ?? Infinity) - (b.whenAt ?? Infinity) || a.createdAt - b.createdAt;
 
-/** Open tasks and appointments grouped for the "Tất cả" tab. Notes and expenses have their own tabs. */
-export function overview(items: Item[], now: number): Overview {
+/**
+ * Open tasks and appointments grouped for the "Tất cả" tab. Notes and expenses have their own tabs.
+ * Something another person shared with me (`received`) is never "overdue" for me: if its time was today it
+ * stays on today's list, if it was earlier it is left out.
+ */
+export function overview(items: Item[], now: number, received: (i: Item) => boolean = () => false): Overview {
   const today0 = startOfDay(now);
   const tomorrow0 = today0 + 86_400_000;
   const out: Overview = { overdue: [], today: [], upcoming: [], someday: [] };
@@ -24,7 +28,9 @@ export function overview(items: Item[], now: number): Overview {
     }
     const over = i.allDay ? i.whenAt < today0 : i.whenAt < now && i.type === "TASK";
     const pastEvent = i.type === "EVENT" && !i.allDay && i.whenAt < today0;
-    if (over || pastEvent) out.overdue.push(i);
+    if ((over || pastEvent) && received(i)) {
+      if (i.whenAt >= today0) out.today.push(i);
+    } else if (over || pastEvent) out.overdue.push(i);
     else if (i.whenAt < tomorrow0) out.today.push(i);
     else out.upcoming.push(i);
   }
@@ -48,14 +54,17 @@ export interface Agenda {
  * The calendar view: one list of every open dated task and appointment. The same item also shows in
  * its own list ("Việc"); it is one record in two views, never a copy.
  */
-export function agenda(items: Item[], now: number): Agenda {
+export function agenda(items: Item[], now: number, received: (i: Item) => boolean = () => false): Agenda {
   const today0 = startOfDay(now);
   const out: Agenda = { overdue: [], ahead: [], past: [] };
   for (const i of items) {
     if (i.status !== "OPEN" || i.whenAt === undefined || (i.type !== "TASK" && i.type !== "EVENT")) continue;
     if (i.type === "TASK") {
       const late = i.allDay ? i.whenAt < today0 : i.whenAt < now;
-      (late ? out.overdue : out.ahead).push(i);
+      // Someone else's late task is not mine to catch up on: today's stays in the day, older ones drop off.
+      if (late && received(i)) {
+        if (i.whenAt >= today0) out.ahead.push(i);
+      } else (late ? out.overdue : out.ahead).push(i);
     } else {
       const end = i.allDay ? startOfDay(i.whenAt) + 86_400_000 : i.whenAt + 3_600_000;
       (end <= now ? out.past : out.ahead).push(i);

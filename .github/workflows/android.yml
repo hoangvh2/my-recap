@@ -36,6 +36,13 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - name: Build
+        # Sync and sharing (Firebase) identifiers come from repository variables; unset = phone-only build.
+        env:
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FIREBASE_SENDER_ID: ${{ vars.FIREBASE_SENDER_ID }}
+          FIREBASE_WEB_CLIENT_ID: ${{ vars.FIREBASE_WEB_CLIENT_ID }}
         run: ./gradlew --no-daemon :core:test :app:lintRelease :app:assembleRelease
       - name: Upload lint report
         if: failure()

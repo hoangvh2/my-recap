@@ -18,6 +18,12 @@ val signingProps = Properties().apply {
 fun signingValue(env: String, prop: String): String? =
     System.getenv(env)?.takeIf { it.isNotBlank() } ?: signingProps.getProperty(prop)
 
+// Cloud sync and sharing (Firebase): identifiers, not secrets. From the environment (CI variables, or
+// `terraform output android_env`) or gradle properties. Empty = the app runs as before, phone-only.
+fun cloudValue(name: String, default: String = ""): String =
+    (System.getenv(name)?.takeIf { it.isNotBlank() } ?: (findProperty(name) as String?) ?: default).trim()
+fun quoted(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 android {
     namespace = "com.vh.myrecap"
     compileSdk = 35
@@ -29,6 +35,13 @@ android {
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
         versionName = System.getenv("VERSION_NAME") ?: "0.1.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "FIREBASE_API_KEY", quoted(cloudValue("FIREBASE_API_KEY")))
+        buildConfigField("String", "FIREBASE_APP_ID", quoted(cloudValue("FIREBASE_APP_ID")))
+        buildConfigField("String", "FIREBASE_PROJECT_ID", quoted(cloudValue("FIREBASE_PROJECT_ID")))
+        buildConfigField("String", "FIREBASE_SENDER_ID", quoted(cloudValue("FIREBASE_SENDER_ID")))
+        buildConfigField("String", "FIREBASE_WEB_CLIENT_ID", quoted(cloudValue("FIREBASE_WEB_CLIENT_ID")))
+        buildConfigField("String", "FUNCTIONS_REGION", quoted(cloudValue("FUNCTIONS_REGION", "asia-southeast1")))
     }
 
     signingConfigs {
@@ -90,6 +103,17 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+
+    // Cloud sync and sharing. Configured in code from BuildConfig (no google-services.json, no plugin).
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-functions")
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")

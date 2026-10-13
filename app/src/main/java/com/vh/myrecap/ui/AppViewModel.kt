@@ -11,7 +11,13 @@ import androidx.compose.runtime.mutableStateListOf
 import com.vh.myrecap.backup.BackupManager
 import com.vh.myrecap.backup.BackupResult
 import com.vh.myrecap.backup.RestoreResult
+import com.vh.myrecap.cloud.Account
+import com.vh.myrecap.cloud.ShareException
+import com.vh.myrecap.cloud.ShareRepo
 import com.vh.myrecap.core.ActionItems
+import com.vh.myrecap.core.Contact
+import com.vh.myrecap.core.ShareNotice
+import com.vh.myrecap.core.SharedItem
 import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.BackupException
 import com.vh.myrecap.core.ClipText
@@ -64,6 +70,11 @@ sealed interface Screen {
     data object Search : Screen
     data object Spending : Screen
     data object Weekly : Screen
+    /** People I linked with; making and entering link codes. */
+    data object Contacts : Screen
+    data class ContactDetail(val uid: String) : Screen
+    /** Read-only view of an item someone shared with me. */
+    data class Shared(val id: String) : Screen
 
     /** Whether this screen shows folder/capture [folderId] (closed when that is deleted). */
     fun shows(folderId: String): Boolean = when (this) {
@@ -177,7 +188,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openWeekly() = push(Screen.Weekly)
     fun openClip(id: String, index: Int) = push(Screen.Clip(id, index))
     fun openSummary(id: String, jobId: String) = push(Screen.Summary(id, jobId))
-    fun openItem(id: String) = push(Screen.ItemEdit(id))
+    /** Opens my item in the editor, or someone else's shared item read-only. */
+    fun openItem(id: String) {
+        if (received.value.any { it.id == id }) openShared(id) else push(Screen.ItemEdit(id))
+    }
+    fun openShared(id: String) = push(Screen.Shared(id))
+    fun openContacts() = push(Screen.Contacts)
+    fun openContact(uid: String) = push(Screen.ContactDetail(uid))
     fun newItem(type: ItemType) = push(Screen.ItemEdit(null, type))
 
     /** A reader opened from a notification replaces the reader already open, not stacks on it. */
@@ -187,6 +204,67 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun back() {
         if (stack.size > 1) stack.removeAt(stack.size - 1)
+    }
+
+    // ------------------------------------------------------------ sync and sharing
+
+    val account: StateFlow<Account> = app.cloud.account
+    val accountProblem: StateFlow<String?> = app.cloud.problem
+    val sharing: ShareRepo? = app.cloud.sharing
+    val contacts: StateFlow<List<Contact>> = sharing?.contacts ?: MutableStateFlow(emptyList())
+    val received: StateFlow<List<SharedItem>> = sharing?.received ?: MutableStateFlow(emptyList())
+    val audiences: StateFlow<Map<String, List<String>>> = sharing?.audiences ?: MutableStateFlow(emptyMap())
+    val notices: StateFlow<List<ShareNotice>> = sharing?.notices ?: MutableStateFlow(emptyList())
+
+    /** One-line result of a sharing action, shown as a snackbar. */
+    var shareMessage by mutableStateOf<String?>(null)
+        private set
+
+    fun say(message: String) {
+        shareMessage = message
+    }
+
+    fun clearShareMessage() {
+        shareMessage = null
+    }
+
+    fun signIn(activity: android.app.Activity) = viewModelScope.launch {
+        app.cloud.signIn(activity)?.let { say(it) }
+    }
+
+    fun signOut() = lasting { app.cloud.signOut() }
+
+    /**
+     * Saves my item and, when [audience] changed, who it is shared with. Sharing needs the item on the server
+     * first (the function reads it there), so this waits for the upload.
+     */
+    fun saveItemAndShare(item: Item, audience: List<String>) = lasting {
+        app.items.upsert(item)
+        Reminders.sync(app, item)
+        val sharing = sharing ?: return@lasting
+        val message = if (app.cloud.sync?.putAndWait(item) != true) {
+            "Đã lưu. Chưa chia sẻ được vì đang mất mạng, mở lại mục này để chia sẻ"
+        } else {
+            try {
+                val now = sharing.setAudience(item.id, audience)
+                if (now.isEmpty()) "Đã lưu, mục này không còn chia sẻ với ai" else "Đã lưu và chia sẻ với ${now.size} người"
+            } catch (e: ShareException) {
+                "Đã lưu. Chưa chia sẻ được: ${e.message}"
+            }
+        }
+        withContext(Dispatchers.Main) { say(message) }
+    }
+
+    /** A copy of something shared with me, as my own item (my reminder, my edits). */
+    fun copyShared(shared: SharedItem) {
+        val copy = shared.asItem().copy(
+            id = ItemStore.newId(),
+            status = ItemStatus.OPEN,
+            doneAt = null,
+            createdAt = System.currentTimeMillis(),
+        )
+        saveItem(copy)
+        say("Đã chép “${shared.title}” về mục của bạn")
     }
 
     fun setHomeTab(tab: Int) = app.settings.update { it.copy(homeTab = tab) }

@@ -1,18 +1,24 @@
-import { randomUUID, createHash } from "node:crypto";
+import { randomInt, randomUUID, createHash } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getMessaging } from "firebase-admin/messaging";
 import * as logger from "firebase-functions/logger";
 import { defineSecret, defineString } from "firebase-functions/params";
+import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { isAllowedToken, parseAllowedEmails } from "./auth";
 import { CaptureError, parseCaptureInput, runCapture, type CaptureDeps } from "./capture";
 import { allowedOrigins, DEFAULT_GEMINI_MODEL, GEMINI_BASE_URL, REGION } from "./config";
 import { FeedHandler, FeedRequestError, FirestoreFeedStore, manageFeed, parseFeedRequest } from "./feed";
 import { GeminiClient } from "./gemini";
+import { FirestoreMembersStore, isMemberToken, manageMembers, MembersError, parseMembersRequest } from "./members";
 import { PUSHOVER_BASE_URL, PushoverClient } from "./notify/pushover";
 import { FirestoreNotifyStore, manageNotify, NotifyError, tick } from "./notify/run";
 import { parseSettingsRequest, SettingsError } from "./notify/settings";
 import { FirestoreQuota } from "./usage";
+import { FirestoreShareStore, MultiChannelPusher } from "./share/firestore";
+import { handleShare, onItemWritten, parseShareRequest, ShareError, type ShareDeps } from "./share/service";
+import type { Item } from "../../shared/model";
 
 initializeApp();
 
@@ -52,7 +58,7 @@ export const capture = onCall(
     memory: "512MiB",
   },
   async (request) => {
-    const uid = requireAllowed(request, "capture");
+    const uid = await requireAllowed(request, "capture");
     const started = Date.now();
     try {
       const input = parseCaptureInput(request.data);
@@ -71,10 +77,14 @@ export const capture = onCall(
   },
 );
 
-/** Signed in with an allow-listed, verified Google account; returns the uid. */
-function requireAllowed(request: CallableRequest, what: string): string {
+/**
+ * Signed in with a verified Google account that is on the fixed list (ALLOWED_EMAILS, the administrators) or
+ * that an administrator added in the app (members/{email}); returns the uid.
+ */
+async function requireAllowed(request: CallableRequest, what: string): Promise<string> {
   if (!request.auth) throw new HttpsError("unauthenticated", "Cần đăng nhập");
-  if (!isAllowedToken(request.auth.token, parseAllowedEmails(ALLOWED_EMAILS.value()))) {
+  const fixed = isAllowedToken(request.auth.token, parseAllowedEmails(ALLOWED_EMAILS.value()));
+  if (!fixed && !(await isMemberToken(new FirestoreMembersStore(getFirestore()), request.auth.token))) {
     logger.warn(`${what} denied`, { uid: shortHash(request.auth.uid) });
     throw new HttpsError("permission-denied", "Tài khoản này chưa được cấp quyền");
   }
@@ -97,7 +107,7 @@ export const calendarlink = onCall(
     memory: "256MiB",
   },
   async (request) => {
-    const uid = requireAllowed(request, "calendarlink");
+    const uid = await requireAllowed(request, "calendarlink");
     try {
       const req = parseFeedRequest(request.data);
       const result = await manageFeed(new FirestoreFeedStore(getFirestore()), uid, req);
@@ -162,7 +172,7 @@ export const notifysettings = onCall(
     memory: "256MiB",
   },
   async (request) => {
-    const uid = requireAllowed(request, "notifysettings");
+    const uid = await requireAllowed(request, "notifysettings");
     try {
       const req = parseSettingsRequest(request.data);
       const result = await manageNotify(new FirestoreNotifyStore(getFirestore()), pushover(), uid, req, Date.now(), appUrl());
@@ -195,6 +205,98 @@ export const notifytick = onRequest(
     } catch (e) {
       logger.error("notifytick crashed", { error: e instanceof Error ? e.message.slice(0, 120) : "unknown" });
       res.status(500).end();
+    }
+  },
+);
+
+// ---------------------------------------------------------------- sharing between people
+
+function shareDeps(): ShareDeps {
+  const db = getFirestore();
+  const token = PUSHOVER_TOKEN.value().trim();
+  const override = inEmulator ? process.env.PUSHOVER_BASE_URL_OVERRIDE : undefined;
+  const pushoverClient = token && token !== "unset" ? new PushoverClient(token, override ?? PUSHOVER_BASE_URL) : null;
+  // The emulator has no FCM; pushes there go to Pushover (faked in the end-to-end run) only.
+  const fcm = inEmulator ? null : getMessaging();
+  return {
+    store: new FirestoreShareStore(db),
+    pusher: new MultiChannelPusher(db, fcm, pushoverClient, (msg, data) => logger.warn(msg, data)),
+    now: () => Date.now(),
+    randomInt: (n) => randomInt(n),
+    appUrl: appUrl(),
+  };
+}
+
+/**
+ * Link codes, contacts and which item is shared with whom. No Gemini, no money: App Check is checked when the
+ * caller has it (the browser) but not required, because the sideloaded Android app cannot attest itself.
+ * Sign-in and the allowlist still gate every call, and wrong codes are rate limited per person.
+ */
+export const share = onCall(
+  {
+    region: REGION,
+    secrets: [PUSHOVER_TOKEN],
+    enforceAppCheck: false,
+    cors: inEmulator ? true : allowedOrigins(project, process.env.EXTRA_ORIGINS),
+    maxInstances: 3,
+    concurrency: 16,
+    timeoutSeconds: 60,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const uid = await requireAllowed(request, "share");
+    const token = request.auth!.token as { email?: string; name?: string };
+    try {
+      const req = parseShareRequest(request.data);
+      const result = await handleShare(shareDeps(), { uid, email: (token.email ?? "").toLowerCase(), name: token.name ?? "" }, req);
+      logger.info("share", { uid: shortHash(uid), action: req.action });
+      return result;
+    } catch (e) {
+      if (e instanceof ShareError) throw new HttpsError(e.code, e.message);
+      logger.error("share crashed", { uid: shortHash(uid), error: e instanceof Error ? e.message.slice(0, 160) : "unknown" });
+      throw new HttpsError("internal", "Chưa làm được, thử lại sau");
+    }
+  },
+);
+
+/** Every write of an item: keep its shared view (if any) in step, and tell the people it is shared with. */
+export const sharesync = onDocumentWritten(
+  { document: "users/{uid}/items/{itemId}", region: REGION, secrets: [PUSHOVER_TOKEN], maxInstances: 5, concurrency: 16, timeoutSeconds: 60, memory: "256MiB", retry: false },
+  async (event) => {
+    const after = event.data?.after;
+    const item = after?.exists ? ({ ...(after.data() as Omit<Item, "id">), id: after.id }) : null;
+    try {
+      const r = await onItemWritten(shareDeps(), event.params.uid, event.params.itemId, item);
+      if (r !== "none") logger.info("sharesync", { uid: shortHash(event.params.uid), result: r });
+    } catch (e) {
+      logger.error("sharesync crashed", { uid: shortHash(event.params.uid), error: e instanceof Error ? e.message.slice(0, 160) : "unknown" });
+    }
+  },
+);
+
+/** Administrators (the fixed list) add or remove the people who may use the app. */
+export const members = onCall(
+  {
+    region: REGION,
+    enforceAppCheck: false,
+    cors: inEmulator ? true : allowedOrigins(project, process.env.EXTRA_ORIGINS),
+    maxInstances: 2,
+    concurrency: 8,
+    timeoutSeconds: 30,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const uid = await requireAllowed(request, "members");
+    try {
+      const req = parseMembersRequest(request.data);
+      const email = String((request.auth!.token as { email?: string }).email ?? "");
+      const result = await manageMembers(new FirestoreMembersStore(getFirestore()), email, parseAllowedEmails(ALLOWED_EMAILS.value()), req, Date.now());
+      logger.info("members", { uid: shortHash(uid), action: req.action });
+      return result;
+    } catch (e) {
+      if (e instanceof MembersError) throw new HttpsError(e.code, e.message);
+      logger.error("members crashed", { uid: shortHash(uid), error: e instanceof Error ? e.name : "unknown" });
+      throw new HttpsError("internal", "Chưa làm được, thử lại sau");
     }
   },
 );

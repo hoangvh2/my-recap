@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, limit, query, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 // The rules are generated from firestore.rules.tmpl with the throwaway list in config/allowed-emails.local
@@ -350,6 +350,105 @@ describe("calendar feed tokens", () => {
     await assertFails(setDoc(doc(ownerCtx(), "feeds/zzz"), { uid: "uOwner" }));
     await assertFails(getDocs(query(collection(ownerCtx(), "feeds"), limit(5))));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "feeds/abc")));
+  });
+});
+
+describe("members added in the app", () => {
+  const lanCtx = () => env.authenticatedContext("uLan", google("lan@example.com")).firestore();
+  it("lets an address an administrator added in /members use its own data, and nothing else", async () => {
+    await assertFails(setDoc(doc(lanCtx(), "users/uLan/items/a1"), item()));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "members/lan@example.com"), { email: "lan@example.com", addedBy: "owner@example.com", addedAt: 1 });
+    });
+    await assertSucceeds(setDoc(doc(lanCtx(), "users/uLan/items/a1"), item()));
+    await assertFails(getDoc(doc(lanCtx(), "users/uOwner/items/a1")));
+    // The members list itself is closed to every client, administrators included.
+    await assertFails(getDoc(doc(ownerCtx(), "members/lan@example.com")));
+    await assertFails(setDoc(doc(lanCtx(), "members/x@example.com"), { email: "x@example.com" }));
+    await assertFails(setDoc(doc(env.authenticatedContext("uX", google("x@example.com")).firestore(), "users/uX/items/a1"), item()));
+    // An unverified address does not get in through the list either.
+    const unverified = env.authenticatedContext("uLan", google("lan@example.com", { email_verified: false })).firestore();
+    await assertFails(setDoc(doc(unverified, "users/uLan/items/a2"), item({ id: "a2" })));
+  });
+});
+
+describe("sharing", () => {
+  const share = (over: Record<string, unknown> = {}) => ({
+    id: "uOwner_e1", ownerUid: "uOwner", ownerName: "Owner", itemId: "e1", audience: ["uMember"],
+    type: "EVENT", status: "OPEN", title: "Nhậu hội lớp", details: "", allDay: false, createdAt: 1, updatedAt: 1, ...over,
+  });
+  const stranger = () => env.authenticatedContext("uX", google("stranger@example.com")).firestore();
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "shares/uOwner_e1"), share());
+      await setDoc(doc(db, "shares/uOwner_e2"), share({ id: "uOwner_e2", itemId: "e2", audience: ["uOther"] }));
+      await setDoc(doc(db, "users/uMember/contacts/uOwner"), { uid: "uOwner", alias: "Owner", googleName: "Owner", maskedEmail: "own•••@example.com", linkedAt: 1, notify: true });
+      await setDoc(doc(db, "users/uMember/notices/n1"), { id: "n1", kind: "unlinked", fromUid: "uOwner", fromName: "Owner", at: 1 });
+      await setDoc(doc(db, "links/uMember_uOwner"), { members: ["uMember", "uOwner"], createdAt: 1 });
+      await setDoc(doc(db, "shareCodes/abc"), { ownerUid: "uOwner", ownerName: "Owner", ownerEmail: "owner@example.com", expiresAt: 9e15 });
+    });
+  });
+
+  it("lets the audience and the owner read a shared view, and nobody else", async () => {
+    await assertSucceeds(getDoc(doc(memberCtx(), "shares/uOwner_e1")));
+    await assertSucceeds(getDoc(doc(ownerCtx(), "shares/uOwner_e1")));
+    await assertFails(getDoc(doc(memberCtx(), "shares/uOwner_e2")));
+    await assertFails(getDoc(doc(stranger(), "shares/uOwner_e1")));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "shares/uOwner_e1")));
+  });
+
+  it("allows only the queries that prove who may read: shared with me, or mine", async () => {
+    const received = await assertSucceeds(getDocs(query(collection(memberCtx(), "shares"), where("audience", "array-contains", "uMember"), limit(500))));
+    expect(received.docs.map((d) => d.id)).toEqual(["uOwner_e1"]);
+    const mine = await assertSucceeds(getDocs(query(collection(ownerCtx(), "shares"), where("ownerUid", "==", "uOwner"), limit(500))));
+    expect(mine.size).toBe(2);
+    await assertFails(getDocs(query(collection(memberCtx(), "shares"), limit(10))));
+    await assertFails(getDocs(query(collection(memberCtx(), "shares"), where("ownerUid", "==", "uOwner"), limit(10))));
+    await assertFails(getDocs(query(collection(memberCtx(), "shares"), where("audience", "array-contains", "uOther"), limit(10))));
+    await assertFails(getDocs(query(collection(memberCtx(), "shares"), where("audience", "array-contains", "uMember"), limit(501))));
+  });
+
+  it("never lets a client write a shared view: recipients are read-only, and owners change it through the function", async () => {
+    await assertFails(setDoc(doc(memberCtx(), "shares/uOwner_e1"), share({ title: "sửa trộm" })));
+    await assertFails(updateDoc(doc(memberCtx(), "shares/uOwner_e1"), { title: "sửa trộm" }));
+    await assertFails(deleteDoc(doc(memberCtx(), "shares/uOwner_e1")));
+    await assertFails(updateDoc(doc(ownerCtx(), "shares/uOwner_e1"), { audience: ["uMember", "uX"] }));
+    await assertFails(setDoc(doc(memberCtx(), "shares/uMember_x"), share({ id: "uMember_x", ownerUid: "uMember" })));
+    // And the original item stays private to its owner.
+    await env.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), "users/uOwner/items/e1"), item({ id: "e1" })));
+    await assertFails(getDoc(doc(memberCtx(), "users/uOwner/items/e1")));
+  });
+
+  it("lets a person read and rename their own contacts, and change nothing else about them", async () => {
+    await assertSucceeds(getDocs(query(collection(memberCtx(), "users/uMember/contacts"), limit(200))));
+    await assertSucceeds(updateDoc(doc(memberCtx(), "users/uMember/contacts/uOwner"), { alias: "Anh An", notify: false }));
+    await assertFails(updateDoc(doc(memberCtx(), "users/uMember/contacts/uOwner"), { alias: "" }));
+    await assertFails(updateDoc(doc(memberCtx(), "users/uMember/contacts/uOwner"), { alias: "x".repeat(41) }));
+    await assertFails(updateDoc(doc(memberCtx(), "users/uMember/contacts/uOwner"), { googleName: "Giả mạo" }));
+    await assertFails(updateDoc(doc(memberCtx(), "users/uMember/contacts/uOwner"), { notify: "yes" }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/contacts/uX"), { uid: "uX", alias: "X", googleName: "X", maskedEmail: "", linkedAt: 1, notify: true }));
+    await assertFails(deleteDoc(doc(memberCtx(), "users/uMember/contacts/uOwner")));
+    await assertFails(getDoc(doc(ownerCtx(), "users/uMember/contacts/uOwner")));
+  });
+
+  it("keeps links and link codes server-only, notices private, and device tokens well-formed", async () => {
+    await assertFails(getDoc(doc(memberCtx(), "links/uMember_uOwner")));
+    await assertFails(setDoc(doc(memberCtx(), "links/uMember_uX"), { members: ["uMember", "uX"], createdAt: 1 }));
+    await assertFails(getDoc(doc(memberCtx(), "shareCodes/abc")));
+    await assertFails(getDocs(query(collection(memberCtx(), "shareCodes"), limit(5))));
+    await assertSucceeds(getDocs(query(collection(memberCtx(), "users/uMember/notices"), limit(50))));
+    await assertSucceeds(deleteDoc(doc(memberCtx(), "users/uMember/notices/n1")));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/notices/n2"), { kind: "linked" }));
+    await assertFails(getDoc(doc(ownerCtx(), "users/uMember/notices/n1")));
+
+    const token = "f".repeat(150);
+    await assertSucceeds(setDoc(doc(memberCtx(), "users/uMember/devices/web1"), { token, platform: "web", updatedAt: 1 }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/web2"), { token, platform: "tv", updatedAt: 1 }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/web3"), { token: "short", platform: "web", updatedAt: 1 }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/web4"), { token, platform: "web", updatedAt: 1, extra: 1 }));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uMember/devices/web5"), { token, platform: "web", updatedAt: 1 }));
+    await assertSucceeds(deleteDoc(doc(memberCtx(), "users/uMember/devices/web1")));
   });
 });
 

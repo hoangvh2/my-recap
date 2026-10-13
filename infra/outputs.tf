@@ -12,6 +12,7 @@ output "web_env" {
     VITE_FIREBASE_AUTH_DOMAIN = local.host
     VITE_APPCHECK_SITE_KEY    = google_recaptcha_enterprise_key.web.name
     VITE_FUNCTIONS_REGION     = var.region
+    VITE_FCM_VAPID_KEY        = coalesce(var.fcm_vapid_key, "")
   }
 }
 
@@ -27,4 +28,15 @@ output "auth_console" {
 output "notifications" {
   description = "Phone notifications: on when pushover_app_token is set."
   value       = !local.pushover_ready ? "off: set pushover_app_token in terraform.tfvars and deploy again" : "on: every minute; each person enters their Pushover User Key in Settings"
+}
+
+output "android_env" {
+  description = "Build settings of the Android app (identifiers, not secrets): export them before ./gradlew assembleRelease, or set them as GitHub Actions variables. FIREBASE_WEB_CLIENT_ID is copied by hand (see infra/README.md)."
+  value = local.android_config == null ? null : {
+    FIREBASE_PROJECT_ID = var.project_id
+    FIREBASE_APP_ID     = google_firebase_android_app.android[0].app_id
+    FIREBASE_API_KEY    = local.android_config.client[0].api_key[0].current_key
+    FIREBASE_SENDER_ID  = local.android_config.project_info.project_number
+    FUNCTIONS_REGION    = var.region
+  }
 }

@@ -5,6 +5,7 @@ import type { Item } from "../lib/model";
 import { agenda, expensesOfMonth, monthKey, overview, shiftMonth } from "../lib/views";
 import { Icon } from "./icons";
 import { ItemRow } from "./ItemRow";
+import { useReceivedMap } from "./hooks";
 import { SpendingPanel } from "./Spending";
 
 interface Handlers {
@@ -27,7 +28,8 @@ function Section(props: { title: string; items: Item[]; tone?: "warn"; showDate?
 const Empty = ({ children }: { children: string }) => <p class="empty">{children}</p>;
 
 export function Overview({ items, ...h }: { items: Item[] } & Handlers) {
-  const o = useMemo(() => overview(items, Date.now()), [items]);
+  const rec = useReceivedMap();
+  const o = useMemo(() => overview(items, Date.now(), (i) => rec.has(i.id)), [items, rec]);
   const todayExpense = useMemo(() => {
     const k = monthKey(Date.now());
     return expensesOfMonth(items, k).total;
@@ -67,7 +69,8 @@ export function Tasks({ items, ...h }: { items: Item[] } & Handlers) {
 export function Events({ items, ...h }: { items: Item[] } & Handlers) {
   const [showPast, setShowPast] = useState(false);
   const now = Date.now();
-  const a = useMemo(() => agenda(items, now), [items, now]);
+  const rec = useReceivedMap();
+  const a = useMemo(() => agenda(items, now, (i) => rec.has(i.id)), [items, now, rec]);
   const groups = new Map<string, Item[]>();
   for (const e of a.ahead) {
     const k = dayLabel(e.whenAt!, now);

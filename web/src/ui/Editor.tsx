@@ -5,12 +5,16 @@ import { formatVnd, parseVnd } from "../lib/money";
 import { EXPENSE_CATEGORIES, MAX, RECURRENCES, RECURRENCE_LABEL, TYPES, TYPE_LABEL, type Item, type ItemType, type Recurrence } from "../lib/model";
 import { saveFile } from "./download";
 import { Icon } from "./icons";
+import { useAudiences } from "./hooks";
 import { CustomerPicker, LicensePicker } from "./pickers";
+import { EditorShareRow } from "./Sharing";
+import { isShareable } from "../../../shared/share";
 
 export interface EditorProps {
   item: Item;
   isNew: boolean;
-  onSave: (item: Item) => void;
+  /** `audience`: who should see it, when the person changed that in the editor (undefined: unchanged). */
+  onSave: (item: Item, audience?: string[]) => void;
   onDelete: (item: Item) => void;
   /** Tick off an open task or appointment straight from the editor. */
   onDone?: (item: Item) => void;
@@ -33,6 +37,8 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
   const [customerId, setCustomerId] = useState<string | undefined>(item.customerId);
   const [licenseId, setLicenseId] = useState<string | undefined>(item.licenseId);
   const [important, setImportant] = useState(item.important === true);
+  const sharedWith = useAudiences().get(item.id) ?? [];
+  const [audience, setAudienceDraft] = useState<string[] | undefined>(undefined);
   const [error, setError] = useState("");
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
@@ -88,7 +94,9 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
   const submit = (e: Event) => {
     e.preventDefault();
     const out = build();
-    if (out) onSave(out);
+    if (!out) return;
+    const changed = audience !== undefined && [...audience].sort().join() !== [...sharedWith].sort().join();
+    onSave(out, changed && isShareable(out.type) ? audience : undefined);
   };
 
   const addToCalendar = async () => {
@@ -159,6 +167,8 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
             )}
           </>
         )}
+
+        {!wasDraft && <EditorShareRow item={{ ...item, type }} value={audience ?? sharedWith} onChange={setAudienceDraft} />}
 
         <label>Chi tiết<textarea rows={3} value={details} maxLength={MAX.details} onInput={(e) => setDetails((e.target as HTMLTextAreaElement).value)} /></label>
 

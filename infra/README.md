@@ -26,6 +26,7 @@ Mọi thứ chạy **trên PC của bạn**. Cấu hình (`terraform.tfvars`) v�
 11. [Lỗi thường gặp](#11-lỗi-thường-gặp)
 12. [An toàn file trên PC, gỡ cài đặt](#12-an-toàn-file-trên-pc-gỡ-cài-đặt)
 13. [Điều chưa được kiểm chứng](#13-điều-chưa-được-kiểm-chứng)
+14. [Chia sẻ giữa người dùng và app Android](#14-chia-sẻ-giữa-người-dùng-và-app-android)
 
 ---
 
@@ -278,6 +279,7 @@ Xoá biểu tượng app cũ khỏi Màn hình chính, mở Safari vào `https:/
 | Việc | Cách làm |
 |---|---|
 | Cập nhật code (có tính năng mới) | `git pull` → `node infra/deploy.mjs --yes` |
+| Cho thêm người thân dùng (không cần deploy) | Người có email trong `allowed_emails` là quản trị: **Cài đặt → Người dùng được phép → Gmail cần thêm → Thêm**. Bỏ ra cũng ở đó |
 | Thêm / bớt email được dùng | Sửa `allowed_emails` trong `terraform.tfvars` → `node infra/deploy.mjs --yes --skip-web` (rules và Function cùng cập nhật). Người bị bỏ ra sẽ mất quyền ngay |
 | Đổi model Gemini | `gemini_model = "..."` trong tfvars → deploy lại |
 | Xoay khoá Gemini | `cd infra && terraform apply -replace='google_apikeys_key.gemini[0]'` (chưa thử thật) |
@@ -388,3 +390,25 @@ Làm lần lượt; mục nào lỗi thì xem [Phần 11](#11-lỗi-thường-g�
 - Đăng nhập Google trong app đã thêm vào Màn hình chính của iOS với tên miền riêng.
 
 Nếu gặp lỗi ở những mục này, ghi lại nguyên văn thông báo lỗi (che email) để xử lý; Terraform và deploy đều chạy lại an toàn.
+
+---
+
+## 14. Chia sẻ giữa người dùng và app Android
+
+Chia sẻ (liên kết bằng mã, chia sẻ từng mục, push khi sửa) được deploy cùng lệnh `node infra/deploy.mjs --yes`: Terraform tạo `share`, `members`, `sharesync` (chạy khi một mục được lưu) và bật Eventarc, Pub/Sub, FCM. Phần còn lại là bước tay:
+
+| Việc | Cách làm | Bắt buộc? |
+|---|---|---|
+| Push trên trình duyệt (web) | Firebase console → Project settings → **Cloud Messaging** → Web Push certificates → **Generate key pair** → chép khoá công khai vào `fcm_vapid_key` trong tfvars → deploy lại. Mỗi người bật trong **Cài đặt → Chia sẻ → Thông báo** | Không: thiếu thì push đi qua Pushover (nếu người nhận đã bật) |
+| App Android đăng nhập được | Lấy SHA-1 của khoá ký APK (`keytool -list -v -keystore keystore/sideload.jks`, hoặc khoá riêng trên CI) → `android_sha1 = ["AB:CD:..."]` trong tfvars → `node infra/deploy.mjs --yes --skip-web` | Có, nếu dùng Android |
+| Build Android có đồng bộ | `cd infra && terraform output android_env` → đặt các giá trị đó làm **Repository variables** trên GitHub (Settings → Secrets and variables → Actions → Variables), thêm `FIREBASE_WEB_CLIENT_ID` = Client ID "Web client (auto created by Google Service)" ở Firebase console → Authentication → Google → Web SDK configuration. Chạy lại workflow Android | Có, nếu dùng Android |
+| Firestore chấp nhận app Android | App cài ngoài Play Store không lấy được App Check, nên phải đặt `enforce_app_check = false` rồi deploy lại | Có, nếu dùng Android |
+
+**Đánh đổi bảo mật của `enforce_app_check = false`:** Firestore vẫn đòi đăng nhập Google đúng tài khoản trong danh sách được phép, và mỗi người chỉ đọc được dữ liệu của mình cùng các mục người khác chia sẻ cho họ. Cái mất đi là lớp "chỉ app thật mới gọi được": ai có tài khoản hợp lệ có thể gọi Firestore bằng script. Với app gia đình, mức này chấp nhận được. Function ghi nhanh (`capture`) vẫn bắt buộc App Check, nên không ai dùng được Gemini ngoài app.
+
+**Chi phí:** một lần lưu mục là một lần chạy `sharesync`. Hầu hết lần chạy dừng sau 1 lần đọc Firestore, vì mục đó không chia sẻ với ai. FCM miễn phí. Với vài người dùng, mức này vẫn nằm trong gói miễn phí của Cloud Functions và Firestore, khoảng 0 đ/tháng (chưa đo trên dự án thật).
+
+**Chưa kiểm trên Google thật:**
+- Trigger Eventarc của `sharesync`: lần deploy đầu có thể báo lỗi quyền của Eventarc service agent. Chạy lại `node infra/deploy.mjs --yes --skip-web` sau vài phút.
+- Gửi FCM thật tới Android và trình duyệt.
+- Đăng nhập Google trên APK thật.

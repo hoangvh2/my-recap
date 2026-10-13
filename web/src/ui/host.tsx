@@ -7,6 +7,8 @@ import { Editor } from "./Editor";
 import { useUid } from "./hooks";
 import type { ReviewFilter } from "./Review";
 import { SearchHost } from "./Search";
+import { SharedHost, SharePickerHost } from "./Sharing";
+import { setAudience } from "../share";
 import { showToast, Toast } from "./toast";
 
 /**
@@ -31,9 +33,17 @@ export function Hosts() {
           key={edit.item.id}
           {...edit}
           onClose={() => editing.set(null)}
-          onSave={(item) => {
+          onSave={(item, audience) => {
             editing.set(null);
-            saveItem(uid, item).catch(fail);
+            const saved = saveItem(uid, item);
+            saved.catch(fail);
+            // The server reads the saved item to build the shared view, so share only once it is stored.
+            if (audience !== undefined) {
+              saved.then(() => setAudience(item.id, audience)).then(
+                (r) => showToast(r.audience.length ? `Đã lưu và chia sẻ với ${r.audience.length} người` : "Đã lưu, thôi chia sẻ"),
+                (e: unknown) => showToast(e instanceof Error ? e.message : "Đã lưu nhưng chưa chia sẻ được"),
+              );
+            }
           }}
           onDone={(item) => {
             editing.set(null);
@@ -53,6 +63,8 @@ export function Hosts() {
         </Sheet>
       )}
       <SearchHost />
+      <SharedHost />
+      <SharePickerHost />
       <ConfirmHost />
       <Toast />
     </>

@@ -4,6 +4,7 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Schedule
+import com.vh.myrecap.core.Share
 import com.vh.myrecap.core.TextSearch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,6 +32,15 @@ class ItemStore(
 ) {
     private val dao = db.items()
     private val _ready = MutableStateFlow(false)
+
+    /** Where saved changes also go (the cloud copy, when signed in). Writes that came from there bypass it. */
+    interface Sink {
+        fun put(item: Item)
+        fun remove(id: String)
+    }
+
+    @Volatile
+    var sink: Sink? = null
 
     /** True once the first list was read, so screens can tell "not loaded yet" from "not found". */
     val ready: StateFlow<Boolean> = _ready
@@ -60,15 +70,29 @@ class ItemStore(
 
     fun bySource(sourceId: String): List<Item> = dao.bySource(sourceId).map { it.toItem() }
 
-    fun upsert(item: Item) = dao.upsert(ItemEntity.of(item))
+    fun upsert(item: Item) {
+        dao.upsert(ItemEntity.of(item))
+        sink?.put(item)
+    }
 
     /** Applies [transform] atomically; returns the new item, or null when it does not exist. */
     fun update(id: String, transform: (Item) -> Item): Item? = db.runInTransaction<Item?> {
         val current = dao.get(id)?.toItem() ?: return@runInTransaction null
         transform(current).also { dao.upsert(ItemEntity.of(it)) }
+    }?.also { sink?.put(it) }
+
+    fun delete(id: String) {
+        dao.delete(id)
+        sink?.remove(id)
     }
 
-    fun delete(id: String) = dao.delete(id)
+    /** Changes made on another device: stored here, not sent back. */
+    fun applyRemote(upserts: List<Item>, removed: Collection<String>) = db.runInTransaction(
+        Runnable {
+            if (upserts.isNotEmpty()) dao.upsertAll(upserts.map(ItemEntity::of))
+            removed.forEach { dao.delete(it) }
+        },
+    )
 
     /**
      * Marks an item done; a repeating task gets its next instance in the same transaction.
@@ -86,16 +110,20 @@ class ItemStore(
         }
         val done = current.copy(status = ItemStatus.DONE, doneAt = now)
         dao.upsert(ItemEntity.of(done))
-        val next = Schedule.nextInstance(done, newId(), zone, now)
+        // The next occurrence's id comes from its date, so two devices finishing the same task make one, not two.
+        val next = Schedule.nextInstance(done, newId(), zone, now)?.let { n -> n.whenAt?.let { n.copy(id = Share.repeatId(done.id, it)) } ?: n }
         next?.let { dao.upsert(ItemEntity.of(it)) }
         done to next
+    }?.also { (done, next) ->
+        sink?.put(done)
+        next?.let { sink?.put(it) }
     }
 
     /** Moves repeating appointments whose occurrence is over to their next one. Returns the moved items. */
     fun rollRecurring(now: Long = System.currentTimeMillis()): List<Item> = db.runInTransaction<List<Item>> {
         dao.openRecurring().mapNotNull { Schedule.rollForward(it.toItem(), ZoneId.systemDefault(), now) }
             .onEach { dao.upsert(ItemEntity.of(it)) }
-    }
+    }.onEach { sink?.put(it) }
 
     /** Replaces the AI proposals of one capture (a re-analysis must not stack duplicates). */
     fun replaceDrafts(sourceId: String, drafts: List<Item>) = dao.replaceDrafts(sourceId, drafts.map(ItemEntity::of))

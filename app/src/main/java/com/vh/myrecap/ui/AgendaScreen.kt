@@ -76,6 +76,8 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.OwnerFilter
+import com.vh.myrecap.core.SharedItem
 import com.vh.myrecap.core.Triage
 import com.vh.myrecap.core.WeeklyRecap
 import com.vh.myrecap.data.Session
@@ -114,9 +116,14 @@ fun AgendaTab(vm: AppViewModel) {
         }
     }
 
+    val received by vm.received.collectAsStateWithLifecycle()
+    var ownerFilter by rememberSaveable { mutableStateOf(OwnerFilter.ALL) }
     val filter = FILTERS[filterIndex]
     val drafts = items.filter { it.status == ItemStatus.DRAFT }
-    val saved = items.filter { it.status != ItemStatus.DRAFT }
+    val mine = items.filter { it.status != ItemStatus.DRAFT }
+    // What others shared with me sits in the same sections, labelled with their name (see ItemRow).
+    val sharedCount = remember(received) { SharedItem.visible(received, ZoneId.systemDefault()).size }
+    val saved = if (sharedCount == 0) mine else withReceived(mine, received, ownerFilter)
     // Captures still being processed or that need the user; analysed ones live on as item sources.
     val pendingMemos = memos.filter { m ->
         m.sttBusy || m.extractBusy || m.extract == TaskStatus.ERROR || m.segments.any { it.stt == TaskStatus.ERROR } ||
@@ -160,6 +167,7 @@ fun AgendaTab(vm: AppViewModel) {
                 item { Banner(StatusInfo(StatusKind.WARNING, "Cần quyền micro để ghi âm"), "Mở cài đặt", { openAppSettings(context) }) }
             }
             item(key = "setup-$resumeTick") { SetupCard(settings, vm) }
+            item(key = "share-notices") { ShareNoticeCards(vm) }
 
             if (pendingMemos.isNotEmpty() || drafts.isNotEmpty()) {
                 item { SectionLabel("Chờ xử lý") }
@@ -179,6 +187,9 @@ fun AgendaTab(vm: AppViewModel) {
                 }
             }
 
+            if (sharedCount > 0) {
+                item(key = "owner-filter") { OwnerFilterRow(ownerFilter, sharedCount) { ownerFilter = it } }
+            }
             item {
                 FilterRow(
                     selected = filterIndex,
@@ -190,7 +201,7 @@ fun AgendaTab(vm: AppViewModel) {
                 null -> overview(saved, vm, onShowExpenses = { filterIndex = FILTERS.indexOf(ItemType.EXPENSE) })
                 ItemType.TASK -> taskList(saved.filter { it.type == ItemType.TASK }, vm)
                 ItemType.EVENT -> eventList(saved.filter { it.type == ItemType.EVENT }, vm)
-                ItemType.EXPENSE -> item { ExpenseView(saved.filter { it.type == ItemType.EXPENSE }, vm) }
+                ItemType.EXPENSE -> item { ExpenseView(mine.filter { it.type == ItemType.EXPENSE }, vm) }
                 ItemType.NOTE -> noteList(saved.filter { it.type == ItemType.NOTE }, vm)
             }
         }

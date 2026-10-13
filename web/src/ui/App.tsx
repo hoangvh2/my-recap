@@ -1,5 +1,7 @@
 import { useEffect } from "preact/hooks";
 import { startSync, syncState } from "../data";
+import { resumePush } from "../push";
+import { startShareSync } from "../share";
 import { useStore } from "../lib/store";
 import { session, signInWithGoogle, signOut, startSession } from "../session";
 import { Shell } from "./Shell";
@@ -37,6 +39,8 @@ function Login({ error }: { error?: string }) {
 
 function Signed({ uid, email }: { uid: string; email: string }) {
   useEffect(() => startSync(uid), [uid]);
+  useEffect(() => startShareSync(uid), [uid]);
+  useEffect(() => void resumePush(uid), [uid]);
   const sync = useStore(syncState);
   if (sync === "denied") {
     return (
