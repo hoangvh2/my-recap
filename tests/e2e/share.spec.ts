@@ -6,6 +6,9 @@ const KEY = "uQiRzpo4DXghDmr9QzzfQu27cmVRsG"; // shape of a Pushover user key: t
 type Push = Record<string, string>;
 const pushes = async (request: APIRequestContext) => (await (await request.get("http://127.0.0.1:8788/pushes")).json()) as Push[];
 
+// A step that cannot happen fails fast and names itself, instead of running into the test timeout.
+test.use({ actionTimeout: 15_000 });
+
 test.beforeEach(async ({ request }) => {
   await request.delete("http://127.0.0.1:8080/emulator/v1/projects/demo-myrecap/databases/(default)/documents");
   await request.get("http://127.0.0.1:8788/reset");

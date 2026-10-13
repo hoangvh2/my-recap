@@ -446,7 +446,9 @@ export function ContactDetail({ uid: other }: { uid: string }) {
   const aud = useAudiences();
   const c = list.find((x) => x.uid === other);
   const [alias, setAlias] = useState(c?.alias ?? "");
-  useEffect(() => { if (c) setAlias(c.alias); }, [c?.alias]);
+  const [typed, setTyped] = useState(false);
+  // Follow the stored name (it may load after this screen opens) until the person starts typing their own.
+  useEffect(() => { if (c && !typed) setAlias(c.alias); }, [c?.alias]);
   if (!c) {
     return (
       <>
@@ -489,7 +491,7 @@ export function ContactDetail({ uid: other }: { uid: string }) {
       <section class="card-block">
         <form class="row gap" onSubmit={(e) => { e.preventDefault(); void saveAlias(); }}>
           <label class="grow">Tên gợi nhớ (chỉ bạn thấy)
-            <input value={alias} maxLength={SHARE_LIMITS.aliasChars} onInput={(e) => setAlias((e.target as HTMLInputElement).value)} />
+            <input value={alias} maxLength={SHARE_LIMITS.aliasChars} onInput={(e) => { setTyped(true); setAlias((e.target as HTMLInputElement).value); }} />
           </label>
           <button type="submit" class="btn ghost" disabled={cleanAlias(alias) === c.alias}>Lưu</button>
         </form>
