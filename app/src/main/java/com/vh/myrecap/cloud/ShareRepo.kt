@@ -81,7 +81,7 @@ class ShareRepo(private val db: FirebaseFirestore, private val functions: Fireba
     private suspend fun call(data: Map<String, Any>): Map<*, *> {
         try {
             val callable = functions.getHttpsCallable("share").apply { setTimeout(60, TimeUnit.SECONDS) }
-            return callable.call(data).await().data as? Map<*, *> ?: emptyMap<String, Any>()
+            return callable.call(data).await().getData() as? Map<*, *> ?: emptyMap<String, Any>()
         } catch (e: FirebaseFunctionsException) {
             val msg = e.message.orEmpty()
             // The function's own refusals carry a Vietnamese sentence; bare codes ("internal") do not.
