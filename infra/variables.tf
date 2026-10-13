@@ -96,3 +96,19 @@ variable "pushover_app_token" {
     error_message = "A Pushover application token is 30 letters and digits."
   }
 }
+
+variable "fcm_vapid_key" {
+  description = "Optional. Public Web Push key (Firebase console > Project settings > Cloud Messaging > Web Push certificates > Generate). Lets the web app receive sharing pushes; without it, pushes go to Pushover only."
+  type        = string
+  default     = null
+}
+
+variable "android_sha1" {
+  description = "Optional. SHA-1 fingerprints of the certificates that sign the Android app (debug and release). Registers the app in Firebase so it can sign in and share."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for h in var.android_sha1 : can(regex("^([0-9A-Fa-f]{2}:?){19}[0-9A-Fa-f]{2}$", h))])
+    error_message = "Each android_sha1 entry is a SHA-1 fingerprint like AB:CD:...:EF (20 bytes)."
+  }
+}

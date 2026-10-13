@@ -4,7 +4,9 @@ rules_version = '2';
 // time from the ALLOWED_EMAILS secret, so addresses never live in the (public) repository.
 //
 // Model: every document belongs to exactly one person under /users/{uid}. Only a verified Google
-// account on the allowlist, signed in as that uid, can touch it. Everything else is denied.
+// account on the allowlist (fixed at deploy time, or added by an administrator in the app as
+// /members/{email}), signed in as that uid, can touch it. The one exception is /shares: the read-only
+// view of an item its owner shared, readable by the people in its audience. Everything else is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -12,7 +14,8 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email_verified == true
         && request.auth.token.firebase.sign_in_provider == 'google.com'
-        && request.auth.token.email.lower() in [__ALLOWED_EMAILS__];
+        && (request.auth.token.email.lower() in [__ALLOWED_EMAILS__]
+            || exists(/databases/$(database)/documents/members/$(request.auth.token.email.lower())));
     }
 
     function owner(uid) {
@@ -188,8 +191,50 @@ service cloud.firestore {
       allow delete: if owner(uid);
     }
 
-    // Quota counters (users/{uid}/meta/*), calendar feed tokens (/feeds), the notification log and the list of
-    // people to notify (/notifiers), and anything unknown: no client access at all.
+    // ------------------------------------------------------------ sharing between people
+    // Contacts, link codes and shared views are written only by the `share` function and the `sharesync`
+    // trigger (admin SDK). Clients read their own contacts, rename them, and read what is shared with them.
+
+    match /users/{uid}/contacts/{other} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 200;
+      allow update: if owner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['alias', 'notify'])
+        && request.resource.data.alias is string
+        && request.resource.data.alias.size() > 0 && request.resource.data.alias.size() <= 40
+        && request.resource.data.notify is bool;
+    }
+
+    // The read-only view of a shared item: its owner and its audience may read it, nobody may write it.
+    match /shares/{id} {
+      allow get: if allowedUser()
+        && (request.auth.uid in resource.data.audience || request.auth.uid == resource.data.ownerUid);
+      allow list: if allowedUser() && request.query.limit <= 500
+        && (request.auth.uid in resource.data.audience || request.auth.uid == resource.data.ownerUid);
+    }
+
+    // "X linked with you" / "X unlinked": shown once in the app, then dismissed.
+    match /users/{uid}/notices/{id} {
+      allow get: if owner(uid);
+      allow list: if owner(uid) && request.query.limit <= 50;
+      allow delete: if owner(uid);
+    }
+
+    // Where to push: one document per signed-in app or browser (an FCM registration token).
+    match /users/{uid}/devices/{id} {
+      allow get: if owner(uid);
+      allow create, update: if owner(uid)
+        && id.matches('^[A-Za-z0-9_-]{1,64}$')
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 20 && request.resource.data.token.size() <= 4096
+        && request.resource.data.platform in ['web', 'android', 'ios']
+        && request.resource.data.updatedAt is int;
+      allow delete: if owner(uid);
+    }
+
+    // Quota counters (users/{uid}/meta/*), links, link codes, the members list, calendar feed tokens (/feeds),
+    // the notification log, the list of people to notify (/notifiers), and anything unknown: no client access.
     match /{document=**} {
       allow read, write: if false;
     }

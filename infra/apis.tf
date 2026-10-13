@@ -21,6 +21,9 @@ locals {
     "storage.googleapis.com",
     "billingbudgets.googleapis.com",
     "cloudscheduler.googleapis.com",
+    "eventarc.googleapis.com", # Firestore change -> sharesync
+    "pubsub.googleapis.com",   # Eventarc's transport
+    "fcm.googleapis.com",      # pushes to phones and browsers
   ]
 }
 

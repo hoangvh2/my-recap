@@ -16,6 +16,8 @@ import { saveFile } from "./download";
 import { useCtx, useGraph, useUid } from "./hooks";
 import { Icon } from "./icons";
 import { NotifySettingsCard } from "./Notify";
+import { MembersCard, SharePushCard } from "./Sharing";
+import { useContacts } from "./hooks";
 import { showToast } from "./toast";
 
 const FIELD_LABEL: Record<ImportField, string> = {
@@ -110,6 +112,7 @@ export function Settings({ email }: { email: string }) {
   const theme = useStore(themeMode);
   const g = useGraph();
   const ctx = useCtx();
+  const people = useContacts();
   const [draft, setDraft] = useState<Prefs>(saved);
   const [dirty, setDirty] = useState(false);
   useEffect(() => { if (!dirty) setDraft(saved); }, [saved, dirty]);
@@ -155,6 +158,13 @@ export function Settings({ email }: { email: string }) {
             ))}
           </div>
           <p class="hint">“Tự động” đổi theo cài đặt Sáng/Tối của điện thoại. Lựa chọn được nhớ trên máy này.</p>
+        </div>
+      </Section>
+
+      <Section title="Chia sẻ">
+        <div class="card-block">
+          <Link to={to.contacts} class="btn ghost wide"><Icon name="users" size={18} /> Liên hệ chia sẻ{people.length > 0 ? ` (${people.length})` : ""}</Link>
+          <SharePushCard />
         </div>
       </Section>
 
@@ -205,6 +215,8 @@ export function Settings({ email }: { email: string }) {
           <button class="btn ghost wide" onClick={() => void backup()}><Icon name="download" size={18} /> Sao lưu dữ liệu (JSON)</button>
         </div>
       </Section>
+
+      <MembersCard />
 
       <Section title="Tài khoản">
         <div class="card-block">

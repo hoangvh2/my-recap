@@ -5,6 +5,8 @@ import { customers, items, licenses, prefs, proposals } from "../data";
 import { buildGraph, type Graph } from "../lib/graph";
 import { useStore } from "../lib/store";
 import { session } from "../session";
+import { audiences, contacts, received } from "../share";
+import type { ShareDoc } from "../../../shared/share";
 
 /** Today's date in this device's zone; moves on by itself if the app is left open past midnight. */
 export function useToday(): ISODate {
@@ -59,3 +61,13 @@ export function useUid(): string {
   const s = useStore(session);
   return s.status === "in" ? s.uid : "";
 }
+
+/** What others shared with me, by share id (the id the lists see). */
+export function useReceivedMap(): Map<string, ShareDoc> {
+  const r = useStore(received);
+  return useMemo(() => new Map(r.map((d) => [d.id, d])), [r]);
+}
+
+/** uids each of my items is shared with. */
+export const useAudiences = () => useStore(audiences);
+export const useContacts = () => useStore(contacts);

@@ -10,9 +10,15 @@ export type Route =
   | { name: "settings" }
   | { name: "import" }
   /** Opened from a notification's "Đã xong" button: tick that item off, then show Today. */
-  | { name: "done"; id: string };
+  | { name: "done"; id: string }
+  /** People I share with, and one of them. */
+  | { name: "contacts" }
+  | { name: "contact"; uid: string }
+  /** Something another person shared with me (read-only), opened from a push. */
+  | { name: "shared"; id: string };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
+const LONG_ID = /^[A-Za-z0-9_-]{1,200}$/;
 
 /** "#/khach/abc" → customer abc. Anything unknown is the Today screen. */
 export function parseRoute(hash: string): Route {
@@ -34,6 +40,10 @@ export function parseRoute(hash: string): Route {
       return { name: "settings" };
     case "nhap":
       return { name: "import" };
+    case "lien-he":
+      return b === undefined ? { name: "contacts" } : LONG_ID.test(b) ? { name: "contact", uid: b } : { name: "contacts" };
+    case "chia-se":
+      return b !== undefined && LONG_ID.test(b) ? { name: "shared", id: b } : { name: "today" };
     default:
       return { name: "today" };
   }
@@ -50,12 +60,15 @@ export const to = {
   settings: "#/cai-dat",
   import: "#/nhap",
   done: (id: string) => `#/xong/${id}`,
+  contacts: "#/lien-he",
+  contact: (uid: string) => `#/lien-he/${uid}`,
+  shared: (id: string) => `#/chia-se/${id}`,
 } as const;
 
 /** Which bottom tab a route belongs to (a customer or licence keeps its own tab lit). */
 export function tabOf(r: Route): "today" | "customers" | "renewals" | "work" | null {
   switch (r.name) {
-    case "today": case "done": return "today";
+    case "today": case "done": case "shared": return "today";
     case "customers": case "customer": return "customers";
     case "renewals": case "license": return "renewals";
     case "work": return "work";

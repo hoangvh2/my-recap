@@ -77,6 +77,21 @@ export async function notify(req: NotifyRequest): Promise<{ enabled: boolean }> 
 
 export const deviceZone = zone;
 
+type MembersRequest = { action: "list" } | { action: "add"; email: string } | { action: "remove"; email: string };
+export interface MembersState { admin: boolean; admins: string[]; members: { email: string; addedBy: string; addedAt: number }[] }
+const membersCall = httpsCallable<MembersRequest, MembersState>(functions, "members", { timeout: 30_000 });
+
+/** Administrators add or remove who may use the app. Anyone else gets `{ admin: false }` for "list". */
+export async function manageMembers(req: MembersRequest): Promise<MembersState> {
+  try {
+    return (await membersCall(req)).data;
+  } catch (e) {
+    const msg = (e as { message?: string } | null)?.message ?? "";
+    if (msg && !/^[a-z-]+$/.test(msg)) throw new ApiError(msg, false);
+    throw toApiError(e);
+  }
+}
+
 export function toApiError(e: unknown): ApiError {
   const code = (e as { code?: string } | null)?.code ?? "";
   const msg = (e as { message?: string } | null)?.message ?? "";

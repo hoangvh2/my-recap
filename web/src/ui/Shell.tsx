@@ -15,6 +15,7 @@ import { Renewals } from "./Renewals";
 import { Settings } from "./Settings";
 import { Today } from "./Today";
 import { Work } from "./Work";
+import { ContactDetail, ContactsScreen, useOpenSharedRoute } from "./Sharing";
 
 function Screen({ r, email }: { r: Route; email: string }) {
   switch (r.name) {
@@ -27,6 +28,9 @@ function Screen({ r, email }: { r: Route; email: string }) {
     case "settings": return <Settings email={email} />;
     case "import": return <ImportScreen />;
     case "done": return <MarkDone id={r.id} key={r.id} />;
+    case "contacts": return <ContactsScreen />;
+    case "contact": return <ContactDetail uid={r.uid} key={r.uid} />;
+    case "shared": return <OpenShared id={r.id} key={r.id} />;
   }
 }
 
@@ -50,6 +54,12 @@ function MarkDone({ id }: { id: string }) {
       fail,
     );
   }, [sync]);
+  return <Today />;
+}
+
+/** A push about something shared ("#/chia-se/<id>"): Today, with that item open on top. */
+function OpenShared({ id }: { id: string }) {
+  useOpenSharedRoute(id);
   return <Today />;
 }
 
