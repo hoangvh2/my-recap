@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -98,7 +99,7 @@ fun itemSubtitle(item: Item): String = listOfNotNull(
 ).joinToString("  ·  ")
 
 /**
- * A list row for an item. Tasks get a check circle that completes them in one tap; everything
+ * A list row for an item. Tasks and appointments get a check circle that completes them in one tap; everything
  * else opens the item.
  */
 @Composable
@@ -114,13 +115,17 @@ fun ItemRow(item: Item, onOpen: () -> Unit, onToggleDone: ((Boolean) -> Unit)?, 
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (item.type == ItemType.TASK && onToggleDone != null) {
+            if ((item.type == ItemType.TASK || item.type == ItemType.EVENT) && onToggleDone != null) {
                 IconButton(onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onToggleDone(!done)
                 }) {
                     Icon(
-                        if (done) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                        when {
+                            done -> Icons.Rounded.CheckCircle
+                            item.type == ItemType.EVENT -> Icons.Rounded.EventAvailable
+                            else -> Icons.Rounded.RadioButtonUnchecked
+                        },
                         contentDescription = if (done) "Bỏ đánh dấu xong" else "Đánh dấu xong",
                         tint = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(26.dp),

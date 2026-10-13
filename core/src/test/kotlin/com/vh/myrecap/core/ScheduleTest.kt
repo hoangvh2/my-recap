@@ -65,6 +65,19 @@ class ScheduleTest {
     }
 
     @Test
+    fun finishingAppointmentsMatchesTheWeb() {
+        val meeting = Item("e", ItemType.EVENT, ItemStatus.OPEN, "Gặp khách", whenAt = ms(2026, 10, 5, 9))
+        val done = Schedule.finishEvent(meeting, zone, ms(2026, 10, 13, 10))
+        assertEquals(ItemStatus.DONE, done.status)
+        assertEquals(ms(2026, 10, 13, 10), done.doneAt)
+        val standup = meeting.copy(recurrence = Recurrence.WEEKLY)
+        val moved = Schedule.finishEvent(standup, zone, ms(2026, 10, 13, 10))
+        assertEquals("repeating: this occurrence only", ItemStatus.OPEN, moved.status)
+        assertEquals(LocalDateTime.of(2026, 10, 19, 9, 0), local(moved.whenAt!!))
+        assertNull(moved.doneAt)
+    }
+
+    @Test
     fun repeatingAppointmentRemindsForTheNextOccurrence() {
         val standup = Item("e", ItemType.EVENT, ItemStatus.OPEN, "Họp team", whenAt = ms(2026, 10, 5, 9), recurrence = Recurrence.WEEKLY)
         assertEquals(ms(2026, 10, 12, 8, 45), ReminderPolicy.triggerAt(standup, zone, now = ms(2026, 10, 10, 12)))

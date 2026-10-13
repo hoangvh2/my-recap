@@ -47,6 +47,17 @@ object Schedule {
     }
 
     /**
+     * "Xong" on an appointment (same rule as the web). A one-off one is done. A repeating one is not
+     * ended: only this occurrence is, so it moves to its next one and stays open.
+     */
+    fun finishEvent(item: Item, zone: ZoneId, now: Long): Item {
+        val rule = item.recurrence
+        val at = item.whenAt
+        if (rule == null || at == null) return item.copy(status = ItemStatus.DONE, doneAt = now)
+        return item.copy(whenAt = nextAfter(at, rule, zone, maxOf(now, at)))
+    }
+
+    /**
      * A repeating appointment whose occurrence is over moves to its next one (nobody ticks
      * appointments off). Null when nothing changes.
      */
