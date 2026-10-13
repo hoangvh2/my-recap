@@ -201,6 +201,8 @@ class Phase3Test {
         assertEquals(ItemStatus.OPEN, next!!.status)
         assertEquals(Recurrence.DAILY, next.recurrence)
         assertTrue("next is later", next.whenAt!! > todayEight)
+        // Same id on every device (and the web), so finishing it on two of them makes one next occurrence.
+        assertEquals("pill_n${next.whenAt}", next.id)
         assertEquals(2, app.items.list().size)
     }
 

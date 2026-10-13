@@ -1,5 +1,6 @@
 package com.vh.myrecap.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -104,6 +105,11 @@ fun itemSubtitle(item: Item): String = listOfNotNull(
  */
 @Composable
 fun ItemRow(item: Item, onOpen: () -> Unit, onToggleDone: ((Boolean) -> Unit)?, modifier: Modifier = Modifier) {
+    val share = LocalShareInfo.current
+    // Someone else's item: their name on it, an indigo edge, and no check circle (only the owner changes it).
+    val owner = share.owners[item.id]
+    val audience = share.audiences[item.id]
+    val toggle = onToggleDone.takeIf { owner == null }
     val style = typeStyle(item.type)
     val haptic = LocalHapticFeedback.current
     val done = item.status == ItemStatus.DONE
@@ -111,14 +117,15 @@ fun ItemRow(item: Item, onOpen: () -> Unit, onToggleDone: ((Boolean) -> Unit)?, 
     Surface(
         onClick = onOpen,
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = if (owner != null) OtherTint.copy(alpha = 0.07f) else MaterialTheme.colorScheme.surfaceContainerLow,
+        border = if (owner != null) BorderStroke(1.dp, OtherTint.copy(alpha = 0.35f)) else null,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if ((item.type == ItemType.TASK || item.type == ItemType.EVENT) && onToggleDone != null) {
+            if ((item.type == ItemType.TASK || item.type == ItemType.EVENT) && toggle != null) {
                 IconButton(onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onToggleDone(!done)
+                    toggle(!done)
                 }) {
                     Icon(
                         when {
@@ -149,6 +156,11 @@ fun ItemRow(item: Item, onOpen: () -> Unit, onToggleDone: ((Boolean) -> Unit)?, 
                         else -> MaterialTheme.colorScheme.onSurface
                     },
                 )
+                if (owner != null || audience != null) {
+                    Row(Modifier.padding(top = 2.dp, bottom = 2.dp)) {
+                        if (owner != null) OwnerChip(owner) else AudienceChip(audience!!)
+                    }
+                }
                 val sub = itemSubtitle(item)
                 if (sub.isNotEmpty()) {
                     Text(

@@ -10,6 +10,7 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.vh.myrecap.ui.MainActivity
+import com.vh.myrecap.cloud.Cloud
 import com.vh.myrecap.core.Adts
 import com.vh.myrecap.core.TimeFormat
 import com.vh.myrecap.data.AppDatabase
@@ -45,6 +46,9 @@ class MyRecapApp : Application() {
         private set
     lateinit var items: ItemStore
         private set
+    /** Sync with the web app and sharing; inert when this build has no Firebase settings. */
+    lateinit var cloud: Cloud
+        private set
 
     /** Background work that outlives screens (database observation, start-up housekeeping). */
     val appScope = CoroutineScope(
@@ -60,6 +64,11 @@ class MyRecapApp : Application() {
         store = SessionStore(File(filesDir, "sessions"))
         settings = SettingsRepository(this)
         items = ItemStore(AppDatabase.open(this), appScope, legacyJson = File(filesDir, "items/items.json"))
+        cloud = Cloud(this, items, appScope) { changed, removed ->
+            // Edited on the web or another phone: reminders follow.
+            changed.forEach { Reminders.sync(this, it) }
+            removed.forEach { Reminders.cancel(this, it) }
+        }
         createChannels()
         addShortcuts()
         recoverInterruptedSessions()
@@ -105,6 +114,12 @@ class MyRecapApp : Application() {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_CALLS, "Sau cuộc gọi", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Gợi ý ghi tóm tắt sau cuộc gọi để tạo việc, lịch hẹn"
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_SHARED, "Chia sẻ", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Khi người đã liên kết chia sẻ, sửa hoặc xoá một mục với bạn"
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             },
         )
@@ -174,6 +189,7 @@ class MyRecapApp : Application() {
         const val CHANNEL_RESULTS = "results"
         const val CHANNEL_REMINDERS = "reminders"
         const val CHANNEL_CALLS = "calls"
+        const val CHANNEL_SHARED = "shared"
 
         fun from(context: Context): MyRecapApp = context.applicationContext as MyRecapApp
     }

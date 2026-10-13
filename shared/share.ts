@@ -90,10 +90,18 @@ export const shareId = (ownerUid: string, itemId: string): string => `${ownerUid
 /** The id of the link between two people: both uids, sorted, so either side computes the same one. */
 export const pairId = (a: string, b: string): string => (a < b ? `${a}_${b}` : `${b}_${a}`);
 
-/** The next occurrence of a repeating task is stored as `${parentId}_n${whenAt}`; it inherits the parent's audience. */
+/**
+ * The next occurrence of a repeating task is stored as `${seriesId}_n${whenAt}`, where the series id is the first
+ * task's id; it inherits that task's audience. Older data chained suffixes (`a_n1_n2`); both read as series `a`.
+ */
 export function parentOfRepeat(itemId: string): string | null {
-  const m = /^(.+)_n\d+$/.exec(itemId);
+  const m = /^(.+?)(?:_n\d+)+$/.exec(itemId);
   return m ? m[1] : null;
+}
+
+/** Id of the occurrence of `itemId`'s series at `whenAt`: stable (a double tap cannot duplicate it) and never grows. */
+export function repeatId(itemId: string, whenAt: number): string {
+  return `${parentOfRepeat(itemId) ?? itemId}_n${whenAt}`;
 }
 
 // ---------------------------------------------------------------- link codes

@@ -117,6 +117,10 @@ fun SettingsScreen(vm: AppViewModel) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            Section("Đồng bộ & chia sẻ") {
+                AccountSection(vm)
+            }
+
             Section("Giao diện") {
                 ChoiceRow(ThemeMode.entries, s.themeMode, { it.label }) { m -> update { it.copy(themeMode = m) } }
                 Hint("Tự động theo chế độ sáng/tối của điện thoại. Màu sắc giữ nguyên bảng màu của app.")

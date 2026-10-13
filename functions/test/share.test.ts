@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Item } from "../../shared/model";
-import { changeKind, changedLabels, cleanAlias, formatCode, maskEmail, normalizeCode, pairId, parentOfRepeat, sharedFields, shareId, type Contact, type ShareDoc } from "../../shared/share";
+import { changeKind, changedLabels, cleanAlias, formatCode, maskEmail, normalizeCode, pairId, parentOfRepeat, repeatId, sharedFields, shareId, type Contact, type ShareDoc } from "../../shared/share";
 import { MembersError, manageMembers, parseMembersRequest, type Member, type MembersStore } from "../src/members";
 import {
   handleShare, hashCode, makeCode, onItemWritten, parseShareRequest, ShareError, whenText,
@@ -110,6 +110,10 @@ describe("codes and small helpers", () => {
     expect(cleanAlias("x".repeat(60))).toHaveLength(40);
     expect(pairId("b", "a")).toBe("a_b");
     expect(parentOfRepeat("t1_n1760000000000")).toBe("t1");
+    expect(parentOfRepeat("t1_n1760000000000_n1760086400000")).toBe("t1");
+    expect(parentOfRepeat("t1")).toBeNull();
+    expect(repeatId("t1", 5)).toBe("t1_n5");
+    expect(repeatId("t1_n5_n6", 7)).toBe("t1_n7");
     expect(parentOfRepeat("t1")).toBeNull();
   });
   it("shows a recipient only what is safe: never customer, licence, money, people, quotes or sources", () => {

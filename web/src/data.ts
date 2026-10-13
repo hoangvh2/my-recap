@@ -7,6 +7,7 @@ import { buildGraph, customerCascade, type Graph } from "./lib/graph";
 import { createStore } from "./lib/store";
 import { normalizePrefs, type Capture, type Customer, type Item, type ItemType, type License, type Prefs, type Proposal } from "./lib/model";
 import { finishEvent, nextInstance, rollForward } from "./lib/schedule";
+import { repeatId } from "../../shared/share";
 
 export type SyncState = "connecting" | "ready" | "denied" | "error";
 
@@ -143,7 +144,7 @@ export function setDone(uid: string, item: Item, done: boolean, now = Date.now()
   if (done) {
     const finished: Item = { ...item, status: "DONE", doneAt: now };
     const probe = nextInstance(finished, "probe", now);
-    const next = probe?.whenAt !== undefined ? { ...probe, id: `${item.id}_n${probe.whenAt}` } : null;
+    const next = probe?.whenAt !== undefined ? { ...probe, id: repeatId(item.id, probe.whenAt) } : null;
     return commit(uid, { items: next ? [finished, next] : [finished] });
   }
   const reopened: Item = { ...item, status: "OPEN" };

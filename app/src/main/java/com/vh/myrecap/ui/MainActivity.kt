@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
                 )
                 onDispose {}
             }
-            MyRecapTheme(mode) { AppRoot(vm) }
+            MyRecapTheme(mode) { ProvideShareInfo(vm) { AppRoot(vm) } }
         }
     }
 
@@ -77,6 +77,8 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent?.getStringExtra(EXTRA_SESSION_ID)?.let { vm.openSession(it) }
         intent?.getStringExtra(EXTRA_ITEM_ID)?.let { vm.openItem(it) }
+        intent?.getStringExtra(EXTRA_SHARE_ID)?.let { vm.openShared(it) }
+        if (intent?.action == ACTION_CONTACTS) vm.openContacts()
         if (intent?.action == ACTION_QUICK_CAPTURE) vm.requestQuickCapture()
         if (intent?.action == ACTION_CALL_NOTE) {
             NotificationManagerCompat.from(this).cancel(CallReceiver.NOTIFICATION_ID)
@@ -87,6 +89,10 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_SESSION_ID = "sessionId"
         const val EXTRA_ITEM_ID = "itemId"
+        /** A sharing push: open what was shared. */
+        const val EXTRA_SHARE_ID = "shareId"
+        /** A "linked / unlinked" push: open the contacts. */
+        const val ACTION_CONTACTS = "com.vh.myrecap.CONTACTS"
         /** Launcher shortcut: open straight into a quick capture. */
         const val ACTION_QUICK_CAPTURE = "com.vh.myrecap.QUICK_CAPTURE"
         /** After-call prompt: a quick capture titled after the call, with the call as context for the AI. */
@@ -143,6 +149,9 @@ private fun AppRoot(vm: AppViewModel) {
             Screen.Search -> SearchScreen(vm)
             Screen.Spending -> SpendingScreen(vm)
             Screen.Weekly -> WeeklyRecapScreen(vm)
+            Screen.Contacts -> ContactsScreen(vm)
+            is Screen.ContactDetail -> ContactDetailScreen(vm, target.uid)
+            is Screen.Shared -> SharedDetailScreen(vm, target.id)
         }
     }
 }
