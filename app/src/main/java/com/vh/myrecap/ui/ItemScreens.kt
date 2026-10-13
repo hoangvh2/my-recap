@@ -481,7 +481,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (!isNew && !isDraft && current.type == ItemType.TASK) {
+                    if (!isNew && !isDraft && (current.type == ItemType.TASK || current.type == ItemType.EVENT)) {
                         val done = original.status == ItemStatus.DONE
                         OutlinedButton(
                             onClick = { save(if (done) ItemStatus.OPEN else ItemStatus.DONE) },

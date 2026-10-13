@@ -2,6 +2,7 @@ package com.vh.myrecap.data
 
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
+import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Schedule
 import com.vh.myrecap.core.TextSearch
 import kotlinx.coroutines.CoroutineScope
@@ -76,9 +77,16 @@ class ItemStore(
     fun complete(id: String, now: Long = System.currentTimeMillis()): Pair<Item, Item?>? = db.runInTransaction<Pair<Item, Item?>?> {
         val current = dao.get(id)?.toItem() ?: return@runInTransaction null
         if (current.status == ItemStatus.DONE) return@runInTransaction current to null
+        val zone = ZoneId.systemDefault()
+        if (current.type == ItemType.EVENT) {
+            // An appointment is ticked off, not replaced: a repeating one moves on and stays open.
+            val finished = Schedule.finishEvent(current, zone, now)
+            dao.upsert(ItemEntity.of(finished))
+            return@runInTransaction finished to null
+        }
         val done = current.copy(status = ItemStatus.DONE, doneAt = now)
         dao.upsert(ItemEntity.of(done))
-        val next = Schedule.nextInstance(done, newId(), ZoneId.systemDefault(), now)
+        val next = Schedule.nextInstance(done, newId(), zone, now)
         next?.let { dao.upsert(ItemEntity.of(it)) }
         done to next
     }

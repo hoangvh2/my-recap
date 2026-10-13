@@ -472,8 +472,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun applyDone(id: String, done: Boolean) {
         if (done) {
-            val (_, next) = app.items.complete(id) ?: return
+            val (finished, next) = app.items.complete(id) ?: return
             Reminders.cancel(app, id)
+            // A repeating appointment ticked off moved to its next occurrence and is still open.
+            if (finished.status == ItemStatus.OPEN) Reminders.sync(app, finished)
             next?.let { Reminders.sync(app, it) }
         } else {
             app.items.update(id) { it.copy(status = ItemStatus.OPEN, doneAt = null) }?.let { Reminders.sync(app, it) }
