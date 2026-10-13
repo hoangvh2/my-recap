@@ -50,6 +50,8 @@ test("Today is a timeline with times, appointments can be ticked off, and a repe
   await seed(request, who, "items", "b", { type: "TASK", status: "OPEN", title: "Gửi email cho khách", details: "", allDay: false, whenAt: at(22, 30), createdAt: now });
   await seed(request, who, "items", "c", { type: "TASK", status: "OPEN", title: "Đóng học phí", details: "", allDay: true, whenAt: at(0, 0), createdAt: now });
   await seed(request, who, "items", "w", { type: "EVENT", status: "OPEN", title: "Họp tuần", details: "", allDay: false, whenAt: at(23, 30), recurrence: "WEEKLY", createdAt: now });
+  // Past timed items leave today's timeline, so the page's clock is pinned to this morning: the run passes at any hour.
+  await page.clock.setFixedTime(at(8));
   await signIn(page, OWNER);
   const tl = page.locator(".timeline");
   await expect(tl.locator(".row-item")).toHaveCount(4);

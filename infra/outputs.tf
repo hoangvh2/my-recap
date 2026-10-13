@@ -12,7 +12,7 @@ output "web_env" {
     VITE_FIREBASE_AUTH_DOMAIN = local.host
     VITE_APPCHECK_SITE_KEY    = google_recaptcha_enterprise_key.web.name
     VITE_FUNCTIONS_REGION     = var.region
-    VITE_FCM_VAPID_KEY        = coalesce(var.fcm_vapid_key, "")
+    VITE_FCM_VAPID_KEY        = var.fcm_vapid_key == null ? "" : var.fcm_vapid_key
   }
 }
 
