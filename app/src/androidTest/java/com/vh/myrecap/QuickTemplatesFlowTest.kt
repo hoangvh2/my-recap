@@ -123,8 +123,11 @@ class QuickTemplatesFlowTest {
             shot("45-templates-new")
             device.findObject(By.text("Lưu mẫu")).click()
             assertTrue("saved", waitFor(5_000) { app.settings.current.quickTemplates.any { it.text == "gửi xe 5k" } })
+            // Let the save finish clearing the box before typing again, or the list re-filters under the tap.
+            assertTrue("box cleared after save", device.wait(Until.gone(By.text("Lưu mẫu")), 5_000))
 
             device.findObject(By.clazz("android.widget.EditText")).text = "goi"
+            assertTrue("filtered", device.wait(Until.gone(By.text("gửi báo cáo tuần")), 5_000))
             assertTrue(device.wait(Until.hasObject(By.text("gọi … mai 9h")), 5_000))
             device.findObject(By.text("gọi … mai 9h")).click()
             assertTrue("edit dialog", device.wait(Until.hasObject(By.text("Sửa mẫu")), 5_000))
