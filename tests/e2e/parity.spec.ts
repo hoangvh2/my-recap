@@ -36,7 +36,11 @@ test("Gõ nhanh: a typed line becomes a task, an appointment or an expense, and 
   await page.locator(".quick-row").getByRole("button", { name: "Thêm" }).click();
   await expect(page.getByText("Đã thêm: cà phê")).toBeVisible();
 
-  // A phrase can be switched off: its words go back to the title.
+  // A phrase can be switched off: its words go back to the title. With the day off, 15:00 means today only while
+  // 15:00 is still ahead (afterwards it means tomorrow), so the page's clock is pinned to this morning.
+  const morning = new Date();
+  morning.setHours(9, 0, 0, 0);
+  await page.clock.setFixedTime(morning);
   await box.fill("gọi anh Nam mai 3h chiều");
   await page.getByRole("button", { name: /Ngày: Mai/ }).click();
   await expect(page.locator(".quick-read")).toContainText("Hôm nay");
