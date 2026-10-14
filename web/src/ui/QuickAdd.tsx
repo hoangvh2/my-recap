@@ -44,6 +44,7 @@ export function QuickAdd() {
   const input = useRef<HTMLInputElement>(null);
   const cursor = useRef<number | null>(null);
   const used = useRef<QuickTemplate | null>(null);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const now = Date.now();
 
   const history = useMemo(() => all.filter((i) => i.type === "EXPENSE"), [all]);
@@ -105,8 +106,15 @@ export function QuickAdd() {
           aria-label="Gõ nhanh một việc, lịch hẹn hoặc khoản chi"
           autoComplete="off"
           onInput={(e) => setText((e.target as HTMLInputElement).value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onFocus={() => {
+            // A blur timer still pending from an earlier blur must not close the list under a box that has focus again.
+            clearTimeout(blurTimer.current);
+            setFocused(true);
+          }}
+          onBlur={() => {
+            clearTimeout(blurTimer.current);
+            blurTimer.current = setTimeout(() => setFocused(false), 150);
+          }}
         />
         <button class="btn solid" type="submit" disabled={!typed || !result.title.trim()}>Thêm</button>
       </form>
