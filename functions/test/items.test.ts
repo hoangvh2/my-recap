@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { ItemExtraction } from "../src/items";
+import { ItemExtraction, tagFrom } from "../src/items";
 
 const zone = "Asia/Ho_Chi_Minh";
 // Saturday 10/10/2026 14:00 local, the same fixed "now" the Android tests use.
@@ -115,6 +115,27 @@ describe("ItemExtraction.parse", () => {
     const [it] = parse(`[{"type":"note","title":"","details":"mua sữa cho bé"}]`)!;
     expect(it.title).toBe("mua sữa cho bé");
     expect(it.details).toBe("");
+  });
+});
+
+describe("ItemExtraction.parse: colour tag", () => {
+  it("keeps a known colour on a task or an appointment", () => {
+    const items = parse(`[{"type":"task","title":"A","tag":"red"},{"type":"event","title":"B","date":"2026-10-12","time":"09:00","tag":" Purple "}]`)!;
+    expect(items.map((i) => i.tag)).toEqual(["red", "purple"]);
+  });
+  it("drops an unknown colour, a non-string and an empty value", () => {
+    const items = parse(`[{"type":"task","title":"A","tag":"green"},{"type":"task","title":"B","tag":5},{"type":"task","title":"C","tag":null},{"type":"task","title":"D","tag":""}]`)!;
+    expect(items).toHaveLength(4);
+    for (const i of items) expect(Object.keys(i)).not.toContain("tag");
+  });
+  it("drops the tag on expenses and notes", () => {
+    const items = parse(`[{"type":"expense","title":"A","amount":5000,"tag":"red"},{"type":"note","title":"B","tag":"blue"}]`)!;
+    expect(items).toHaveLength(2);
+    for (const i of items) expect(Object.keys(i)).not.toContain("tag");
+  });
+  it("tagFrom accepts exactly the five colours", () => {
+    for (const t of ["red", "yellow", "orange", "blue", "purple"]) expect(tagFrom(t)).toBe(t);
+    for (const t of ["green", "RED!", undefined, null, 1, {}, "none"]) expect(tagFrom(t)).toBeUndefined();
   });
 });
 

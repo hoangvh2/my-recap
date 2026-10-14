@@ -9,6 +9,7 @@ const paths: Record<string, ComponentChildren> = {
   coin: <><circle cx="12" cy="12" r="9" /><path d="M14.5 9.5c-.4-.9-1.400-1.500-2.500-1.500-1.400 0-2.500.8-2.500 2s1 1.700 2.500 2 2.500.8 2.500 2-1.100 2-2.500 2c-1.100 0-2.100-.6-2.500-1.500M12 6v2M12 16v2" /></>,
   note: <><path d="M6 3h8l5 5v13H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
   task: <><circle cx="12" cy="12" r="9" /><path d="M8 12l3 3 5-6" /></>,
+  circle: <circle cx="12" cy="12" r="9" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   search: <><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></>,
   close: <path d="M6 6l12 12M18 6L6 18" />,

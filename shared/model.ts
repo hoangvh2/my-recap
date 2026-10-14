@@ -6,6 +6,12 @@ export type ItemType = "TASK" | "EVENT" | "EXPENSE" | "NOTE";
 export type ItemStatus = "DRAFT" | "OPEN" | "DONE";
 export type Recurrence = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY";
 
+/** A visual-only mark that draws the eye to a task or appointment; unlike `important` it never changes reminders. */
+export type ItemTag = "red" | "yellow" | "orange" | "blue" | "purple";
+export const ITEM_TAGS: readonly ItemTag[] = ["red", "yellow", "orange", "blue", "purple"];
+/** Only tasks and appointments can carry a tag. */
+export const canTag = (type: ItemType): boolean => type === "TASK" || type === "EVENT";
+
 /** One thing the secretary keeps. Same shape as the Android app and the Firestore rules. */
 export interface Item {
   id: string;
@@ -31,6 +37,8 @@ export interface Item {
   licenseId?: string;
   /** Must not be missed: reminded louder (Pushover emergency, repeated until acknowledged). */
   important?: boolean;
+  /** Personal colour tag (tasks and appointments only). Not shared with other people. */
+  tag?: ItemTag;
 }
 
 export interface Capture {

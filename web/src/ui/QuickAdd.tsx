@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { deleteItems, items as itemsStore, newId, saveItem } from "../data";
+import { applyAutoTag, tagRules } from "../lib/autotag";
 import { formatVnd } from "../lib/money";
 import { TYPE_LABEL } from "../lib/model";
 import { whenLabel } from "../lib/format";
@@ -63,7 +64,7 @@ export function QuickAdd() {
   const add = (line: string, template: QuickTemplate | null) => {
     const r = parseQuick(line, Date.now(), template ? new Set() : new Set(off), history);
     if (!r.title.trim()) return;
-    const item = toItem(r, newId(), Date.now());
+    const item = applyAutoTag(tagRules.get(), toItem(r, newId(), Date.now()));
     saveItem(uid, item).then(
       () => showToast(`Đã thêm: ${item.title}`, { label: "Hoàn tác", run: () => deleteItems(uid, [item.id]).catch(fail) }),
       fail,

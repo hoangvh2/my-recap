@@ -1,4 +1,4 @@
-import { expect, type Page, type APIRequestContext } from "@playwright/test";
+import { expect, type Locator, type Page, type APIRequestContext } from "@playwright/test";
 
 export const OWNER = "owner@example.com";
 export const MEMBER = "member@example.com";
@@ -83,4 +83,25 @@ export async function idTokenFor(request: APIRequestContext, email: string): Pro
   expect(res.ok()).toBeTruthy();
   const j = await res.json();
   return { idToken: j.idToken, uid: j.localId };
+}
+
+/** Drags a row sideways with the mouse, in small steps like a finger: "right" finishes it, "left" deletes it. */
+export async function swipeRow(page: Page, row: Locator, dir: "left" | "right", dist = 150) {
+  const box = (await row.boundingBox())!;
+  const y = box.y + box.height / 2;
+  const x0 = box.x + box.width * (dir === "left" ? 0.7 : 0.3);
+  await page.mouse.move(x0, y);
+  await page.mouse.down();
+  const sign = dir === "left" ? -1 : 1;
+  for (let i = 1; i <= 10; i++) await page.mouse.move(x0 + (sign * dist * i) / 10, y + i * 0.2);
+  await page.mouse.up();
+}
+
+/** Holds the mouse on a row long enough for the quick-pick popover (a long press). */
+export async function holdRow(page: Page, row: Locator, ms = 700) {
+  const box = (await row.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
 }

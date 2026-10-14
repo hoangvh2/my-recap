@@ -18,6 +18,12 @@
   --danger: #b42318;
   --warn: #8a5300;
   --ok: #166534;
+  /* Tags: a colour plus a glyph on its own text colour (4.5:1 or better). Brighter in dark mode. */
+  --tag-red: #c62828; --on-tag-red: #ffffff;
+  --tag-yellow: #f2b100; --on-tag-yellow: #2b1d00;
+  --tag-orange: #cc4a0a; --on-tag-orange: #ffffff;
+  --tag-blue: #1c5fd0; --on-tag-blue: #ffffff;
+  --tag-purple: #7a3fc2; --on-tag-purple: #ffffff;
   /* What other people shared with me: indigo, always with a name and a lock next to it (never colour alone). */
   --other: #4338ca;
   --other-bg: #eef0fd;
@@ -44,6 +50,11 @@
     --danger: #f87171;
     --warn: #fbbf24;
     --ok: #4ade80;
+    --tag-red: #f87171; --on-tag-red: #2a0707;
+    --tag-yellow: #fcd34d; --on-tag-yellow: #2b1d00;
+    --tag-orange: #fb923c; --on-tag-orange: #2b1100;
+    --tag-blue: #6aa6ff; --on-tag-blue: #07162f;
+    --tag-purple: #c39bff; --on-tag-purple: #1f0b3a;
     --other: #a5b4fc;
     --other-bg: #1e2140;
   }
@@ -65,6 +76,11 @@
   --danger: #f87171;
   --warn: #fbbf24;
   --ok: #4ade80;
+  --tag-red: #f87171; --on-tag-red: #2a0707;
+  --tag-yellow: #fcd34d; --on-tag-yellow: #2b1d00;
+  --tag-orange: #fb923c; --on-tag-orange: #2b1100;
+  --tag-blue: #6aa6ff; --on-tag-blue: #07162f;
+  --tag-purple: #c39bff; --on-tag-purple: #1f0b3a;
   --other: #a5b4fc;
   --other-bg: #1e2140;
 }
@@ -490,3 +506,65 @@ details summary { cursor: pointer; font-weight: 600; min-height: 36px; display: 
 .push-card .status.ok { color: var(--ok); font-weight: 600; margin: 0; }
 .danger-text { color: var(--danger); }
 .members .list { margin-top: 10px; }
+
+/* ---------------------------------------------------------------- tags, swipes, quick pick */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tag-red { --tg: var(--tag-red); --on-tg: var(--on-tag-red); }
+.tag-yellow { --tg: var(--tag-yellow); --on-tg: var(--on-tag-yellow); }
+.tag-orange { --tg: var(--tag-orange); --on-tg: var(--on-tag-orange); }
+.tag-blue { --tg: var(--tag-blue); --on-tg: var(--on-tag-blue); }
+.tag-purple { --tg: var(--tag-purple); --on-tg: var(--on-tag-purple); }
+.tg { display: inline-grid; place-items: center; border-radius: 50%; background: var(--tg); color: var(--on-tg); font-style: normal; font-weight: 800; line-height: 1; flex: none; font-variant-emoji: text; }
+.no-tag { flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 4 3; }
+
+.row-item { position: relative; }
+.row-item.gest { touch-action: pan-y; }
+/* No text selection or iOS callout on a row: a long press means "pick a tag", not "select text". */
+.row-item.gest, .row-item.gest * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.row-item.swiping { z-index: 1; }
+.row-item.done { opacity: 0.78; }
+.badge.ok { background: color-mix(in srgb, var(--ok) 18%, var(--surface2)); color: var(--ok); }
+.tag-corner { position: absolute; top: 0; right: 0; width: 34px; height: 34px; pointer-events: none; background: linear-gradient(225deg, var(--tg) 0 50%, transparent 50%); color: var(--on-tg); }
+.tag-corner b { position: absolute; top: 2px; right: 5px; font-size: 13px; line-height: 1; font-weight: 800; font-variant-emoji: text; }
+.row-item.tagged .row-main { padding-right: 18px; }
+.row-item.tagged .amount { margin-right: 14px; }
+
+.swipe-act { position: absolute; top: 0; bottom: 0; width: 160px; display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; color: #fff; }
+.swipe-act.del { left: 100%; padding-left: 18px; background: var(--danger-solid); }
+.swipe-act.ok { right: 100%; padding-right: 18px; justify-content: flex-end; background: var(--ok-solid); }
+:root { --danger-solid: #b42318; --ok-solid: #15803d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --danger-solid: #b91c1c; --ok-solid: #15803d; } }
+:root[data-theme="dark"] { --danger-solid: #b91c1c; --ok-solid: #15803d; }
+
+.pop-backdrop { position: fixed; inset: 0; z-index: 35; -webkit-touch-callout: none; user-select: none; }
+.tag-pop { position: fixed; width: 262px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 10px; display: grid; gap: 8px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); }
+.tag-dots { display: flex; justify-content: space-between; }
+.tag-pick { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
+.tag-pick.sel .tg { outline: 3px solid var(--text); outline-offset: 2px; }
+.pop-btn { min-height: 40px; border-radius: 10px; background: var(--surface2); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; }
+.pop-btn:disabled { opacity: 0.5; }
+.pop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pop-btn.danger-text { color: var(--danger); }
+
+.tag-filter { padding-bottom: 8px; }
+.chips button.tagchip { min-height: 38px; min-width: 42px; padding: 0 8px; justify-content: center; }
+.chips button.tagchip.on { background: var(--surface); border: 2px solid var(--text); color: var(--text); }
+
+.sheet { position: relative; }
+.sheet header.has-tag { padding-right: 46px; }
+.tag-trigger { position: absolute; top: 0; right: 0; width: 56px; height: 56px; z-index: 2; border-top-right-radius: 24px; background: linear-gradient(225deg, var(--tg) 0 50%, transparent 50%); color: var(--on-tg); }
+.tag-trigger b { position: absolute; top: 7px; right: 12px; font-size: 16px; line-height: 1; font-weight: 800; font-variant-emoji: text; }
+.tag-trigger.unset { background: none; color: var(--muted); }
+.tag-trigger.unset::before { content: ""; position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-top: 2px dashed var(--muted); border-right: 2px dashed var(--muted); border-top-right-radius: 14px; }
+.tag-menu { position: absolute; top: 52px; right: 12px; z-index: 3; width: 220px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: grid; gap: 2px; }
+.tag-menu button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 10px; text-align: left; font-size: 15px; font-weight: 600; }
+.tag-menu button.sel { background: var(--surface2); }
+.tag-menu .glyph { width: 16px; text-align: center; color: var(--muted); font-variant-emoji: text; }
+.tag-menu .name { flex: 1; }
+
+.tag-rules .rule-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tag-rules .rule-row input { grid-column: 1 / 3; grid-row: 2; }
+.tag-rules .rule-row select:nth-of-type(2) { grid-column: 2; grid-row: 1; }
+.tag-rules .rule-row .icon-btn { grid-column: 3; grid-row: 1 / 3; }
+.tag-rules select, .tag-rules input { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; width: 100%; min-width: 0; font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { .row-item { transition: none !important; } }

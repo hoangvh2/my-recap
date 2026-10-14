@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { fromInputs, toDateInput, toTimeInput } from "../lib/format";
 import { buildIcs } from "../lib/ics";
+import { applyAutoTag, tagRules } from "../lib/autotag";
 import { formatVnd, parseVnd } from "../lib/money";
-import { EXPENSE_CATEGORIES, MAX, RECURRENCES, RECURRENCE_LABEL, TYPES, TYPE_LABEL, type Item, type ItemType, type Recurrence } from "../lib/model";
+import { useStore } from "../lib/store";
+import { EXPENSE_CATEGORIES, MAX, RECURRENCES, RECURRENCE_LABEL, TYPES, TYPE_LABEL, type Item, type ItemTag, type ItemType, type Recurrence } from "../lib/model";
 import { saveFile } from "./download";
 import { Icon } from "./icons";
 import { useAudiences } from "./hooks";
+import { TagCornerButton, TagMenu } from "./TagUI";
 import { CustomerPicker, LicensePicker } from "./pickers";
 import { EditorShareRow } from "./Sharing";
 import { isShareable } from "../../../shared/share";
@@ -37,6 +40,11 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
   const [customerId, setCustomerId] = useState<string | undefined>(item.customerId);
   const [licenseId, setLicenseId] = useState<string | undefined>(item.licenseId);
   const [important, setImportant] = useState(item.important === true);
+  const [tag, setTag] = useState<ItemTag | undefined>(item.tag);
+  // Once the person has chosen (including "Không thẻ"), the auto-tag rules stay out of it.
+  const [tagTouched, setTagTouched] = useState(false);
+  const [tagMenu, setTagMenu] = useState(false);
+  const rules = useStore(tagRules);
   const sharedWith = useAudiences().get(item.id) ?? [];
   const [audience, setAudienceDraft] = useState<string[] | undefined>(undefined);
   const [error, setError] = useState("");
@@ -49,6 +57,14 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
 
   const wasDraft = item.status === "DRAFT";
   const dated = type === "TASK" || type === "EVENT";
+  const changeType = (t: ItemType) => {
+    setType(t);
+    // Notes and expenses cannot carry a tag.
+    if (t !== "TASK" && t !== "EVENT") {
+      setTag(undefined);
+      setTagMenu(false);
+    }
+  };
 
   const build = (): Item | null => {
     const t = title.trim();
@@ -81,10 +97,12 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
         if (repeat) out.recurrence = repeat;
       }
       if (important) out.important = true;
+      if (tag) out.tag = tag;
       if (place.trim()) out.place = place.trim().slice(0, MAX.place);
       if (person.trim()) out.person = person.trim().slice(0, MAX.person);
     }
-    return out;
+    // A new (or just-confirmed) task or appointment without a tag gets one from the rules; an edit never does.
+    return dated && !out.tag && (isNew || wasDraft) && !tagTouched ? applyAutoTag(rules, out) : out;
   };
   const fail = (m: string): null => {
     setError(m);
@@ -107,7 +125,13 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
   return (
     <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label={isNew ? "Thêm mới" : "Sửa"} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <form class="sheet" onSubmit={submit}>
-        <header>
+        {dated && (
+          <>
+            <TagCornerButton tag={tag} expanded={tagMenu} onClick={() => setTagMenu(!tagMenu)} />
+            {tagMenu && <TagMenu current={tag} onClose={() => setTagMenu(false)} onPick={(t) => { setTag(t); setTagTouched(true); setTagMenu(false); }} />}
+          </>
+        )}
+        <header class={dated ? "has-tag" : ""}>
           <h2>{isNew ? "Thêm mới" : wasDraft ? "Xem lại" : "Sửa"}</h2>
           <button type="button" class="icon-btn" aria-label="Đóng" onClick={onClose}><Icon name="close" /></button>
         </header>
@@ -115,7 +139,7 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
         {(isNew || wasDraft) && (
           <div class="seg" role="radiogroup" aria-label="Loại">
             {TYPES.map((t) => (
-              <button type="button" key={t} role="radio" aria-checked={type === t} class={type === t ? "on" : ""} onClick={() => setType(t)}>{TYPE_LABEL[t]}</button>
+              <button type="button" key={t} role="radio" aria-checked={type === t} class={type === t ? "on" : ""} onClick={() => changeType(t)}>{TYPE_LABEL[t]}</button>
             ))}
           </div>
         )}

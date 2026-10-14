@@ -14,6 +14,7 @@ import { Weekly } from "./Weekly";
 import { showToast } from "./toast";
 import { withReceived } from "../lib/sharing";
 import { received as receivedStore } from "../share";
+import { TagFilterBar, useTagFilter } from "./TagUI";
 import { OwnerFilterBar, useOwnerFilter } from "./Sharing";
 
 type Tab = "ALL" | "WEEK" | ItemType;
@@ -31,6 +32,9 @@ export function Work() {
   const mine = useMemo(() => all.filter((i) => i.status !== "DRAFT"), [all]);
   // Expenses and the week view are mine only; the other lists also show what others shared with me.
   const saved = useMemo(() => withReceived(mine, rec, who), [mine, rec, who]);
+  // The tag filter only applies to the lists that hold tasks and appointments.
+  const tf = useTagFilter(saved);
+  const taggable = tab === "ALL" || tab === "TASK" || tab === "EVENT";
   const counts = useMemo(() => {
     const open = mine.filter((i) => i.status === "OPEN");
     // The calendar chip counts what is on it today: overdue tasks and today's entries.
@@ -60,9 +64,10 @@ export function Work() {
         ))}
       </nav>
       {tab !== "EXPENSE" && tab !== "WEEK" && <OwnerFilterBar value={who} onChange={setWho} />}
-      {tab === "ALL" && <Overview items={saved} onOpen={open} onToggle={toggle} />}
-      {tab === "TASK" && <Tasks items={saved} onOpen={open} onToggle={toggle} />}
-      {tab === "EVENT" && <Events items={saved} onOpen={open} onToggle={toggle} />}
+      {taggable && tf.visible && <TagFilterBar active={tf.active} />}
+      {tab === "ALL" && <Overview items={tf.shown} onOpen={open} onToggle={toggle} />}
+      {tab === "TASK" && <Tasks items={tf.shown} onOpen={open} onToggle={toggle} />}
+      {tab === "EVENT" && <Events items={tf.shown} onOpen={open} onToggle={toggle} />}
       {tab === "EXPENSE" && <Expenses items={mine} onOpen={open} />}
       {tab === "NOTE" && <Notes items={saved} onOpen={open} onToggle={toggle} />}
       {tab === "WEEK" && <Weekly items={mine} />}
