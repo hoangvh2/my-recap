@@ -5,7 +5,7 @@ import { formatVnd } from "../lib/money";
 import { canTag, RECURRENCE_LABEL, type Item, type ItemTag } from "../lib/model";
 import { isHorizontalSwipe, swipeCommit, swipeOffset, type SwipeAction } from "../lib/swipe";
 import { tagOf, withTag } from "../lib/tags";
-import { CustomerChip, LicenseChip } from "./common";
+import { confirmDialog, CustomerChip, LicenseChip } from "./common";
 import { useAudiences, useReceivedMap, useUid } from "./hooks";
 import { Icon, type IconName } from "./icons";
 import { AudienceChip, openShared, OwnerChip } from "./Sharing";
@@ -65,7 +65,10 @@ export function ItemRow(props: {
     setDone(uid, item, next).catch(failToast);
     if (next) showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(failToast) });
   };
-  const remove = () => {
+  /** Asks first, always: a swipe or a key press must not delete on its own. */
+  const remove = async () => {
+    const ok = await confirmDialog({ title: "Xoá mục này?", body: item.title, ok: "Xoá", danger: true });
+    if (!ok) return;
     deleteItems(uid, [item.id]).catch(failToast);
     showToast(`Đã xoá: ${item.title}`, { label: "Hoàn tác", run: () => saveItem(uid, item).catch(failToast) });
   };
@@ -145,12 +148,18 @@ export function ItemRow(props: {
       offset.current = 0;
       return setDx(0);
     }
+    if (act === "delete") {
+      // The row springs back and the dialog decides; the list only changes once the person confirms.
+      offset.current = 0;
+      setDx(0);
+      void remove();
+      return;
+    }
     // Slide the row out, then do it; the list re-renders without the row (or with it reset).
     const width = li.current?.offsetWidth ?? 360;
-    setDx(act === "delete" ? -width : width);
+    setDx(width);
     timers.current.push(window.setTimeout(() => {
-      if (act === "delete") remove();
-      else tick(!done);
+      tick(!done);
       setSettling(false);
       offset.current = 0;
       setDx(0);
@@ -165,13 +174,13 @@ export function ItemRow(props: {
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Delete" && mine && (e.target as HTMLElement).closest(".row-main")) {
       e.preventDefault();
-      remove();
+      void remove();
     }
   };
 
   const actions: PopoverAction[] = [
     ...(tickable ? [{ label: done ? "Mở lại" : "Xong", icon: "check" as const, run: () => { setPop(null); tick(!done); } }] : []),
-    { label: "Xoá", icon: "trash" as const, danger: true, run: () => { setPop(null); remove(); } },
+    { label: "Xoá", icon: "trash" as const, danger: true, run: () => { setPop(null); void remove(); } },
   ];
 
   const swiping = dx !== 0;

@@ -2,7 +2,7 @@ import { deleteItems, saveItem, setDone } from "../data";
 import { createStore, useStore } from "../lib/store";
 import type { Item } from "../lib/model";
 import { Capture } from "./Capture";
-import { ConfirmHost, Sheet } from "./common";
+import { ConfirmHost, confirmDialog, Sheet } from "./common";
 import { Editor } from "./Editor";
 import { useUid } from "./hooks";
 import type { ReviewFilter } from "./Review";
@@ -50,7 +50,8 @@ export function Hosts() {
             setDone(uid, item, true).catch(fail);
             showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(fail) });
           }}
-          onDelete={(item) => {
+          onDelete={async (item) => {
+            if (!(await confirmDialog({ title: "Xoá mục này?", body: item.title, ok: "Xoá", danger: true }))) return;
             editing.set(null);
             deleteItems(uid, [item.id]).catch(fail);
             showToast(`Đã xoá: ${item.title}`, { label: "Hoàn tác", run: () => saveItem(uid, item).catch(fail) });

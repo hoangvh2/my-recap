@@ -166,6 +166,10 @@ class Phase2FlowTest {
             task!!.click()
             assertTrue(device.wait(Until.hasObject(By.desc("Xoá mục")), 5_000))
             device.findObject(By.desc("Xoá mục")).click()
+            // Deleting always asks first; nothing is removed until the dialog is confirmed.
+            assertTrue("confirm dialog", device.wait(Until.hasObject(By.text("Xoá mục này?")), 5_000))
+            assertNotNull("not deleted yet", app.items.get("p2-task"))
+            device.findObject(By.text("Xoá")).click()
             assertTrue("deleted", waitFor(5_000) { app.items.get("p2-task") == null })
             assertTrue("undo offered", device.wait(Until.hasObject(By.text("Hoàn tác")), 5_000))
             shot("27-undo")

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectNoProblems, idTokenFor, OWNER, seed, signIn, tab, watchBrowser } from "./helpers";
+import { answerConfirm, expectNoProblems, idTokenFor, OWNER, seed, signIn, tab, watchBrowser } from "./helpers";
 
 // Features that came from the Android app: typed quick add, templates, Rà soát, spending stats, weekly recap.
 test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
@@ -77,6 +77,10 @@ test("Mẫu câu: add, edit and delete from the manager", async ({ page }) => {
   await expect(sheet.getByText("phở 60k")).toBeVisible();
   await shot(page, "53-templates-manager");
   await sheet.getByRole("button", { name: "Xoá mẫu phở 60k" }).click();
+  await answerConfirm(page, "Không");
+  await expect(sheet.getByText("phở 60k")).toBeVisible();
+  await sheet.getByRole("button", { name: "Xoá mẫu phở 60k" }).click();
+  await answerConfirm(page, "Xoá");
   await expect(sheet.getByText("phở 60k")).toHaveCount(0);
 });
 

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { expectNoProblems, geminiCalls, OWNER, signIn, STRANGER, swipeRow, tab, textCapture, watchBrowser } from "./helpers";
+import { answerConfirm, expectNoProblems, geminiCalls, OWNER, signIn, STRANGER, swipeRow, tab, textCapture, watchBrowser } from "./helpers";
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `e2e/.artifacts/${name}.png` });
 
@@ -101,6 +101,7 @@ test("manual add, tick off a repeating task, undo, delete", async ({ page }) => 
   // Delete with undo.
   await page.locator(".row-item", { hasText: "Uống thuốc" }).first().locator(".row-main").click();
   await page.getByRole("button", { name: /Xoá/ }).click();
+  await answerConfirm(page, "Xoá");
   await expect(page.getByText("Đã xoá: Uống thuốc")).toBeVisible();
   await page.getByRole("button", { name: "Hoàn tác" }).click();
   await expect(page.locator(".row-item", { hasText: "Uống thuốc" }).first()).toBeVisible();
@@ -114,6 +115,7 @@ test("a Google account that is not on the list is told so and sees nothing", asy
   await expect(page.getByRole("heading", { name: "Hôm nay" })).toHaveCount(0);
   await shot(page, "07-denied");
   await page.getByRole("button", { name: "Đăng xuất" }).click();
+  await answerConfirm(page, "Đăng xuất");
   await expect(page.getByRole("button", { name: "Đăng nhập bằng Google" })).toBeVisible();
 });
 
@@ -140,6 +142,7 @@ test("exports: calendar file and JSON backup; sign out", async ({ page }) => {
   expect(backup.licenses).toEqual([]);
 
   await page.getByRole("button", { name: "Đăng xuất" }).click();
+  await answerConfirm(page, "Đăng xuất");
   await expect(page.getByRole("button", { name: "Đăng nhập bằng Google" })).toBeVisible();
   // Signed out: the previous person's data is gone from the screen.
   await expect(page.getByText("Họp anh Nam")).toHaveCount(0);

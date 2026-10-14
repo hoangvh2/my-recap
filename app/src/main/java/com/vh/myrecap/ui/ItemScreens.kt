@@ -329,6 +329,17 @@ fun ReviewScreen(vm: AppViewModel, id: String) {
 
 @Composable
 private fun DraftCard(item: Item, onType: (ItemType) -> Unit, onEdit: () -> Unit, onDiscard: () -> Unit, onSave: () -> Unit) {
+    var confirmDiscard by remember { mutableStateOf(false) }
+    if (confirmDiscard) {
+        ConfirmDialog(
+            title = "Bỏ đề xuất này?",
+            text = item.title,
+            confirmLabel = "Bỏ",
+            destructive = true,
+            onConfirm = onDiscard,
+            onDismiss = { confirmDiscard = false },
+        )
+    }
     Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             TypeSelector(item.type, onType)
@@ -365,7 +376,7 @@ private fun DraftCard(item: Item, onType: (ItemType) -> Unit, onEdit: () -> Unit
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onDiscard, modifier = Modifier.weight(1f)) { Text("Bỏ") }
+                OutlinedButton(onClick = { confirmDiscard = true }, modifier = Modifier.weight(1f)) { Text("Bỏ") }
                 Button(onClick = onSave, modifier = Modifier.weight(1f)) { Text("Lưu") }
             }
         }
@@ -440,6 +451,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     var pickDate by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     // Who sees this item (sharing). Only for my saved tasks, appointments and notes while signed in.
     val account by vm.account.collectAsStateWithLifecycle()
@@ -484,11 +496,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                         IconButton(onClick = { Sharing.shareText(context, current.title, ItemText.line(current, zone)) }) {
                             Icon(Icons.Rounded.Share, contentDescription = "Chia sẻ")
                         }
-                        // No confirmation: the previous screen offers Undo.
-                        IconButton(onClick = {
-                            vm.deleteItem(original.id)
-                            vm.back()
-                        }) { Icon(Icons.Rounded.Delete, contentDescription = "Xoá mục") }
+                        IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, contentDescription = "Xoá mục") }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -686,6 +694,19 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     TextButton(onClick = { pickTime = false }) { Text("Huỷ") }
                 }
             },
+        )
+    }
+    if (confirmDelete) {
+        ConfirmDialog(
+            title = "Xoá mục này?",
+            text = current.title,
+            confirmLabel = "Xoá",
+            destructive = true,
+            onConfirm = {
+                vm.deleteItem(original.id) // the previous screen offers Undo
+                vm.back()
+            },
+            onDismiss = { confirmDelete = false },
         )
     }
     if (confirmLeave) {

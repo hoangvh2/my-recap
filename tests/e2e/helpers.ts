@@ -105,3 +105,11 @@ export async function holdRow(page: Page, row: Locator, ms = 700) {
   await page.waitForTimeout(ms);
   await page.mouse.up();
 }
+
+/** Answers the app's confirmation dialog (every delete, unlink and sign-out asks first). */
+export async function answerConfirm(page: Page, button: string | null): Promise<void> {
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: button ?? "Không", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
