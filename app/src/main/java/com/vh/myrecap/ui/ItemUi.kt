@@ -121,7 +121,7 @@ fun itemSubtitle(item: Item): String = listOfNotNull(
 
 /**
  * A list row for an item. Swipe right marks a task or appointment done (reopens it when done), swipe left
- * deletes (with Undo); there is deliberately no check circle to hit by mistake while scrolling. A long press
+ * asks, then deletes (with Undo); there is deliberately no check circle to hit by mistake while scrolling. A long press
  * offers the colour tags; the tag shows as a diagonal corner at the top-right.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -148,6 +148,7 @@ fun ItemRow(
     val canDelete = onDelete != null && owner == null
     val canTag = onTag != null && owner == null && item.type.canHaveTag()
     var menu by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val doneNow by rememberUpdatedState(done)
     val toggleNow by rememberUpdatedState(onToggleDone)
     val deleteNow by rememberUpdatedState(onDelete)
@@ -155,10 +156,10 @@ fun ItemRow(
         confirmValueChange = { target ->
             when (target) {
                 SwipeToDismissBoxValue.StartToEnd -> toggleNow?.let { haptic.performHapticFeedback(HapticFeedbackType.LongPress); it(!doneNow) }
-                SwipeToDismissBoxValue.EndToStart -> deleteNow?.let { haptic.performHapticFeedback(HapticFeedbackType.LongPress); it() }
+                SwipeToDismissBoxValue.EndToStart -> if (deleteNow != null) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); confirmDelete = true }
                 SwipeToDismissBoxValue.Settled -> Unit
             }
-            false // the row snaps back; the list itself moves or drops it
+            false // the row snaps back; a delete waits for the dialog, then the list drops it
         },
     )
     val rowShape = RoundedCornerShape(18.dp)
@@ -178,7 +179,7 @@ fun ItemRow(
                 .semantics(mergeDescendants = true) {
                     val actions = buildList {
                         if (canDone) add(CustomAccessibilityAction(if (done) "Mở lại" else "Đánh dấu xong") { onToggleDone?.invoke(!done); true })
-                        if (canDelete) add(CustomAccessibilityAction("Xoá") { onDelete?.invoke(); true })
+                        if (canDelete) add(CustomAccessibilityAction("Xoá") { confirmDelete = true; true })
                         if (canTag) add(CustomAccessibilityAction("Gắn thẻ") { menu = true; true })
                     }
                     if (actions.isNotEmpty()) customActions = actions
@@ -241,6 +242,16 @@ fun ItemRow(
                 }
             }
         }
+    }
+    if (confirmDelete) {
+        ConfirmDialog(
+            title = "Xoá mục này?",
+            text = item.title,
+            confirmLabel = "Xoá",
+            destructive = true,
+            onConfirm = { onDelete?.invoke() },
+            onDismiss = { confirmDelete = false },
+        )
     }
     if (canDone || canDelete) {
         SwipeToDismissBox(

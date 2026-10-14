@@ -10,6 +10,7 @@ import { createStore, useStore } from "../lib/store";
 import { Icon, type IconName } from "./icons";
 import { useGraph } from "./hooks";
 import { BRAND, copyright } from "../brand";
+import { signOut } from "../session";
 
 /** An anchor that moves inside the app without reloading, and still works with "open in new tab". */
 export function Link(props: { to: string; class?: string; children: ComponentChildren; label?: string }) {
@@ -155,6 +156,12 @@ const asking = createStore<Ask | null>(null);
 /** "Bạn chắc chứ?" in plain words. Resolves true only when the person confirms. */
 export function confirmDialog(o: { title: string; body?: string; ok: string; danger?: boolean }): Promise<boolean> {
   return new Promise((resolve) => asking.set({ ...o, done: resolve }));
+}
+
+/** Signing out always asks first; the signed-out screen is a dead end until the person signs in again. */
+export async function signOutAsk(): Promise<void> {
+  const ok = await confirmDialog({ title: "Đăng xuất?", body: "Bạn sẽ phải đăng nhập lại bằng Google để dùng tiếp.", ok: "Đăng xuất", danger: true });
+  if (ok) await signOut();
 }
 
 export function ConfirmHost() {

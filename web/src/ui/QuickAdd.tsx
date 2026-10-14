@@ -10,7 +10,7 @@ import {
   BLANK, addTemplate, editTemplate, featured, fill, hasBlank, matching, setTemplates, suggest, templates, usedTemplate, type QuickTemplate,
 } from "../lib/templates";
 import { RECURRENCE_LABEL } from "../lib/model";
-import { Sheet } from "./common";
+import { confirmDialog, Sheet } from "./common";
 import { useUid } from "./hooks";
 import { Icon } from "./icons";
 import { showToast } from "./toast";
@@ -173,7 +173,7 @@ function TemplatesSheet({ onClose }: { onClose: () => void }) {
                   <span class="title">{t.text}</span>
                   {t.uses > 0 && <span class="meta">Đã dùng {t.uses} lần</span>}
                 </button>
-                <button type="button" class="icon-btn" aria-label={`Xoá mẫu ${t.text}`} onClick={() => setTemplates(list.filter((_, i) => i !== index))}><Icon name="trash" size={18} /></button>
+                <button type="button" class="icon-btn" aria-label={`Xoá mẫu ${t.text}`} onClick={() => void confirmDialog({ title: "Xoá mẫu này?", body: t.text, ok: "Xoá", danger: true }).then((ok) => ok && setTemplates(templates.get().filter((_, i) => i !== index)))}><Icon name="trash" size={18} /></button>
               </>
             )}
           </li>

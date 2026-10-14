@@ -3,11 +3,11 @@ import { startSync, syncState } from "../data";
 import { resumePush } from "../push";
 import { startShareSync } from "../share";
 import { useStore } from "../lib/store";
-import { session, signInWithGoogle, signOut, startSession } from "../session";
+import { session, signInWithGoogle, startSession } from "../session";
 import { Shell } from "./Shell";
 import { Icon } from "./icons";
 import { BRAND } from "../brand";
-import { Signature } from "./common";
+import { ConfirmHost, signOutAsk, Signature } from "./common";
 
 export function App() {
   const s = useStore(session);
@@ -49,8 +49,9 @@ function Signed({ uid, email }: { uid: string; email: string }) {
           <Icon name="lock" size={36} />
           <h1>Chưa được cấp quyền</h1>
           <p class="muted">Tài khoản <strong>{email}</strong> chưa có quyền dùng ứng dụng này. Hãy đăng nhập bằng tài khoản Google khác hoặc liên hệ chủ ứng dụng.</p>
-          <button class="btn solid wide" onClick={() => void signOut()}>Đăng xuất</button>
+          <button class="btn solid wide" onClick={() => void signOutAsk()}>Đăng xuất</button>
         </div>
+        <ConfirmHost />
       </div>
     );
   }

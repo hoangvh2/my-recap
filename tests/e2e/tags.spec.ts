@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { expectNoProblems, holdRow, idTokenFor, OWNER, seed, signIn, swipeRow, tab, watchBrowser } from "./helpers";
+import { answerConfirm, expectNoProblems, holdRow, idTokenFor, OWNER, seed, signIn, swipeRow, tab, watchBrowser } from "./helpers";
 
 /** Real screenshots for review go to TAG_SHOTS when it is set (a folder); otherwise nothing is written. */
 const SHOTS = process.env.TAG_SHOTS;
@@ -106,6 +106,8 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(row("Xác nhận lịch bay").locator(".swipe-act.del")).toBeVisible();
     await shot(page, "04-swipe-left-delete", scheme);
     await page.mouse.up();
+    await answerConfirm(page, "Không"); // a long swipe left asks first; "Không" keeps the row
+    await expect(row("Xác nhận lịch bay")).toBeVisible();
 
     await swipeRow(page, row("Mua sữa"), "right");
     await expect(page.getByText("Đã xong: Mua sữa")).toBeVisible();
@@ -114,6 +116,13 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(row("Mua sữa")).toBeVisible();
 
     await swipeRow(page, row("Mua sữa"), "left");
+    // A swipe never deletes on its own: the row springs back and the dialog asks.
+    await expect(page.getByRole("alertdialog")).toContainText("Mua sữa");
+    await answerConfirm(page, "Không");
+    await expect(row("Mua sữa")).toBeVisible();
+    await expect(page.getByText("Đã xoá: Mua sữa")).toHaveCount(0);
+    await swipeRow(page, row("Mua sữa"), "left");
+    await answerConfirm(page, "Xoá");
     await expect(page.getByText("Đã xoá: Mua sữa")).toBeVisible();
     await expect(row("Mua sữa")).toHaveCount(0);
     await page.getByRole("button", { name: "Hoàn tác" }).click();
@@ -125,6 +134,7 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.getByText("Đã xong: Đóng tiền điện")).toBeVisible();
     await row("Đón con tan học").locator(".row-main").focus();
     await page.keyboard.press("Delete");
+    await answerConfirm(page, "Xoá");
     await expect(page.getByText("Đã xoá: Đón con tan học")).toBeVisible();
 
     // ---- editor: corner trigger, list with dot + glyph + name + "Không thẻ"; saved with the item

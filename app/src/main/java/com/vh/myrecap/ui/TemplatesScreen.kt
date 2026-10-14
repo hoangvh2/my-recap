@@ -70,6 +70,7 @@ fun TemplatesScreen(vm: AppViewModel) {
     val list = settings.quickTemplates
     var query by rememberSaveable { mutableStateOf("") }
     var editing by remember { mutableStateOf<Int?>(null) }
+    var confirmDelete by remember { mutableStateOf<Int?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val zone = ZoneId.systemDefault()
@@ -92,6 +93,10 @@ fun TemplatesScreen(vm: AppViewModel) {
     }
 
     fun delete(index: Int) {
+        confirmDelete = index
+    }
+
+    fun reallyDelete(index: Int) {
         val removed = list.getOrNull(index) ?: return
         vm.removeTemplate(index)
         scope.launch {
@@ -183,6 +188,16 @@ fun TemplatesScreen(vm: AppViewModel) {
         }
     }
 
+    confirmDelete?.let { pending ->
+        ConfirmDialog(
+            title = "Xoá mẫu này?",
+            text = list.getOrNull(pending)?.text,
+            confirmLabel = "Xoá",
+            destructive = true,
+            onConfirm = { reallyDelete(pending) },
+            onDismiss = { confirmDelete = null },
+        )
+    }
     val index = editing
     val current = index?.let { list.getOrNull(it) }
     if (index != null && current != null) {

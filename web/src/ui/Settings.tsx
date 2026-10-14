@@ -13,8 +13,7 @@ import { templateCsv } from "../lib/table";
 import { to } from "../lib/router";
 import { useStore } from "../lib/store";
 import { setTheme, THEME_LABEL, THEME_MODES, themeMode } from "../lib/theme";
-import { signOut } from "../session";
-import { confirmDialog, Link, Section, Signature, TopBar } from "./common";
+import { confirmDialog, Link, Section, signOutAsk, Signature, TopBar } from "./common";
 import { saveFile } from "./download";
 import { useCtx, useGraph, useUid } from "./hooks";
 import { Icon } from "./icons";
@@ -131,7 +130,7 @@ function TagRulesCard() {
           <select aria-label={`Quy tắc ${i + 1}: gắn thẻ`} value={r.tag} onChange={(e) => edit(i, { tag: (e.target as HTMLSelectElement).value as TagRule["tag"] })}>
             {ITEM_TAGS.map((t) => <option key={t} value={t}>{TAG_INFO[t].glyph} {TAG_INFO[t].label}</option>)}
           </select>
-          <button type="button" class="icon-btn" aria-label={`Xoá quy tắc ${i + 1}`} onClick={() => change(rules.filter((_, j) => j !== i))}><Icon name="trash" size={18} /></button>
+          <button type="button" class="icon-btn" aria-label={`Xoá quy tắc ${i + 1}`} onClick={() => void confirmDialog({ title: "Xoá quy tắc này?", body: r.text ? `“${r.text}”` : undefined, ok: "Xoá", danger: true }).then((ok) => ok && change(rules.filter((_, j) => j !== i)))}><Icon name="trash" size={18} /></button>
         </div>
       ))}
       <button type="button" class="btn ghost wide" disabled={rules.length >= MAX_RULES} onClick={() => change([...rules, { field: "keyword", text: "", tag: "red" }])}>
@@ -261,7 +260,7 @@ export function Settings({ email }: { email: string }) {
         <div class="card-block">
           <p class="muted">{email}</p>
           <p class="note"><Icon name="lock" size={14} /> Dữ liệu lưu trên Google, không lưu trong trình duyệt. Khoá Gemini nằm ở máy chủ.</p>
-          <button class="btn danger wide" onClick={() => void signOut()}><Icon name="logout" size={18} /> Đăng xuất</button>
+          <button class="btn danger wide" onClick={() => void signOutAsk()}><Icon name="logout" size={18} /> Đăng xuất</button>
         </div>
       </Section>
       <Signature />

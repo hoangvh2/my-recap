@@ -12,13 +12,16 @@ import { useGraph, useUid } from "./hooks";
 import { Editor } from "./Editor";
 import { CustomerForm, LicenseForm } from "./forms";
 import { ItemRow } from "./ItemRow";
-import { Section } from "./common";
+import { confirmDialog, Section } from "./common";
 import { showToast } from "./toast";
 
 export interface ReviewFilter {
   customerId?: string;
   licenseId?: string;
 }
+
+/** Dropping a draft deletes it, so it asks first like every other delete. */
+const ask = (title: string): Promise<boolean> => confirmDialog({ title, body: "Mục nháp này sẽ bị xoá.", ok: "Bỏ", danger: true });
 
 function DraftRow(props: { icon: "building" | "file" | "renew"; title: string; meta?: string; onOpen?: () => void; onDrop: () => void; dropLabel: string }) {
   return (
@@ -89,7 +92,7 @@ export function Review({ filter }: { filter?: ReviewFilter }) {
               <ul class="list">
                 {p.customers.map((c) => (
                   <DraftRow key={c.id} icon="building" title={c.name} meta={[c.contact, c.phone].filter(Boolean).join(" · ")} dropLabel={`Bỏ khách ${c.name}`}
-                    onOpen={() => setEditCustomer(c)} onDrop={() => void dropDraftCustomer(uid, g, c).catch(fail)} />
+                    onOpen={() => setEditCustomer(c)} onDrop={() => void ask(`Bỏ khách ${c.name}?`).then((ok) => { if (ok) void dropDraftCustomer(uid, g, c).catch(fail); })} />
                 ))}
               </ul>
             </div>
@@ -101,7 +104,7 @@ export function Review({ filter }: { filter?: ReviewFilter }) {
                 {p.licenses.map((l) => (
                   <DraftRow key={l.id} icon="file" title={`${g.customerName(l.customerId)} · ${l.product}`}
                     meta={`${KIND_LABEL[l.kind]} · hết hạn ${formatDate(l.endDate)}${l.note?.includes("tạm tính") ? " (tạm tính, chạm để sửa)" : ""}${l.value ? ` · ${formatVnd(l.value)}` : ""}`} dropLabel={`Bỏ ${l.product}`}
-                    onOpen={() => setEditLicense(l)} onDrop={() => void dropDraftLicense(uid, g, l).catch(fail)} />
+                    onOpen={() => setEditLicense(l)} onDrop={() => void ask(`Bỏ ${l.product}?`).then((ok) => { if (ok) void dropDraftLicense(uid, g, l).catch(fail); })} />
                 ))}
               </ul>
             </div>
@@ -121,13 +124,14 @@ export function Review({ filter }: { filter?: ReviewFilter }) {
               <h4>Cập nhật gia hạn</h4>
               <ul class="list">
                 {p.proposals.map((x) => (
-                  <DraftRow key={x.id} icon="renew" title={x.summary} dropLabel="Bỏ gợi ý này" onDrop={() => void dismissProposal(uid, x).catch(fail)} />
+                  <DraftRow key={x.id} icon="renew" title={x.summary} dropLabel="Bỏ gợi ý này" onDrop={() => void ask("Bỏ gợi ý này?").then((ok) => { if (ok) void dismissProposal(uid, x).catch(fail); })} />
                 ))}
               </ul>
             </div>
           )}
           <div class="row gap">
             <button class="btn ghost" onClick={async () => {
+              if (!(await ask("Bỏ hết ghi chú nháp này?"))) return;
               const undo = await discardCapture(uid, g, p.id, props).catch(() => { fail(); return null; });
               if (undo) showToast("Đã bỏ ghi chú nháp", { label: "Hoàn tác", run: () => void undo().catch(fail) });
             }}>Bỏ hết</button>
@@ -137,11 +141,11 @@ export function Review({ filter }: { filter?: ReviewFilter }) {
       ))}
 
       {editCustomer && <CustomerForm customer={editCustomer} isNew={false} onClose={() => setEditCustomer(null)}
-        onSave={(c) => { setEditCustomer(null); void saveCustomer(uid, c).catch(fail); }} onDelete={async (c) => { setEditCustomer(null); await dropDraftCustomer(uid, g, c).catch(fail); }} />}
+        onSave={(c) => { setEditCustomer(null); void saveCustomer(uid, c).catch(fail); }} onDelete={async (c) => { if (!(await ask(`Bỏ khách ${c.name}?`))) return; setEditCustomer(null); await dropDraftCustomer(uid, g, c).catch(fail); }} />}
       {editLicense && <LicenseForm license={editLicense} isNew={false} onClose={() => setEditLicense(null)}
-        onSave={(l) => { setEditLicense(null); void saveLicense(uid, l).catch(fail); }} onDelete={async (l) => { setEditLicense(null); await dropDraftLicense(uid, g, l).catch(fail); }} />}
+        onSave={(l) => { setEditLicense(null); void saveLicense(uid, l).catch(fail); }} onDelete={async (l) => { if (!(await ask(`Bỏ ${l.product}?`))) return; setEditLicense(null); await dropDraftLicense(uid, g, l).catch(fail); }} />}
       {editItem && <Editor key={editItem.id} item={editItem} isNew={false} onClose={() => setEditItem(null)}
-        onSave={(i) => { setEditItem(null); void saveItem(uid, i).catch(fail); }} onDelete={(i) => { setEditItem(null); void dropDraftItem(uid, i).catch(fail); }} />}
+        onSave={(i) => { setEditItem(null); void saveItem(uid, i).catch(fail); }} onDelete={async (i) => { if (!(await ask(`Bỏ "${i.title}"?`))) return; setEditItem(null); void dropDraftItem(uid, i).catch(fail); }} />}
     </Section>
   );
 }

@@ -712,12 +712,23 @@ private fun TagRulesSection(s: AppSettings, update: ((AppSettings) -> AppSetting
     var field by remember { mutableStateOf(TagRule.Field.KEYWORD) }
     var text by remember { mutableStateOf("") }
     var tag by remember { mutableStateOf(ItemTag.RED) }
+    var confirmRule by remember { mutableStateOf<Int?>(null) }
+    confirmRule?.let { pending ->
+        ConfirmDialog(
+            title = "Xoá quy tắc này?",
+            text = s.tagRules.getOrNull(pending)?.let { "${it.field.label}: ${it.text}" },
+            confirmLabel = "Xoá",
+            destructive = true,
+            onConfirm = { update { it.copy(tagRules = it.tagRules.filterIndexed { i, _ -> i != pending }) } },
+            onDismiss = { confirmRule = null },
+        )
+    }
     Hint("Việc hoặc lịch hẹn mới khớp một quy tắc sẽ được gắn thẻ ngay (quy tắc đầu tiên khớp thắng). Sửa mục sau đó không bị gắn lại. Chạy trên máy, không tốn phí.")
     s.tagRules.forEachIndexed { index, rule ->
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TagCorner(rule.tag, size = 28)
             Text("${rule.field.label}: ${rule.text}", Modifier.weight(1f).padding(start = 8.dp))
-            IconButton(onClick = { update { it.copy(tagRules = it.tagRules.filterIndexed { i, _ -> i != index }) } }) {
+            IconButton(onClick = { confirmRule = index }) {
                 Icon(Icons.Rounded.Close, contentDescription = "Xoá quy tắc ${rule.text}")
             }
         }
