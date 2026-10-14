@@ -39,6 +39,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -86,6 +87,9 @@ import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.VadSensitivity
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
+import com.vh.myrecap.core.ItemTag
+import com.vh.myrecap.core.TagRule
+import com.vh.myrecap.core.TagRules
 import com.vh.myrecap.core.ThemeMode
 import com.vh.myrecap.settings.AppSettings
 import kotlinx.coroutines.launch
@@ -128,6 +132,13 @@ fun SettingsScreen(vm: AppViewModel) {
 
             Section("Mẫu nhập nhanh") {
                 TemplatesSection(vm, s)
+            }
+            Section("Thẻ màu tự gắn") {
+                TagRulesSection(s) { transform -> update(transform) }
+            }
+            Section("Nhắc lặp mục Quan trọng") {
+                SwitchRow("Không nhắc lặp ban đêm (22:00–06:30)", s.quietNags) { v -> update { it.copy(quietNags = v) } }
+                Hint("Mục ❗ Quan trọng nhắc lại mỗi 10 phút, tối đa 6 lần. Bật mục này thì lần nhắc rơi vào ban đêm sẽ chờ đến 06:30.")
             }
             Section("1. Chuyển giọng nói → văn bản") {
                 ProviderChoice(s.sttProvider) { k -> update { it.copy(sttProvider = k) } }
@@ -692,4 +703,47 @@ private fun BackupSection(vm: AppViewModel, s: AppSettings) {
 private fun TemplatesSection(vm: AppViewModel, s: AppSettings) {
     Hint("Câu mẫu để thêm việc, lịch hẹn, chi tiêu nhanh. Ô gõ nhanh hiện mẫu hay dùng nhất của mỗi loại; gõ chữ thì hiện các mẫu khớp.")
     FilledTonalButton(onClick = vm::openTemplates, modifier = Modifier.fillMaxWidth()) { Text("Quản lý mẫu câu (${s.quickTemplates.size})") }
+}
+
+/** Rules like "người: anh Nam → thẻ ?" that tag new tasks and appointments; edits never re-apply them. */
+@Composable
+private fun TagRulesSection(s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
+    var field by remember { mutableStateOf(TagRule.Field.KEYWORD) }
+    var text by remember { mutableStateOf("") }
+    var tag by remember { mutableStateOf(ItemTag.RED) }
+    Hint("Việc hoặc lịch hẹn mới khớp một quy tắc sẽ được gắn thẻ ngay (quy tắc đầu tiên khớp thắng). Sửa mục sau đó không bị gắn lại. Chạy trên máy, không tốn phí.")
+    s.tagRules.forEachIndexed { index, rule ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TagCorner(rule.tag, size = 28)
+            Text("${rule.field.label}: ${rule.text}", Modifier.weight(1f).padding(start = 8.dp))
+            IconButton(onClick = { update { it.copy(tagRules = it.tagRules.filterIndexed { i, _ -> i != index }) } }) {
+                Icon(Icons.Rounded.Close, contentDescription = "Xoá quy tắc ${rule.text}")
+            }
+        }
+    }
+    if (s.tagRules.size < TagRules.MAX) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TagRule.Field.entries.forEach { f ->
+                FilterChip(selected = field == f, onClick = { field = f }, label = { Text(f.label) })
+            }
+        }
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text(if (field == TagRule.Field.KEYWORD) "Từ khoá trong tiêu đề, ghi chú" else "Chứa chữ…") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            ItemTag.entries.forEach { t -> TagDot(t, selected = tag == t, onClick = { tag = t }) }
+        }
+        FilledTonalButton(
+            onClick = {
+                update { it.copy(tagRules = TagRules.add(it.tagRules, TagRule(field, text, tag))) }
+                text = ""
+            },
+            enabled = text.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Thêm quy tắc") }
+    }
 }

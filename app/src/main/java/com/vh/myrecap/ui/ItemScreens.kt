@@ -98,6 +98,8 @@ import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Money
 import com.vh.myrecap.core.Recurrence
+import com.vh.myrecap.core.canHaveTag
+import com.vh.myrecap.core.itemTag
 import com.vh.myrecap.data.ItemStore
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.reminder.Reminders
@@ -115,11 +117,12 @@ private fun Item.withType(t: ItemType): Item = when (t) {
         type = t,
         recurrence = null,
         important = false,
+        tag = null,
         whenAt = whenAt ?: LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli(),
         allDay = if (whenAt == null) true else allDay,
         category = category ?: "Khác",
     )
-    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null, important = false)
+    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null, important = false, tag = null)
     else -> copy(type = t, amount = null, category = null)
 }
 
@@ -282,7 +285,7 @@ fun ReviewScreen(vm: AppViewModel, id: String) {
             if (saved.isNotEmpty()) {
                 item { SectionLabel("Đã lưu từ ghi chú này") }
                 items(saved, key = { "saved-${it.id}" }) { item ->
-                    ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) })
+                    ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) })
                 }
             }
         }
@@ -523,14 +526,20 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             TypeSelector(edit.type, { edit = edit.withType(it) })
-            OutlinedTextField(
-                value = edit.title,
-                onValueChange = { edit = edit.copy(title = it) },
-                label = { Text("Tiêu đề") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                OutlinedTextField(
+                    value = edit.title,
+                    onValueChange = { edit = edit.copy(title = it) },
+                    label = { Text("Tiêu đề") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.weight(1f),
+                )
+                // The tag corner sits at the form's top-right, where it shows in the list.
+                if (edit.type.canHaveTag()) {
+                    TagFormButton(edit.itemTag, onPick = { edit = edit.copy(tag = it?.key) })
+                }
+            }
             if (edit.type == ItemType.EXPENSE) {
                 OutlinedTextField(
                     value = amountText,

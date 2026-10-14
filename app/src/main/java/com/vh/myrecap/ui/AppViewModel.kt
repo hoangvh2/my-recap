@@ -25,6 +25,10 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.QuickTemplate
 import com.vh.myrecap.core.QuickTemplates
 import com.vh.myrecap.core.ItemStatus
+import com.vh.myrecap.core.ItemTag
+import com.vh.myrecap.core.TagFilter
+import com.vh.myrecap.core.TagRules
+import com.vh.myrecap.core.canHaveTag
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.ProviderConfig
@@ -415,15 +419,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** Confirms AI proposals; only then do they count and remind. */
     fun confirm(ids: Collection<String>) = io {
         ids.forEach { id ->
-            app.items.update(id) { if (it.status == ItemStatus.DRAFT) it.copy(status = ItemStatus.OPEN) else it }
+            val rules = settings.value.tagRules
+            app.items.update(id) { if (it.status == ItemStatus.DRAFT) TagRules.applyToNew(rules, it.copy(status = ItemStatus.OPEN)) else it }
                 ?.let { Reminders.sync(app, it) }
         }
     }
 
     fun saveItem(item: Item) = io {
-        app.items.upsert(item)
-        Reminders.sync(app, item)
+        // A brand-new item gets the tag its rules give; an edit never re-applies them.
+        val toSave = if (app.items.get(item.id) == null) TagRules.applyToNew(settings.value.tagRules, item) else item
+        app.items.upsert(toSave)
+        Reminders.sync(app, toSave)
     }
+
+    /** Sets or clears the colour tag of a task or appointment (null = none). */
+    fun setTag(id: String, tag: ItemTag?) = io {
+        app.items.update(id) { if (it.type.canHaveTag()) it.copy(tag = tag?.key) else it }
+    }
+
+    /** What the list screens are narrowed to by tag. */
+    var tagFilter by mutableStateOf(TagFilter())
+        private set
+
+    fun filterByTag(filter: TagFilter) { tagFilter = filter }
 
     fun setDone(id: String, done: Boolean) = io { applyDone(id, done) }
 
@@ -433,7 +451,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Saves a typed quick-add as a confirmed item (the user saw what was understood), with its reminder. */
     fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result) = lasting {
-        val item = parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis())
+        val item = TagRules.applyToNew(settings.value.tagRules, parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis()))
         app.items.upsert(item)
         Reminders.sync(app, item)
         withContext(Dispatchers.Main) { lastAddedItem = item }

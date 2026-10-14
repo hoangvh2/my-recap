@@ -57,6 +57,8 @@ data class Item(
     val recurrence: Recurrence? = null,
     /** Tasks and appointments only: must not be missed; highlighted in lists and reminded louder. */
     val important: Boolean = false,
+    /** Tasks and appointments only: a colour tag ([ItemTag] key) that draws the eye; changes no reminder. */
+    val tag: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -76,6 +78,7 @@ data class Item(
         .putOpt("doneAt", doneAt)
         .putOpt("recurrence", recurrence?.name)
         .apply { if (important) put("important", true) }
+        .apply { if (itemTag != null) put("tag", tag) }
 
     companion object {
         fun fromJson(o: JSONObject) = Item(
@@ -96,6 +99,7 @@ data class Item(
             doneAt = o.optLongOrNull("doneAt"),
             recurrence = o.optStringOrNull("recurrence")?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
             important = o.optBoolean("important", false),
+            tag = ItemTag.fromKey(o.optStringOrNull("tag"))?.key,
         )
     }
 }

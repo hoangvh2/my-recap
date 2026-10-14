@@ -202,7 +202,8 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 
     private fun nag(context: Context, item: Item, repeats: Int) {
-        val at = ReminderPolicy.nextNagAt(item, repeats, System.currentTimeMillis()) ?: return
+        val quiet = MyRecapApp.from(context).settings.current.quietNags
+        val at = ReminderPolicy.nextNagAt(item, repeats, System.currentTimeMillis(), quiet) ?: return
         Reminders.scheduleFollowUp(context, item.id, at, repeats)
     }
 

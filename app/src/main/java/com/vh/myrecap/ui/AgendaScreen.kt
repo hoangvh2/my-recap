@@ -197,10 +197,22 @@ fun AgendaTab(vm: AppViewModel) {
                     onSelect = { filterIndex = it },
                 )
             }
-            when (filter) {
-                null -> overview(saved, vm, onShowExpenses = { filterIndex = FILTERS.indexOf(ItemType.EXPENSE) })
-                ItemType.TASK -> taskList(saved.filter { it.type == ItemType.TASK }, vm)
-                ItemType.EVENT -> eventList(saved.filter { it.type == ItemType.EVENT }, vm)
+            val tagFilter = vm.tagFilter
+            val tagged = filter != ItemType.EXPENSE && filter != ItemType.NOTE
+            if (tagged) {
+                item(key = "tag-filter") { TagFilterRow(saved, tagFilter, vm::filterByTag, Modifier.padding(top = 8.dp)) }
+            }
+            val shown = if (tagged) tagFilter.apply(saved) else saved
+            val nothingTagged = tagged && tagFilter.active && shown.none { it.status == ItemStatus.OPEN }
+            if (nothingTagged) {
+                item(key = "tag-filter-empty") {
+                    Text("Không có mục nào đang mở với thẻ này.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
+                }
+            }
+            if (!nothingTagged) when (filter) {
+                null -> overview(shown, vm, onShowExpenses = { filterIndex = FILTERS.indexOf(ItemType.EXPENSE) })
+                ItemType.TASK -> taskList(shown.filter { it.type == ItemType.TASK }, vm)
+                ItemType.EVENT -> eventList(shown.filter { it.type == ItemType.EVENT }, vm)
                 ItemType.EXPENSE -> item { ExpenseView(mine.filter { it.type == ItemType.EXPENSE }, vm) }
                 ItemType.NOTE -> noteList(saved.filter { it.type == ItemType.NOTE }, vm)
             }
@@ -423,7 +435,7 @@ private fun LazyListScope.itemGroup(label: String, list: List<Item>, vm: AppView
     if (list.isEmpty()) return
     item(key = "label-$label") { SectionLabel(label, trailing = trailing) }
     items(list, key = { "$label-${it.id}" }) { item ->
-        ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) })
+        ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) })
     }
 }
 
@@ -438,7 +450,7 @@ private fun LazyListScope.doneGroup(done: List<Item>, vm: AppViewModel, label: S
             }
             AnimatedVisibility(open) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    done.forEach { d -> ItemRow(d, onOpen = { vm.openItem(d.id) }, onToggleDone = { vm.setDone(d.id, it) }) }
+                    done.forEach { d -> ItemRow(d, onOpen = { vm.openItem(d.id) }, onToggleDone = { vm.setDone(d.id, it) }, onDelete = { vm.deleteItem(d.id) }, onTag = { vm.setTag(d.id, it) }) }
                 }
             }
         }

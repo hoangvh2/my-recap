@@ -187,6 +187,7 @@ object CloudItem {
         sourceId = item.sourceId?.takeIf { ID.matches(it) },
         quote = item.quote?.take(400),
         recurrence = item.recurrence.takeIf { item.type == ItemType.TASK || item.type == ItemType.EVENT },
+        tag = item.itemTag?.key.takeIf { item.type.canHaveTag() },
     )
 
     /**
@@ -213,6 +214,7 @@ object CloudItem {
             "doneAt" to c.doneAt,
             "recurrence" to c.recurrence?.name,
             "important" to if (c.important) true else null,
+            "tag" to c.tag,
         )
     }
 
@@ -237,6 +239,7 @@ object CloudItem {
             doneAt = (m["doneAt"] as? Number)?.toLong(),
             recurrence = (m["recurrence"] as? String)?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
             important = m["important"] as? Boolean ?: false,
+            tag = ItemTag.fromKey(m["tag"] as? String)?.key?.takeIf { type.canHaveTag() },
         )
     }
 

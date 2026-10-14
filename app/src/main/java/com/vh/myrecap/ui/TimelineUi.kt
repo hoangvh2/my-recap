@@ -41,7 +41,7 @@ internal fun LazyListScope.todayTimeline(today: List<Item>, vm: AppViewModel) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(52.dp),
                 )
-                ItemRow(row.item, onOpen = { vm.openItem(row.item.id) }, onToggleDone = { vm.setDone(row.item.id, it) }, modifier = Modifier.weight(1f))
+                ItemRow(row.item, onOpen = { vm.openItem(row.item.id) }, onToggleDone = { vm.setDone(row.item.id, it) }, onDelete = { vm.deleteItem(row.item.id) }, onTag = { vm.setTag(row.item.id, it) }, modifier = Modifier.weight(1f))
             }
         }
     }
