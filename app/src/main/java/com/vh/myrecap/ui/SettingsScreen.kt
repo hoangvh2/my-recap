@@ -706,6 +706,7 @@ private fun TemplatesSection(vm: AppViewModel, s: AppSettings) {
 }
 
 /** Rules like "người: anh Nam → thẻ ?" that tag new tasks and appointments; edits never re-apply them. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun TagRulesSection(s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
     var field by remember { mutableStateOf(TagRule.Field.KEYWORD) }
