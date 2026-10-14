@@ -339,6 +339,12 @@ describe("notifications", () => {
     await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/imp"), item({ id: "imp", important: true })));
     await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/imp2"), item({ id: "imp2", important: "yes" })));
   });
+  it("an item can carry a colour tag, on a task or appointment only", async () => {
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/tg1"), item({ id: "tg1", tag: "red" })));
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/tg2"), item({ id: "tg2", type: "EVENT", tag: "purple" })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg3"), item({ id: "tg3", tag: "green" })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg4"), item({ id: "tg4", type: "NOTE", tag: "red" })));
+  });
 });
 
 describe("calendar feed tokens", () => {

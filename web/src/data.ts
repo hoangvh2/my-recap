@@ -2,6 +2,7 @@ import {
   collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, setDoc, writeBatch, type FirestoreError, type WriteBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { applyAutoTag, tagRules } from "./lib/autotag";
 import { applyProposal, renew as renewLicense, type RenewalInput } from "./lib/flow";
 import { buildGraph, customerCascade, type Graph } from "./lib/graph";
 import { createStore } from "./lib/store";
@@ -224,7 +225,8 @@ export function confirmCapture(uid: string, g: Graph, sourceId: string, all: Pro
     {
       customers: p.customers.map((c) => ({ ...c, status: "OPEN" as const, updatedAt: now })),
       licenses: [...p.licenses.map((l) => ({ ...l, status: "OPEN" as const, updatedAt: now })), ...changed],
-      items: p.items.map((i) => ({ ...i, status: "OPEN" as const })),
+      // Newly confirmed tasks and appointments get their auto-tag here, once (an edit never re-applies the rules).
+      items: p.items.map((i) => applyAutoTag(tagRules.get(), { ...i, status: "OPEN" as const })),
     },
     { proposals: p.proposals },
   );

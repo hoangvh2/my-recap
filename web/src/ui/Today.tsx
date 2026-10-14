@@ -13,6 +13,7 @@ import { received as receivedStore } from "../share";
 import { NoticeBanner, OwnerFilterBar, useOwnerFilter } from "./Sharing";
 import { NudgeRow, useLicenseActions } from "./actions";
 import { Capture } from "./Capture";
+import { TagFilterBar, useTagFilter } from "./TagUI";
 import { QuickAdd } from "./QuickAdd";
 import { TriageCard } from "./Triage";
 import { Empty, Link, Section, TopBar } from "./common";
@@ -39,8 +40,9 @@ export function Today() {
   const [who, setWho] = useOwnerFilter();
   const recIds = useMemo(() => new Set(rec.map((d) => d.id)), [rec]);
   // My saved items plus what others shared with me (filtered by whose); theirs never count as overdue for me.
-  const shown = useMemo(() => withReceived(all.filter((i) => i.status !== "DRAFT"), rec, who), [all, rec, who]);
-  const o = useMemo(() => overview(shown, now, (i) => recIds.has(i.id)), [shown, now, recIds]);
+  const base = useMemo(() => withReceived(all.filter((i) => i.status !== "DRAFT"), rec, who), [all, rec, who]);
+  const tf = useTagFilter(base);
+  const o = useMemo(() => overview(tf.shown, now, (i) => recIds.has(i.id)), [tf.shown, now, recIds]);
   const tl = useMemo(() => timeline(o.today, now), [o.today, now]);
 
   const openItem = (i: Item) => openEditor(i);
@@ -49,6 +51,7 @@ export function Today() {
     setDone(uid, item, done).catch(fail);
     if (done) showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(fail) });
   };
+  const filtering = tf.active !== null;
   const nothing = due.length === 0 && o.overdue.length === 0 && o.today.length === 0;
   const hasData = g.customers.some((c) => c.status === "OPEN") || all.length > 0 || rec.length > 0;
 
@@ -67,6 +70,7 @@ export function Today() {
       )}
 
       <OwnerFilterBar value={who} onChange={setWho} />
+      {tf.visible && <TagFilterBar active={tf.active} />}
 
       {o.overdue.length > 0 && (
         <Section title="Việc quá hạn" count={o.overdue.length} tone="warn">
@@ -87,7 +91,8 @@ export function Today() {
         </Section>
       )}
 
-      {nothing && hasData && <Empty>Hôm nay không có gì gấp. Bạn có thể nghỉ một chút hoặc gọi thăm khách lâu không liên lạc.</Empty>}
+      {filtering && o.overdue.length === 0 && o.today.length === 0 && o.upcoming.length === 0 && <Empty>Không có việc hay lịch hẹn nào với thẻ này.</Empty>}
+      {nothing && !filtering && hasData && <Empty>Hôm nay không có gì gấp. Bạn có thể nghỉ một chút hoặc gọi thăm khách lâu không liên lạc.</Empty>}
       {!hasData && (
         <section class="welcome">
           <h3>Bắt đầu thế nào?</h3>

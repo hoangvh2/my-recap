@@ -1,5 +1,5 @@
 import { DateTime, IANAZone } from "luxon";
-import type { Item, ItemType, Recurrence } from "../../shared/model";
+import { ITEM_TAGS, type Item, type ItemTag, type ItemType, type Recurrence } from "../../shared/model";
 import { EXPENSE_CATEGORIES, LIMITS } from "./config";
 import { parseVnd } from "./money";
 
@@ -160,7 +160,17 @@ export function itemFromRecord(rec: Record<string, unknown>, ctx: ItemContext): 
   if (repeat) item.recurrence = repeat;
   // Only for things that are reminded; "true" as text is a common model slip.
   if ((type === "TASK" || type === "EVENT") && (rec.important === true || rec.important === "true")) item.important = true;
+  // A personal colour mark: only tasks and appointments, only the known colours (anything else is dropped).
+  const tag = (type === "TASK" || type === "EVENT") ? tagFrom(rec.tag) : undefined;
+  if (tag) item.tag = tag;
   return item;
+}
+
+/** One of the five known colours, else undefined (case and spaces tolerated; "none", unknown values and non-strings drop). */
+export function tagFrom(v: unknown): ItemTag | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.toLowerCase().trim();
+  return ITEM_TAGS.find((t) => t === s);
 }
 
 function typeFrom(s: string | null): ItemType {

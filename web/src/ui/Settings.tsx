@@ -6,6 +6,9 @@ import { buildEverythingCalendar } from "../lib/ics";
 import {
   DEFAULT_IMPORT_COLUMNS, DEFAULT_PREFS, IMPORT_FIELDS, MILESTONE_LABELS, normalizePrefs, validMilestones, type ImportField, type Prefs,
 } from "../lib/model";
+import { MAX_RULES, MAX_RULE_TEXT, RULE_FIELDS, RULE_FIELD_LABEL, setTagRules, tagRules, type RuleField, type TagRule } from "../lib/autotag";
+import { ITEM_TAGS } from "../lib/model";
+import { TAG_INFO } from "../lib/tags";
 import { templateCsv } from "../lib/table";
 import { to } from "../lib/router";
 import { useStore } from "../lib/store";
@@ -106,6 +109,38 @@ function CalendarLink() {
   );
 }
 
+/** "Thẻ tự động": up to 20 rules that tag a new task or appointment. Saved on this device as you type (like the quick-add lines). */
+function TagRulesCard() {
+  const saved = useStore(tagRules);
+  const [rules, setRules] = useState<TagRule[]>(saved);
+  const change = (next: TagRule[]) => {
+    setRules(next);
+    setTagRules(next);
+  };
+  const edit = (i: number, patch: Partial<TagRule>) => change(rules.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  return (
+    <div class="card-block tag-rules">
+      <p class="hint">Việc hoặc lịch hẹn <strong>mới</strong> không có thẻ sẽ được gắn thẻ theo quy tắc đầu tiên khớp (không phân biệt hoa thường và dấu). Quy tắc không tự áp dụng lại khi bạn sửa, nên thẻ đã bỏ sẽ không tự quay lại.</p>
+      {rules.length === 0 && <p class="muted">Chưa có quy tắc nào.</p>}
+      {rules.map((r, i) => (
+        <div class="rule-row" key={i}>
+          <select aria-label={`Quy tắc ${i + 1}: áp dụng cho`} value={r.field} onChange={(e) => edit(i, { field: (e.target as HTMLSelectElement).value as RuleField })}>
+            {RULE_FIELDS.map((f) => <option key={f} value={f}>{RULE_FIELD_LABEL[f]}</option>)}
+          </select>
+          <input aria-label={`Quy tắc ${i + 1}: chứa chữ`} value={r.text} maxLength={MAX_RULE_TEXT} placeholder="chứa chữ…" onInput={(e) => edit(i, { text: (e.target as HTMLInputElement).value })} />
+          <select aria-label={`Quy tắc ${i + 1}: gắn thẻ`} value={r.tag} onChange={(e) => edit(i, { tag: (e.target as HTMLSelectElement).value as TagRule["tag"] })}>
+            {ITEM_TAGS.map((t) => <option key={t} value={t}>{TAG_INFO[t].glyph} {TAG_INFO[t].label}</option>)}
+          </select>
+          <button type="button" class="icon-btn" aria-label={`Xoá quy tắc ${i + 1}`} onClick={() => change(rules.filter((_, j) => j !== i))}><Icon name="trash" size={18} /></button>
+        </div>
+      ))}
+      <button type="button" class="btn ghost wide" disabled={rules.length >= MAX_RULES} onClick={() => change([...rules, { field: "keyword", text: "", tag: "red" }])}>
+        <Icon name="plus" size={18} /> Thêm quy tắc ({rules.length}/{MAX_RULES})
+      </button>
+    </div>
+  );
+}
+
 export function Settings({ email }: { email: string }) {
   const uid = useUid();
   const saved = useStore(prefsStore);
@@ -159,6 +194,10 @@ export function Settings({ email }: { email: string }) {
           </div>
           <p class="hint">“Tự động” đổi theo cài đặt Sáng/Tối của điện thoại. Lựa chọn được nhớ trên máy này.</p>
         </div>
+      </Section>
+
+      <Section title="Thẻ tự động">
+        <TagRulesCard />
       </Section>
 
       <Section title="Chia sẻ">

@@ -1,6 +1,29 @@
 package com.vh.myrecap.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.vh.myrecap.core.ItemTag
+import com.vh.myrecap.core.canHaveTag
+import com.vh.myrecap.core.itemTag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,13 +37,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Event
-import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.Payments
-import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -100,85 +120,167 @@ fun itemSubtitle(item: Item): String = listOfNotNull(
 ).joinToString("  ·  ")
 
 /**
- * A list row for an item. Tasks and appointments get a check circle that completes them in one tap; everything
- * else opens the item.
+ * A list row for an item. Swipe right marks a task or appointment done (reopens it when done), swipe left
+ * deletes (with Undo); there is deliberately no check circle to hit by mistake while scrolling. A long press
+ * offers the colour tags; the tag shows as a diagonal corner at the top-right.
  */
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ItemRow(item: Item, onOpen: () -> Unit, onToggleDone: ((Boolean) -> Unit)?, modifier: Modifier = Modifier) {
+fun ItemRow(
+    item: Item,
+    onOpen: () -> Unit,
+    onToggleDone: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    onDelete: (() -> Unit)? = null,
+    onTag: ((ItemTag?) -> Unit)? = null,
+) {
     val share = LocalShareInfo.current
-    // Someone else's item: their name on it, an indigo edge, and no check circle (only the owner changes it).
+    // Someone else's item: their name on it, an indigo edge, and no actions (only the owner changes it).
     val owner = share.owners[item.id]
     val audience = share.audiences[item.id]
-    val toggle = onToggleDone.takeIf { owner == null }
     val style = typeStyle(item.type)
     val haptic = LocalHapticFeedback.current
     val done = item.status == ItemStatus.DONE
     val overdue = isOverdue(item)
-    Surface(
-        onClick = onOpen,
-        shape = RoundedCornerShape(18.dp),
-        color = if (owner != null) OtherTint.copy(alpha = 0.07f) else MaterialTheme.colorScheme.surfaceContainerLow,
-        border = if (owner != null) BorderStroke(1.dp, OtherTint.copy(alpha = 0.35f)) else null,
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Row(Modifier.padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if ((item.type == ItemType.TASK || item.type == ItemType.EVENT) && toggle != null) {
-                IconButton(onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    toggle(!done)
-                }) {
-                    Icon(
-                        when {
-                            done -> Icons.Rounded.CheckCircle
-                            item.type == ItemType.EVENT -> Icons.Rounded.EventAvailable
-                            else -> Icons.Rounded.RadioButtonUnchecked
-                        },
-                        contentDescription = if (done) "Bỏ đánh dấu xong" else "Đánh dấu xong",
-                        tint = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-            } else {
-                Box(Modifier.padding(8.dp)) { IconTile(style.icon, style.container, style.content, size = 34.dp) }
+    val tag = item.itemTag.takeIf { item.type.canHaveTag() }
+    val actionable = item.type == ItemType.TASK || item.type == ItemType.EVENT
+    val canDone = actionable && onToggleDone != null && owner == null
+    val canDelete = onDelete != null && owner == null
+    val canTag = onTag != null && owner == null && item.type.canHaveTag()
+    var menu by remember { mutableStateOf(false) }
+    val doneNow by rememberUpdatedState(done)
+    val toggleNow by rememberUpdatedState(onToggleDone)
+    val deleteNow by rememberUpdatedState(onDelete)
+    val swipe = rememberSwipeToDismissBoxState(
+        confirmValueChange = { target ->
+            when (target) {
+                SwipeToDismissBoxValue.StartToEnd -> toggleNow?.let { haptic.performHapticFeedback(HapticFeedbackType.LongPress); it(!doneNow) }
+                SwipeToDismissBoxValue.EndToStart -> deleteNow?.let { haptic.performHapticFeedback(HapticFeedbackType.LongPress); it() }
+                SwipeToDismissBoxValue.Settled -> Unit
             }
-            Spacer(Modifier.width(6.dp))
-            Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                Text(
-                    if (item.important) "❗ ${item.title}" else item.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textDecoration = if (done) TextDecoration.LineThrough else null,
-                    color = when {
-                        done -> MaterialTheme.colorScheme.onSurfaceVariant
-                        item.important -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurface
-                    },
+            false // the row snaps back; the list itself moves or drops it
+        },
+    )
+    val rowShape = RoundedCornerShape(18.dp)
+    val row: @Composable () -> Unit = {
+        Surface(
+            shape = rowShape,
+            color = if (owner != null) OtherTint.copy(alpha = 0.07f) else MaterialTheme.colorScheme.surfaceContainerLow,
+            border = if (owner != null) BorderStroke(1.dp, OtherTint.copy(alpha = 0.35f)) else null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(rowShape)
+                .combinedClickable(
+                    onClick = onOpen,
+                    onLongClick = if (canTag) ({ haptic.performHapticFeedback(HapticFeedbackType.LongPress); menu = true }) else null,
+                    onLongClickLabel = if (canTag) "Gắn thẻ" else null,
                 )
-                if (owner != null || audience != null) {
-                    Row(Modifier.padding(top = 2.dp, bottom = 2.dp)) {
-                        if (owner != null) OwnerChip(owner) else AudienceChip(audience!!)
+                .semantics(mergeDescendants = true) {
+                    val actions = buildList {
+                        if (canDone) add(CustomAccessibilityAction(if (done) "Mở lại" else "Đánh dấu xong") { onToggleDone?.invoke(!done); true })
+                        if (canDelete) add(CustomAccessibilityAction("Xoá") { onDelete?.invoke(); true })
+                        if (canTag) add(CustomAccessibilityAction("Gắn thẻ") { menu = true; true })
+                    }
+                    if (actions.isNotEmpty()) customActions = actions
+                    if (tag != null) stateDescription = "Thẻ ${tag.label}"
+                },
+        ) {
+            Box {
+                Row(
+                    Modifier.padding(start = 6.dp, end = if (tag != null) 26.dp else 14.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.padding(8.dp)) {
+                        if (done && actionable) {
+                            Icon(Icons.Rounded.CheckCircle, contentDescription = "Đã xong", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
+                        } else {
+                            IconTile(style.icon, style.container, style.content, size = 34.dp)
+                        }
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                        Text(
+                            if (item.important) "❗ ${item.title}" else item.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textDecoration = if (done) TextDecoration.LineThrough else null,
+                            color = when {
+                                done -> MaterialTheme.colorScheme.onSurfaceVariant
+                                item.important -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                        if (owner != null || audience != null) {
+                            Row(Modifier.padding(top = 2.dp, bottom = 2.dp)) {
+                                if (owner != null) OwnerChip(owner) else AudienceChip(audience!!)
+                            }
+                        }
+                        val sub = itemSubtitle(item)
+                        if (sub.isNotEmpty()) {
+                            Text(
+                                sub,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    item.amount?.let {
+                        Spacer(Modifier.width(10.dp))
+                        Text(Money.format(it), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
-                val sub = itemSubtitle(item)
-                if (sub.isNotEmpty()) {
-                    Text(
-                        sub,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                if (tag != null) TagCorner(tag, Modifier.align(Alignment.TopEnd))
+                if (canTag) {
+                    Box(Modifier.align(Alignment.TopEnd)) {
+                        TagQuickMenu(menu, tag, onDismiss = { menu = false }, onPick = { menu = false; onTag?.invoke(it) })
+                    }
                 }
             }
-            item.amount?.let {
-                Spacer(Modifier.width(10.dp))
-                Text(Money.format(it), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        }
+    }
+    if (canDone || canDelete) {
+        SwipeToDismissBox(
+            state = swipe,
+            modifier = modifier,
+            enableDismissFromStartToEnd = canDone,
+            enableDismissFromEndToStart = canDelete,
+            backgroundContent = { SwipeBackground(swipe.dismissDirection, done, rowShape) },
+            content = { row() },
+        )
+    } else {
+        Box(modifier) { row() }
+    }
+}
+
+/** What shows behind a swiped row: a green "Xong" (or "Mở lại") on the left, a red "Xoá" on the right. Icon and word, not colour alone. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeBackground(direction: SwipeToDismissBoxValue, done: Boolean, shape: RoundedCornerShape) {
+    val (color, label, icon, align) = when (direction) {
+        SwipeToDismissBoxValue.StartToEnd -> SwipeLook(
+            Color(0xFF2E7D32), if (done) "Mở lại" else "Xong", if (done) Icons.Rounded.Replay else Icons.Rounded.Check, Alignment.CenterStart,
+        )
+        SwipeToDismissBoxValue.EndToStart -> SwipeLook(Color(0xFFC62828), "Xoá", Icons.Rounded.DeleteOutline, Alignment.CenterEnd)
+        SwipeToDismissBoxValue.Settled -> return
+    }
+    Box(Modifier.fillMaxSize().clip(shape).background(color).padding(horizontal = 20.dp), contentAlignment = align) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                Icon(icon, null, tint = Color.White)
+                Text(label, color = Color.White, fontWeight = FontWeight.SemiBold)
+            } else {
+                Text(label, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Icon(icon, null, tint = Color.White)
             }
         }
     }
 }
+
+private data class SwipeLook(val color: Color, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val align: Alignment)
 
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier, trailing: String? = null) {

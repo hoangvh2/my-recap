@@ -108,8 +108,26 @@ object ReminderPolicy {
     const val MAX_NAGS = 6
 
     /** When the next repeat is due after [nagsSoFar] repeats, or null when the item is not important or the limit is reached. */
-    fun nextNagAt(item: Item, nagsSoFar: Int, now: Long): Long? =
-        if (item.important && item.status == ItemStatus.OPEN && nagsSoFar < MAX_NAGS) now + NAG_INTERVAL_MS else null
+    fun nextNagAt(item: Item, nagsSoFar: Int, now: Long, quiet: Boolean = false, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): Long? {
+        if (!item.important || item.status != ItemStatus.OPEN || nagsSoFar >= MAX_NAGS) return null
+        val at = now + NAG_INTERVAL_MS
+        return if (quiet) afterQuietHours(at, zone) else at
+    }
+
+    /** Repeats are silent overnight (same window as the web's default); one that falls inside waits for the morning. */
+    const val QUIET_FROM_MIN = 22 * 60
+    const val QUIET_TO_MIN = 6 * 60 + 30
+
+    fun afterQuietHours(at: Long, zone: java.time.ZoneId): Long {
+        val local = java.time.Instant.ofEpochMilli(at).atZone(zone)
+        val minute = local.hour * 60 + local.minute
+        val end = java.time.LocalTime.of(QUIET_TO_MIN / 60, QUIET_TO_MIN % 60)
+        return when {
+            minute >= QUIET_FROM_MIN -> local.toLocalDate().plusDays(1).atTime(end).atZone(zone).toInstant().toEpochMilli()
+            minute < QUIET_TO_MIN -> local.toLocalDate().atTime(end).atZone(zone).toInstant().toEpochMilli()
+            else -> at
+        }
+    }
 
     private fun trigger(item: Item, at: Long, zone: java.time.ZoneId): Long = when {
         item.allDay -> java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()

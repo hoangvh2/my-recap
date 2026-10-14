@@ -9,6 +9,8 @@ import com.vh.myrecap.core.QuickTemplate
 import com.vh.myrecap.core.QuickTemplates
 import com.vh.myrecap.core.SegmenterConfig
 import com.vh.myrecap.core.SessionMode
+import com.vh.myrecap.core.TagRule
+import com.vh.myrecap.core.TagRules
 import com.vh.myrecap.core.ThemeMode
 import com.vh.myrecap.core.VadSensitivity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +67,10 @@ data class AppSettings(
     val homeTab: Int = 0,
     /** Saved quick-add lines; the most used one of each kind is offered first and on the widget. */
     val quickTemplates: List<QuickTemplate> = QuickTemplates.DEFAULTS,
+    /** "Person / place / word → tag" rules applied to new tasks and appointments. */
+    val tagRules: List<TagRule> = emptyList(),
+    /** Repeats of an important item wait for the morning instead of ringing overnight. */
+    val quietNags: Boolean = true,
 
     /** Folder (SAF tree URI) for the weekly automatic backup; blank = off. */
     val autoBackupUri: String = "",
@@ -151,6 +157,8 @@ class SettingsRepository(context: Context) {
             themeMode = enumPref("themeMode", d.themeMode),
             homeTab = prefs.getInt("homeTab", d.homeTab),
             quickTemplates = QuickTemplates.decode(prefs.getString("quickTemplates", null)) ?: d.quickTemplates,
+            tagRules = TagRules.decode(prefs.getString("tagRules", null)) ?: d.tagRules,
+            quietNags = prefs.getBoolean("quietNags", d.quietNags),
             autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
             autoBackupError = prefs.getString("autoBackupError", null) ?: d.autoBackupError,
             lastBackupAt = prefs.getLong("lastBackupAt", d.lastBackupAt),
@@ -189,6 +197,8 @@ class SettingsRepository(context: Context) {
             .putString("themeMode", s.themeMode.name)
             .putInt("homeTab", s.homeTab)
             .putString("quickTemplates", QuickTemplates.encode(s.quickTemplates))
+            .putString("tagRules", TagRules.encode(s.tagRules))
+            .putBoolean("quietNags", s.quietNags)
             .putString("autoBackupUri", s.autoBackupUri)
             .putString("autoBackupError", s.autoBackupError)
             .putLong("lastBackupAt", s.lastBackupAt)

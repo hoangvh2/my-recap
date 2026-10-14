@@ -46,6 +46,8 @@ data class ItemEntity(
     val recurrence: String? = null,
     /** Added in schema 3. */
     val important: Boolean = false,
+    /** Added in schema 4. */
+    val tag: String? = null,
 ) {
     fun toItem() = Item(
         id = id,
@@ -65,6 +67,7 @@ data class ItemEntity(
         doneAt = doneAt,
         recurrence = recurrence?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
         important = important,
+        tag = tag,
     )
 
     companion object {
@@ -86,6 +89,7 @@ data class ItemEntity(
             doneAt = item.doneAt,
             recurrence = item.recurrence?.name,
             important = item.important,
+            tag = item.tag,
             search = TextSearch.fold(listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote).joinToString(" ")),
         )
     }
@@ -141,7 +145,7 @@ abstract class ItemDao {
  * Schema changes must add a [androidx.room.migration.Migration]; there is deliberately no
  * destructive fallback, so a missing migration fails loudly instead of wiping the user's data.
  */
-@Database(entities = [ItemEntity::class], version = 3, exportSchema = false)
+@Database(entities = [ItemEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun items(): ItemDao
 
@@ -160,8 +164,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4: colour tag on tasks and appointments. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN tag TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = "myrecap.db"): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
 
         /** For tests. */
         fun inMemory(context: Context): AppDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()

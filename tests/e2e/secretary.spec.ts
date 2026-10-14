@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { expectNoProblems, geminiCalls, OWNER, signIn, STRANGER, tab, textCapture, watchBrowser } from "./helpers";
+import { expectNoProblems, geminiCalls, OWNER, signIn, STRANGER, swipeRow, tab, textCapture, watchBrowser } from "./helpers";
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `e2e/.artifacts/${name}.png` });
 
@@ -91,7 +91,8 @@ test("manual add, tick off a repeating task, undo, delete", async ({ page }) => 
 
   const row = page.locator(".row-item", { hasText: "Uống thuốc" });
   await expect(row).toHaveCount(1);
-  await row.getByRole("checkbox").click();
+  await swipeRow(page, row, "right");
+  await expect(page.getByText("Đã xong: Uống thuốc")).toBeVisible(); // the row slides out first, then it is done
   // Finishing a repeating task creates tomorrow's: still exactly one open "Uống thuốc".
   await page.getByRole("button", { name: /^Việc/ }).click();
   await expect(page.locator(".block", { has: page.getByRole("heading", { name: /Cần làm/ }) }).locator(".row-item", { hasText: "Uống thuốc" })).toHaveCount(1);

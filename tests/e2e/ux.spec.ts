@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectNoProblems, idTokenFor, OWNER, seed, signIn, tab, textCapture, watchBrowser } from "./helpers";
+import { expectNoProblems, idTokenFor, OWNER, seed, signIn, swipeRow, tab, textCapture, watchBrowser } from "./helpers";
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `e2e/.artifacts/${name}.png` });
 
@@ -59,12 +59,13 @@ test("Today is a timeline with times, appointments can be ticked off, and a repe
   expect(await tl.locator(".row-item .title").allTextContents()).toEqual(["Đóng học phí", "Gửi email cho khách", "Họp với khách", "Họp tuần"]);
   await shot(page, "50-today-timeline");
 
-  // An appointment has its own "done" circle.
-  await tl.locator(".row-item", { hasText: "Họp với khách" }).getByRole("checkbox").click();
+  // An appointment is finished with a swipe to the right (there is no check button any more).
+  await expect(tl.getByRole("checkbox")).toHaveCount(0);
+  await swipeRow(page, tl.locator(".row-item", { hasText: "Họp với khách" }), "right");
   await expect(page.getByText("Đã xong: Họp với khách")).toBeVisible();
   await expect(tl.locator(".row-item", { hasText: "Họp với khách" })).toHaveCount(0);
   // A weekly one is not ended: it moves to next week (and leaves today's timeline).
-  await tl.locator(".row-item", { hasText: "Họp tuần" }).getByRole("checkbox").click();
+  await swipeRow(page, tl.locator(".row-item", { hasText: "Họp tuần" }), "right");
   await expect(tl.locator(".row-item", { hasText: "Họp tuần" })).toHaveCount(0);
   await page.locator(".tabbar").getByText("Việc", { exact: true }).click();
   await page.locator(".chips").getByRole("button", { name: /^Lịch/ }).click();

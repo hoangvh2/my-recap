@@ -103,6 +103,8 @@ test("two people link with a code, share one appointment, the edit reaches the o
   await expect(shared).toBeVisible();
   await expect(shared.locator(".owner-chip")).toHaveText("Anh An");
   await expect(shared.getByRole("checkbox")).toHaveCount(0);
+  // Received rows are read-only: not swipeable, no tag popover.
+  await expect(shared).not.toHaveClass(/\bgest\b/);
   await expect(member.getByText("Gặp khách ABC")).toHaveCount(0);
   await expect.poll(async () => (await pushes(request)).some((p) => p.title === "Anh An chia sẻ: Nhậu hội lớp, về trễ")).toBe(true);
   await shot(member, "64-member-today");

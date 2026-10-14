@@ -91,6 +91,15 @@ class ItemStoreTest {
     }
 
     @Test
+    fun colourTagIsStoredAndCleared() {
+        val store = ItemStore(db, scope)
+        store.upsert(item("t", "Nộp báo cáo").copy(tag = "red"))
+        assertEquals("red", store.get("t")!!.tag)
+        store.update("t") { it.copy(tag = null) }
+        assertNull(store.get("t")!!.tag)
+    }
+
+    @Test
     fun searchIgnoresAccentsAndWordOrder() {
         val store = ItemStore(db, scope)
         store.upsert(item("1", "Gửi báo giá cho khách").copy(details = "Công ty Đông Á"))
