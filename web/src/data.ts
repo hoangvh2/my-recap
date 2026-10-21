@@ -5,8 +5,9 @@ import { db } from "./firebase";
 import { applyAutoTag, tagRules } from "./lib/autotag";
 import { applyProposal, renew as renewLicense, type RenewalInput } from "./lib/flow";
 import { buildGraph, customerCascade, type Graph } from "./lib/graph";
+import { progress } from "./lib/checklist";
 import { createStore } from "./lib/store";
-import { normalizePrefs, type Capture, type Customer, type Item, type ItemType, type License, type Prefs, type Proposal } from "./lib/model";
+import { canChecklist, normalizePrefs, type Capture, type Customer, type Item, type ItemType, type License, type Prefs, type Proposal } from "./lib/model";
 import { finishEvent, nextInstance, rollForward } from "./lib/schedule";
 import { repeatId } from "../../shared/share";
 
@@ -151,6 +152,21 @@ export function setDone(uid: string, item: Item, done: boolean, now = Date.now()
   const reopened: Item = { ...item, status: "OPEN" };
   delete reopened.doneAt;
   return commit(uid, { items: [reopened] });
+}
+
+/**
+ * Saves a ticked or unticked checklist. Ticking the last line finishes the item (a repeating one moves on to its
+ * next occurrence with every line unticked); unticking a line on a finished item opens it again.
+ */
+export function saveChecklist(uid: string, item: Item, next: Item, now = Date.now()): Promise<void> {
+  const complete = progress(next).complete;
+  if (complete && item.status === "OPEN" && canChecklist(item.type)) return setDone(uid, next, true, now);
+  if (item.status === "DONE" && !complete) {
+    const reopened: Item = { ...next, status: "OPEN" };
+    delete reopened.doneAt;
+    return saveItem(uid, reopened);
+  }
+  return saveItem(uid, next);
 }
 
 // ---------------------------------------------------------------- customers and licences

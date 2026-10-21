@@ -98,6 +98,7 @@ import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Money
 import com.vh.myrecap.core.Recurrence
+import com.vh.myrecap.core.canChecklist
 import com.vh.myrecap.core.canHaveTag
 import com.vh.myrecap.core.itemTag
 import com.vh.myrecap.data.ItemStore
@@ -118,11 +119,12 @@ private fun Item.withType(t: ItemType): Item = when (t) {
         recurrence = null,
         important = false,
         tag = null,
+        checklist = emptyList(),
         whenAt = whenAt ?: LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli(),
         allDay = if (whenAt == null) true else allDay,
         category = category ?: "Khác",
     )
-    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null, important = false, tag = null)
+    ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null, important = false, tag = null, checklist = emptyList())
     else -> copy(type = t, amount = null, category = null)
 }
 
@@ -285,7 +287,7 @@ fun ReviewScreen(vm: AppViewModel, id: String) {
             if (saved.isNotEmpty()) {
                 item { SectionLabel("Đã lưu từ ghi chú này") }
                 items(saved, key = { "saved-${it.id}" }) { item ->
-                    ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) })
+                    ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) }, onChecklist = { vm.checklist(item.id, it) })
                 }
             }
         }
@@ -431,7 +433,8 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     val items by vm.items.collectAsStateWithLifecycle()
     val stored = id?.let { i -> items.firstOrNull { it.id == i } }
     val template = remember(id) {
-        Item(
+        // A checklist template without its own time starts the editor with its lines already filled.
+        vm.takeDraft() ?: Item(
             id = ItemStore.newId(),
             type = newType,
             status = ItemStatus.OPEN,
@@ -439,6 +442,8 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             createdAt = System.currentTimeMillis(),
         ).let { if (newType == ItemType.EXPENSE) it.withType(ItemType.EXPENSE) else it }
     }
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val messages = rememberShareMessages(vm)
     val original = stored ?: if (id == null) template else null
     val ready by vm.itemsReady.collectAsStateWithLifecycle()
     if (original == null) {
@@ -462,7 +467,11 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     var picking by remember { mutableStateOf(false) }
 
     val parsedAmount = Money.parseVnd(amountText)
-    val current = edit.copy(amount = if (edit.type == ItemType.EXPENSE) parsedAmount else null, title = edit.title.trim())
+    val current = edit.copy(
+        amount = if (edit.type == ItemType.EXPENSE) parsedAmount else null,
+        title = edit.title.trim(),
+        checklist = if (edit.type.canChecklist()) edit.checklist.filter { it.text.isNotBlank() }.map { it.copy(text = it.text.trim()) } else emptyList(),
+    )
     val isNew = id == null
     val isDraft = original.status == ItemStatus.DRAFT
     val canShare = account is Account.SignedIn && !isDraft && Share.isShareable(current.copy(status = ItemStatus.OPEN))
@@ -483,6 +492,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(messages) },
         topBar = {
             TopAppBar(
                 title = { Text(if (isNew) "${current.type.label} mới" else if (isDraft) "Xác nhận đề xuất" else current.type.label) },
@@ -604,6 +614,16 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     label = { Text("Với ai") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (edit.type.canChecklist()) {
+                ChecklistEditor(
+                    entries = edit.checklist,
+                    templates = settings.checklistTemplates,
+                    title = edit.title,
+                    onChange = { edit = edit.copy(checklist = it) },
+                    onNeedTitle = { name -> edit = edit.copy(title = name) },
+                    onSaveAsTemplate = { vm.saveChecklistAsTemplate(edit.title, current.checklist) },
                 )
             }
             OutlinedTextField(

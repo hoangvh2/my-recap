@@ -26,7 +26,7 @@ internal fun LazyListScope.triageCard(overdueTasks: List<Item>, vm: AppViewModel
     item(key = "triage-card") {
         Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(top = 4.dp, bottom = 4.dp)) {
-                ItemRow(current, onOpen = { vm.openItem(current.id) }, onToggleDone = { vm.setDone(current.id, it) })
+                ItemRow(current, onOpen = { vm.openItem(current.id) }, onToggleDone = { vm.setDone(current.id, it) }, onChecklist = { vm.checklist(current.id, it) })
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (move in Triage.Move.entries) {
                         TextButton(onClick = { vm.triage(current.id, move) }, modifier = Modifier.weight(1f)) {

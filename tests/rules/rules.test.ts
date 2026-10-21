@@ -345,6 +345,15 @@ describe("notifications", () => {
     await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg3"), item({ id: "tg3", tag: "green" })));
     await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg4"), item({ id: "tg4", type: "NOTE", tag: "red" })));
   });
+  it("a task or appointment can carry a checklist of at most 40 lines; nothing else can", async () => {
+    const list = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `e${i}`, text: `Mục ${i}`, done: i % 2 === 0 }));
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/ck1"), item({ id: "ck1", checklist: list(5) })));
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/ck2"), item({ id: "ck2", type: "EVENT", checklist: list(40) })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/ck3"), item({ id: "ck3", checklist: list(41) })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/ck4"), item({ id: "ck4", checklist: "Ví, chìa khoá" })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/ck5"), item({ id: "ck5", type: "NOTE", checklist: list(2) })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/ck6"), item({ id: "ck6", type: "EXPENSE", amount: 5000, checklist: list(2) })));
+  });
 });
 
 describe("calendar feed tokens", () => {

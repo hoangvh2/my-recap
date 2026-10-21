@@ -101,6 +101,14 @@ describe("reminders", () => {
     expect(occurrences(weekdays, at("2026-10-10T00:00"), at("2026-10-13T23:00"), zone)).toEqual([at("2026-10-12T09:00"), at("2026-10-13T09:00")]);
   });
 
+  it("says what is still missing from the checklist, and nothing when it is all ticked", () => {
+    const list = (done: string[]) => ["Ví", "Chìa khoá", "Sạc", "Thuốc", "Thẻ xe", "Ô"].map((text) => ({ id: text, text, ...(done.includes(text) ? { done: true } : {}) }));
+    const [m] = plan([item({ title: "Ra khỏi nhà", whenAt: at("2026-10-12T07:30"), checklist: list(["Ví"]) })], "2026-10-12T07:30");
+    expect(m.body).toContain("<b>Còn 5 mục:</b> Chìa khoá · Sạc · Thuốc · Thẻ xe · +1");
+    const [full] = plan([item({ title: "Ra khỏi nhà", whenAt: at("2026-10-12T07:30"), checklist: list(["Ví", "Chìa khoá", "Sạc", "Thuốc", "Thẻ xe", "Ô"]) })], "2026-10-12T07:30");
+    expect(full.body).not.toContain("Còn");
+  });
+
   it("escapes what the owner typed, so a title cannot inject markup", () => {
     const [m] = plan([item({ title: "<b>x</b> & y", whenAt: at("2026-10-12T10:00") })], "2026-10-12T10:00");
     expect(m.body).not.toContain("<b>x</b>");
@@ -145,6 +153,7 @@ describe("digest", () => {
     expect(m.body).toContain("Quá hạn (1)");
     expect(m.body).toContain("Nộp thuế");
     expect(m.body).toContain("<b>09:00</b> Họp <i>(VP)</i>");
+    expect(digest("morning", "k", { ...base, items: [item({ title: "Ra khỏi nhà", whenAt: at("2026-10-12T00:00"), allDay: true, checklist: [{ id: "a", text: "Ví" }, { id: "b", text: "Sạc", done: true }] })], licenses: [], drafts: 0, nowMs: at("2026-10-12T07:00") })!.body).toContain("Ra khỏi nhà <i>(còn 1 mục)</i>");
     expect(m.body).toContain("<b>Cả ngày</b> Gửi báo giá <i>(Công ty ABC)</i>");
     expect(m.body).toContain("🔴 Công ty ABC · Kế toán");
     expect(m.body).toContain("2 ghi nhanh");

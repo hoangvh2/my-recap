@@ -34,7 +34,7 @@ service cloud.firestore {
       return d.keys().hasAll(['id', 'type', 'status', 'title', 'details', 'allDay', 'createdAt'])
         && d.keys().hasOnly(['id', 'type', 'status', 'title', 'details', 'whenAt', 'allDay', 'amount',
                              'category', 'place', 'person', 'sourceId', 'quote', 'createdAt', 'doneAt', 'recurrence',
-                             'customerId', 'licenseId', 'important', 'tag'])
+                             'customerId', 'licenseId', 'important', 'tag', 'checklist'])
         && id.matches('^[A-Za-z0-9_-]{1,64}$')
         && d.id == id
         && d.type in ['TASK', 'EVENT', 'EXPENSE', 'NOTE']
@@ -57,6 +57,8 @@ service cloud.firestore {
         && (!('important' in d) || d.important == null || d.important is bool)
         && (!('tag' in d) || d.tag == null
             || (d.tag in ['red', 'yellow', 'orange', 'blue', 'purple'] && d.type in ['TASK', 'EVENT']))
+        && (!('checklist' in d) || d.checklist == null
+            || (d.checklist is list && d.checklist.size() <= 40 && d.type in ['TASK', 'EVENT']))
         && (!('recurrence' in d) || d.recurrence == null
             || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY']);
     }

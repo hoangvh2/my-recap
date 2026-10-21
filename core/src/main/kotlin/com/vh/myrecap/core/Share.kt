@@ -188,6 +188,12 @@ object CloudItem {
         quote = item.quote?.take(400),
         recurrence = item.recurrence.takeIf { item.type == ItemType.TASK || item.type == ItemType.EVENT },
         tag = item.itemTag?.key.takeIf { item.type.canHaveTag() },
+        checklist = if (item.type.canChecklist()) {
+            item.checklist.take(Checklist.MAX_ENTRIES)
+                .map { it.copy(text = it.text.trim().take(Checklist.MAX_TEXT)) }.filter { it.text.isNotEmpty() }
+        } else {
+            emptyList()
+        },
     )
 
     /**
@@ -215,6 +221,7 @@ object CloudItem {
             "recurrence" to c.recurrence?.name,
             "important" to if (c.important) true else null,
             "tag" to c.tag,
+            "checklist" to c.checklist.takeIf { it.isNotEmpty() }?.let { Checklist.toCloud(it) },
         )
     }
 
@@ -240,6 +247,7 @@ object CloudItem {
             recurrence = (m["recurrence"] as? String)?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
             important = m["important"] as? Boolean ?: false,
             tag = ItemTag.fromKey(m["tag"] as? String)?.key?.takeIf { type.canHaveTag() },
+            checklist = if (type.canChecklist()) Checklist.fromCloud(m["checklist"]) else emptyList(),
         )
     }
 

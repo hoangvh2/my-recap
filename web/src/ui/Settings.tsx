@@ -14,6 +14,7 @@ import { to } from "../lib/router";
 import { useStore } from "../lib/store";
 import { setTheme, THEME_LABEL, THEME_MODES, themeMode } from "../lib/theme";
 import { confirmDialog, Link, Section, signOutAsk, Signature, TopBar } from "./common";
+import { ChecklistTemplatesCard } from "./ChecklistTemplates";
 import { saveFile } from "./download";
 import { useCtx, useGraph, useUid } from "./hooks";
 import { Icon } from "./icons";
@@ -193,6 +194,10 @@ export function Settings({ email }: { email: string }) {
           </div>
           <p class="hint">“Tự động” đổi theo cài đặt Sáng/Tối của điện thoại. Lựa chọn được nhớ trên máy này.</p>
         </div>
+      </Section>
+
+      <Section title="Mẫu checklist">
+        <ChecklistTemplatesCard />
       </Section>
 
       <Section title="Thẻ tự động">

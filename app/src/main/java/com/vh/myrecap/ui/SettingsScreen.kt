@@ -133,6 +133,10 @@ fun SettingsScreen(vm: AppViewModel) {
             Section("Mẫu nhập nhanh") {
                 TemplatesSection(vm, s)
             }
+            Section("Mẫu checklist") {
+                Hint("Danh sách cần nhớ (ra khỏi nhà mang gì, giao hàng, chuẩn bị họp). Một chạm ở ô gõ nhanh là tạo việc kèm checklist.")
+                FilledTonalButton(onClick = vm::openChecklistTemplates, modifier = Modifier.fillMaxWidth()) { Text("Quản lý mẫu checklist (${s.checklistTemplates.size})") }
+            }
             Section("Thẻ màu tự gắn") {
                 TagRulesSection(s) { transform -> update(transform) }
             }

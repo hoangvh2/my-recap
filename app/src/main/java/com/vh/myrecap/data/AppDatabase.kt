@@ -13,6 +13,7 @@ import androidx.room.Transaction
 import androidx.room.Upsert
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.vh.myrecap.core.Checklist
 import com.vh.myrecap.core.Recurrence
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
@@ -48,6 +49,8 @@ data class ItemEntity(
     val important: Boolean = false,
     /** Added in schema 4. */
     val tag: String? = null,
+    /** Added in schema 5: the checklist as JSON ([Checklist.encode]); null when there is none. */
+    val checklist: String? = null,
 ) {
     fun toItem() = Item(
         id = id,
@@ -68,6 +71,7 @@ data class ItemEntity(
         recurrence = recurrence?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
         important = important,
         tag = tag,
+        checklist = checklist?.let { runCatching { Checklist.decode(org.json.JSONArray(it)) }.getOrDefault(emptyList()) } ?: emptyList(),
     )
 
     companion object {
@@ -90,6 +94,7 @@ data class ItemEntity(
             recurrence = item.recurrence?.name,
             important = item.important,
             tag = item.tag,
+            checklist = item.checklist.takeIf { it.isNotEmpty() }?.let { Checklist.encode(it).toString() },
             search = TextSearch.fold(listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote).joinToString(" ")),
         )
     }
@@ -145,7 +150,7 @@ abstract class ItemDao {
  * Schema changes must add a [androidx.room.migration.Migration]; there is deliberately no
  * destructive fallback, so a missing migration fails loudly instead of wiping the user's data.
  */
-@Database(entities = [ItemEntity::class], version = 4, exportSchema = false)
+@Database(entities = [ItemEntity::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun items(): ItemDao
 
@@ -171,8 +176,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v5: checklist on tasks and appointments (JSON). */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN checklist TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = "myrecap.db"): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
 
         /** For tests. */
         fun inMemory(context: Context): AppDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()

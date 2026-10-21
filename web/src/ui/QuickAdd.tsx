@@ -1,8 +1,13 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { deleteItems, items as itemsStore, newId, saveItem } from "../data";
 import { applyAutoTag, tagRules } from "../lib/autotag";
+import { entriesFrom, splitChecklistLine } from "../lib/checklist";
+import {
+  byUse as ckByUse, checklistTemplates, instantiate, isScheduled, matching as ckMatching, scheduleLabel, setChecklistTemplates, usedTemplate as ckUsed, type ChecklistTemplate,
+} from "../lib/checklistTemplates";
 import { formatVnd } from "../lib/money";
-import { TYPE_LABEL } from "../lib/model";
+import { canChecklist, TYPE_LABEL } from "../lib/model";
+import { go, to } from "../lib/router";
 import { whenLabel } from "../lib/format";
 import { PART_LABEL, parseQuick, toItem, type Part } from "../lib/quickadd";
 import { useStore } from "../lib/store";
@@ -12,6 +17,7 @@ import {
 import { RECURRENCE_LABEL } from "../lib/model";
 import { confirmDialog, Sheet } from "./common";
 import { useUid } from "./hooks";
+import { openEditor } from "./host";
 import { Icon } from "./icons";
 import { showToast } from "./toast";
 
@@ -37,6 +43,7 @@ export function QuickAdd() {
   const uid = useUid();
   const all = useStore(itemsStore);
   const saved = useStore(templates);
+  const cks = useStore(checklistTemplates);
   const [text, setText] = useState("");
   const [off, setOff] = useState<Part[]>([]);
   const [focused, setFocused] = useState(false);
@@ -50,6 +57,12 @@ export function QuickAdd() {
   const history = useMemo(() => all.filter((i) => i.type === "EXPENSE"), [all]);
   const result = useMemo(() => parseQuick(text, Date.now(), new Set(off), history), [text, off, history]);
   const offered = text.trim() ? matching(saved, text) : focused ? featured(saved, now) : [];
+  const offeredCk = text.trim() ? ckMatching(cks, text).slice(0, 3) : focused ? ckByUse(cks).slice(0, 3) : [];
+  // "ra khỏi nhà: ví, chìa khoá, sạc" adds the task and its checklist in one go.
+  const withList = useMemo(() => {
+    const split = splitChecklistLine(text);
+    return split && canChecklist(parseQuick(split.head, Date.now()).type) ? split : null;
+  }, [text]);
 
   // Before paint, so a key pressed right after picking a template lands on the blank.
   useLayoutEffect(() => {
@@ -63,9 +76,12 @@ export function QuickAdd() {
   const fail = () => showToast("Chưa lưu được, kiểm tra mạng rồi thử lại");
 
   const add = (line: string, template: QuickTemplate | null) => {
-    const r = parseQuick(line, Date.now(), template ? new Set() : new Set(off), history);
+    const split = template ? null : splitChecklistLine(line);
+    const hasList = split !== null && canChecklist(parseQuick(split.head, Date.now()).type);
+    const r = parseQuick(hasList ? split.head : line, Date.now(), template ? new Set() : new Set(off), history);
     if (!r.title.trim()) return;
-    const item = applyAutoTag(tagRules.get(), toItem(r, newId(), Date.now()));
+    let item = applyAutoTag(tagRules.get(), toItem(r, newId(), Date.now()));
+    if (hasList) item = { ...item, checklist: entriesFrom(split.lines) };
     saveItem(uid, item).then(
       () => showToast(`Đã thêm: ${item.title}`, { label: "Hoàn tác", run: () => deleteItems(uid, [item.id]).catch(fail) }),
       fail,
@@ -74,6 +90,19 @@ export function QuickAdd() {
     setText("");
     setOff([]);
     used.current = null;
+  };
+
+  /** A template with its own time or repeat is created at once; one without opens the editor to choose the day. */
+  const pickChecklist = (t: ChecklistTemplate) => {
+    const item = applyAutoTag(tagRules.get(), instantiate(t, newId(), Date.now()));
+    setChecklistTemplates(ckUsed(checklistTemplates.get(), t.id, Date.now()));
+    setText("");
+    setOff([]);
+    if (!isScheduled(t)) return openEditor(item, true);
+    saveItem(uid, item).then(
+      () => showToast(`Đã thêm: ${item.title} (${scheduleLabel(t)})`, { label: "Hoàn tác", run: () => deleteItems(uid, [item.id]).catch(fail) }),
+      fail,
+    );
   };
 
   const pick = (t: QuickTemplate) => {
@@ -130,17 +159,23 @@ export function QuickAdd() {
               <button key={p} type="button" class="pill off" aria-label={`Bật lại ${PART_LABEL[p]}`} onClick={() => toggle(p)}>{PART_LABEL[p]}</button>
             ))}
           </div>
-          <p class="muted">{summary(result, Date.now())}</p>
+          <p class="muted">{summary(result, Date.now())}{withList ? ` · Checklist ${withList.lines.length} mục` : ""}</p>
         </div>
       )}
-      {(offered.length > 0 || focused || managing) && (
+      {(offeredCk.length > 0 || offered.length > 0 || focused || managing) && (
         <div class="chips-inline templates" role="group" aria-label="Mẫu câu">
+          {offeredCk.map((t) => (
+            <button key={t.id} type="button" class="pill tpl ck-tpl" aria-label={`Mẫu checklist ${t.name}, ${t.items.length} mục`} onMouseDown={(e) => e.preventDefault()} onClick={() => pickChecklist(t)}>
+              <Icon name="check" size={14} /> {t.name} · {t.items.length}
+            </button>
+          ))}
           {offered.map((t) => (
             <button key={t.text} type="button" class="pill tpl" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(t)}>
               {t.text.replace("...", BLANK)}
             </button>
           ))}
           <button type="button" class="pill ghost" onMouseDown={(e) => e.preventDefault()} onClick={() => setManaging(true)}>Mẫu câu…</button>
+          <button type="button" class="pill ghost" onMouseDown={(e) => e.preventDefault()} onClick={() => go(to.settings)}>Mẫu checklist…</button>
         </div>
       )}
       {managing && <TemplatesSheet onClose={() => setManaging(false)} />}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { deleteItems, saveItem, setDone } from "../data";
+import { deleteItems, saveChecklist, saveItem, setDone } from "../data";
+import { chipLabel, progress, remainingLabel, reset, tickAll, toggleEntry } from "../lib/checklist";
 import { whenLabel } from "../lib/format";
 import { formatVnd } from "../lib/money";
 import { canTag, RECURRENCE_LABEL, type Item, type ItemTag } from "../lib/model";
@@ -8,6 +9,7 @@ import { tagOf, withTag } from "../lib/tags";
 import { confirmDialog, CustomerChip, LicenseChip } from "./common";
 import { useAudiences, useReceivedMap, useUid } from "./hooks";
 import { Icon, type IconName } from "./icons";
+import { ChecklistPanel } from "./Checklist";
 import { AudienceChip, openShared, OwnerChip } from "./Sharing";
 import { TagCorner, TagPopover, type PopoverAction } from "./TagUI";
 import { showToast } from "./toast";
@@ -59,8 +61,25 @@ export function ItemRow(props: {
     item.type === "EXPENSE" && item.category ? item.category : null,
   ].filter(Boolean);
 
+  // ---- checklist: the chip opens the card under the row; ticking the last line finishes the item
+  const cl = progress(item);
+  const hasCl = mine && cl.total > 0;
+  const [ckOpen, setCkOpen] = useState(false);
+  const changeChecklist = (next: Item, say?: string) => {
+    const before = item;
+    saveChecklist(uid, item, next).catch(failToast);
+    const finishes = progress(next).complete && item.status === "OPEN";
+    if (finishes) showToast(`Đã đủ: ${item.title}`, { label: "Hoàn tác", run: () => saveItem(uid, before).catch(failToast) });
+    else if (say) showToast(say, { label: "Hoàn tác", run: () => saveItem(uid, before).catch(failToast) });
+  };
+
   // ---- actions (shared by gestures, popover and keyboard)
-  const tick = (next: boolean) => {
+  const tick = async (next: boolean) => {
+    // Finishing something whose checklist is not all ticked asks once, so a swipe cannot skip what was forgotten.
+    if (next && hasCl && !cl.complete) {
+      const ok = await confirmDialog({ title: `Còn ${cl.remaining.length} mục chưa có. Xong luôn?`, body: remainingLabel(item, 5), ok: "Xong luôn" });
+      if (!ok) return;
+    }
     if (props.onToggle) return props.onToggle(item, next);
     setDone(uid, item, next).catch(failToast);
     if (next) showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(failToast) });
@@ -109,7 +128,7 @@ export function ItemRow(props: {
   const onPointerDown = (e: PointerEvent) => {
     if (!mine || (e.pointerType === "mouse" && e.button !== 0) || !e.isPrimary) return;
     // Chips inside the row (customer, licence, owner) are links of their own.
-    if ((e.target as HTMLElement).closest(".links")) return;
+    if ((e.target as HTMLElement).closest(".links, .ck-ui")) return;
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, locked: false };
     swallow.current = false; // a new touch starts a new gesture
     stopHold();
@@ -159,7 +178,7 @@ export function ItemRow(props: {
     const width = li.current?.offsetWidth ?? 360;
     setDx(width);
     timers.current.push(window.setTimeout(() => {
-      tick(!done);
+      void tick(!done);
       setSettling(false);
       offset.current = 0;
       setDx(0);
@@ -179,7 +198,7 @@ export function ItemRow(props: {
   };
 
   const actions: PopoverAction[] = [
-    ...(tickable ? [{ label: done ? "Mở lại" : "Xong", icon: "check" as const, run: () => { setPop(null); tick(!done); } }] : []),
+    ...(tickable ? [{ label: done ? "Mở lại" : "Xong", icon: "check" as const, run: () => { setPop(null); void tick(!done); } }] : []),
     { label: "Xoá", icon: "trash" as const, danger: true, run: () => { setPop(null); void remove(); } },
   ];
 
@@ -187,7 +206,7 @@ export function ItemRow(props: {
   return (
     <li
       ref={li}
-      class={`row-item ${done ? "done" : ""} ${props.time !== undefined ? "tl" : ""} ${props.past ? "past" : ""} ${share ? "shared-in" : ""} ${mine ? "gest" : ""} ${swiping ? "swiping" : ""} ${tag ? "tagged" : ""} t-${item.type}`}
+      class={`row-item ${hasCl ? "has-ck" : ""} ${done ? "done" : ""} ${props.time !== undefined ? "tl" : ""} ${props.past ? "past" : ""} ${share ? "shared-in" : ""} ${mine ? "gest" : ""} ${swiping ? "swiping" : ""} ${tag ? "tagged" : ""} t-${item.type}`}
       style={swiping || settling ? { transform: `translateX(${dx}px)`, transition: settling ? "transform 170ms ease-out" : "none" } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -217,7 +236,13 @@ export function ItemRow(props: {
             {item.recurrence && <span class="rep"> <Icon name="repeat" size={12} /> {RECURRENCE_LABEL[item.recurrence]}</span>}
           </span>
         )}
+        {hasCl && !cl.complete && <span class="ck-rem">{remainingLabel(item)}</span>}
       </button>
+      {hasCl && (
+        <button type="button" class={`ck-chip ck-ui ${cl.complete ? "full" : ""}`} aria-expanded={ckOpen} aria-label={`Checklist ${chipLabel(item)}. ${ckOpen ? "Thu gọn" : "Mở để tick"}`} onClick={() => setCkOpen(!ckOpen)}>
+          <Icon name="check" size={14} /> {chipLabel(item)}
+        </button>
+      )}
       {item.type === "EXPENSE" && item.amount !== undefined && <span class="amount">{formatVnd(item.amount)}</span>}
       {((!props.hideCustomer && item.customerId) || item.licenseId || share || audience > 0) && (
         <div class="links">
@@ -226,6 +251,16 @@ export function ItemRow(props: {
           {!props.hideCustomer && <CustomerChip id={item.customerId} />}
           <LicenseChip id={item.licenseId} />
         </div>
+      )}
+      {hasCl && ckOpen && (
+        <ChecklistPanel
+          item={item}
+          remaining={cl.remaining}
+          ticked={cl.ticked}
+          onToggle={(id) => changeChecklist(toggleEntry(item, id))}
+          onAll={() => changeChecklist(tickAll(item))}
+          onReset={() => changeChecklist(reset(item), "Đã đặt lại checklist")}
+        />
       )}
       {tag && <TagCorner tag={tag} />}
       {swiping && dx < 0 && <span class="swipe-act del" aria-hidden="true"><Icon name="trash" size={20} /> Xoá</span>}

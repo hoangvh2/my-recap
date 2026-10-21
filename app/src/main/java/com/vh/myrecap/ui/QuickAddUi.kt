@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,7 +49,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vh.myrecap.core.Checklist
+import com.vh.myrecap.core.ChecklistTemplates
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.canChecklist
 import com.vh.myrecap.core.QuickAdd
 import com.vh.myrecap.core.QuickTemplate
 import com.vh.myrecap.core.QuickTemplates
@@ -90,9 +94,15 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
         }
     }
     val result = remember(text, off, history) { QuickAdd.parse(text, System.currentTimeMillis(), ZoneId.systemDefault(), off, history) }
+    // "ra khỏi nhà: ví, chìa khoá, sạc" adds the task with its checklist.
+    val split = remember(text) { Checklist.splitLine(text) }
+    val splitResult = remember(split, off, history) {
+        split?.let { QuickAdd.parse(it.first, System.currentTimeMillis(), ZoneId.systemDefault(), off, history) }
+            ?.takeIf { it.type.canChecklist() && it.title.isNotBlank() }
+    }
     fun submit() {
         if (text.isBlank()) return
-        vm.quickAdd(result)
+        if (split != null && splitResult != null) vm.quickAdd(splitResult, split.second) else vm.quickAdd(result)
         field = TextFieldValue("")
         off = emptySet()
     }
@@ -135,14 +145,31 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
             val featured = remember(settings.quickTemplates) {
                 QuickTemplates.featured(settings.quickTemplates, System.currentTimeMillis(), ZoneId.systemDefault())
             }
+            val checklists = remember(settings.checklistTemplates) { ChecklistTemplates.byUse(settings.checklistTemplates).take(3) }
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 featured.forEach { t -> SuggestionChip(onClick = { use(t) }, label = { Text(QuickTemplates.normalize(t.text)) }) }
+                checklists.forEach { t ->
+                    SuggestionChip(
+                        onClick = { vm.addFromChecklistTemplate(t); focusManager.clearFocus() },
+                        label = { Text("${t.name} · ${t.items.size}") },
+                        icon = { Icon(Icons.Rounded.Check, contentDescription = "Mẫu checklist", modifier = Modifier.size(16.dp)) },
+                    )
+                }
                 if (featured.isEmpty()) TextButton(onClick = vm::openTemplates) { Text("Thêm mẫu", style = MaterialTheme.typography.labelLarge) }
+                TextButton(onClick = vm::openChecklistTemplates) { Text("Mẫu checklist…", style = MaterialTheme.typography.labelLarge) }
             }
         } else if (text.isNotBlank()) {
             val matches = remember(text, settings.quickTemplates) { QuickTemplates.matching(settings.quickTemplates, text) }
-            if (matches.isNotEmpty()) {
+            val checklistMatches = remember(text, settings.checklistTemplates) { ChecklistTemplates.matching(settings.checklistTemplates, text).take(3) }
+            if (matches.isNotEmpty() || checklistMatches.isNotEmpty()) {
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    checklistMatches.forEach { t ->
+                        SuggestionChip(
+                            onClick = { vm.addFromChecklistTemplate(t); field = TextFieldValue(""); off = emptySet(); focusManager.clearFocus() },
+                            label = { Text("${t.name} · ${t.items.size}") },
+                            icon = { Icon(Icons.Rounded.Check, contentDescription = "Mẫu checklist", modifier = Modifier.size(16.dp)) },
+                        )
+                    }
                     matches.forEach { t ->
                         SuggestionChip(
                             onClick = { use(t) },
@@ -153,6 +180,7 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
                 }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (split != null && splitResult != null) AssistChip(onClick = {}, label = { Text("Checklist ${split.second.size} mục") })
                 if (result.type == ItemType.EVENT) AssistChip(onClick = {}, label = { Text("Lịch hẹn") })
                 if (result.type == ItemType.EXPENSE) AssistChip(onClick = {}, label = { Text("Chi tiêu · ${result.category}") })
                 result.spans.forEach { span ->

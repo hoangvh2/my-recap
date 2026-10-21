@@ -43,7 +43,7 @@ object Schedule {
         val at = done.whenAt ?: return null
         if (done.type != ItemType.TASK) return null
         val nextAt = nextAfter(at, rule, zone, maxOf(at, if (done.allDay) startOfDay(now, zone) else now))
-        return done.copy(id = newId, status = ItemStatus.OPEN, whenAt = nextAt, doneAt = null, createdAt = now)
+        return Checklist.reset(done.copy(id = newId, status = ItemStatus.OPEN, whenAt = nextAt, doneAt = null, createdAt = now))
     }
 
     /**
@@ -54,7 +54,7 @@ object Schedule {
         val rule = item.recurrence
         val at = item.whenAt
         if (rule == null || at == null) return item.copy(status = ItemStatus.DONE, doneAt = now)
-        return item.copy(whenAt = nextAfter(at, rule, zone, maxOf(now, at)))
+        return Checklist.reset(item.copy(whenAt = nextAfter(at, rule, zone, maxOf(now, at))))
     }
 
     /**
@@ -70,7 +70,7 @@ object Schedule {
         var t = at
         var steps = 0
         while (end(t) <= now && steps++ < MAX_STEPS) t = next(t, rule, zone)
-        return item.copy(whenAt = t)
+        return Checklist.reset(item.copy(whenAt = t))
     }
 
     private fun startOfDay(t: Long, zone: ZoneId) =

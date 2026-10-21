@@ -1,3 +1,4 @@
+import { reset } from "./checklist";
 import type { Item, Recurrence } from "./model";
 
 /**
@@ -54,7 +55,7 @@ export function startOfDay(t: number): number {
 export function nextInstance(done: Item, newId: string, now: number): Item | null {
   if (!done.recurrence || done.whenAt === undefined || done.type !== "TASK") return null;
   const nextAt = nextAfter(done.whenAt, done.recurrence, Math.max(done.whenAt, done.allDay ? startOfDay(now) : now));
-  const copy: Item = { ...done, id: newId, status: "OPEN", whenAt: nextAt, createdAt: now };
+  const copy: Item = reset({ ...done, id: newId, status: "OPEN", whenAt: nextAt, createdAt: now });
   delete copy.doneAt;
   return copy;
 }
@@ -68,14 +69,14 @@ export function rollForward(item: Item, now: number): Item | null {
   let t = item.whenAt;
   let steps = 0;
   while (end(t) <= now && steps++ < MAX_STEPS) t = next(t, item.recurrence);
-  return { ...item, whenAt: t };
+  return reset({ ...item, whenAt: t });
 }
 
 /**
  * "Đã xong" on an appointment. A one-off one is done. A repeating one is not ended by it: only this
- * occurrence is, so it moves to the next one (a weekly meeting ticked today shows next week).
+ * occurrence is, so it moves to the next one (a weekly meeting ticked today shows next week). Its checklist starts unticked again.
  */
 export function finishEvent(item: Item, now: number): Item {
   if (!item.recurrence || item.whenAt === undefined) return { ...item, status: "DONE", doneAt: now };
-  return { ...item, whenAt: nextAfter(item.whenAt, item.recurrence, Math.max(now, item.whenAt)) };
+  return reset({ ...item, whenAt: nextAfter(item.whenAt, item.recurrence, Math.max(now, item.whenAt)) });
 }
