@@ -586,7 +586,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 36px; display: 
 .ck-editor legend { padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .ck-edit-row { display: flex; gap: 6px; align-items: center; }
 .ck-edit-row input { flex: 1; }
-.ck-editor select { width: auto; min-height: 36px; font-size: 14px; border-radius: 18px; padding: 0 12px; }
+.ck-editor select { width: auto; min-height: 36px; font-size: 16px; border-radius: 18px; padding: 0 12px; }
 .danger-text { color: var(--danger); }
 .ck-templates .list { margin: 0; }
 .pill.ck-tpl { border-color: var(--accent); color: var(--accent); font-weight: 600; }

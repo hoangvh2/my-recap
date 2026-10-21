@@ -38,12 +38,12 @@ test("Gõ nhanh: a typed line becomes a task, an appointment or an expense, and 
 
   // Templates: the empty box offers one line per kind; a line with a blank puts the cursor on it.
   await box.focus();
-  await expect(page.locator(".templates .tpl")).toHaveCount(3);
+  await expect(page.locator(".templates .tpl:not(.ck-tpl)")).toHaveCount(3);
   await shot(page, "52-quickadd-templates");
   await box.fill("an tru");
-  await expect(page.locator(".templates .tpl")).toHaveText(["ăn trưa …k"]);
+  await expect(page.locator(".templates .tpl:not(.ck-tpl)")).toHaveText(["ăn trưa …k"]);
   await shot(page, "52b-quickadd-matching");
-  await page.locator(".templates .tpl", { hasText: "ăn trưa …k" }).click();
+  await page.locator(".templates .tpl:not(.ck-tpl)", { hasText: "ăn trưa …k" }).click();
   await expect(box).toHaveValue("ăn trưa k");
   await page.keyboard.type("50");
   await expect(box).toHaveValue("ăn trưa 50k");
