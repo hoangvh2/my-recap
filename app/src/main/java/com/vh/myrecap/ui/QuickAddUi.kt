@@ -147,6 +147,7 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
             }
             val checklists = remember(settings.checklistTemplates) { ChecklistTemplates.byUse(settings.checklistTemplates).take(3) }
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                featured.forEach { t -> SuggestionChip(onClick = { use(t) }, label = { Text(QuickTemplates.normalize(t.text)) }) }
                 checklists.forEach { t ->
                     SuggestionChip(
                         onClick = { vm.addFromChecklistTemplate(t); focusManager.clearFocus() },
@@ -154,7 +155,6 @@ fun QuickAddBar(vm: AppViewModel, modifier: Modifier = Modifier, initial: String
                         icon = { Icon(Icons.Rounded.Check, contentDescription = "Mẫu checklist", modifier = Modifier.size(16.dp)) },
                     )
                 }
-                featured.forEach { t -> SuggestionChip(onClick = { use(t) }, label = { Text(QuickTemplates.normalize(t.text)) }) }
                 if (featured.isEmpty()) TextButton(onClick = vm::openTemplates) { Text("Thêm mẫu", style = MaterialTheme.typography.labelLarge) }
                 TextButton(onClick = vm::openChecklistTemplates) { Text("Mẫu checklist…", style = MaterialTheme.typography.labelLarge) }
             }

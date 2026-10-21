@@ -221,7 +221,10 @@ class SecretaryFlowTest {
             assertTrue("item editor not shown", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000))
             shot("20-item-editor")
             // The link back to the capture sits at the end of the form.
-            device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, 1f)
+            // (the checklist section made the form longer: scroll until it shows)
+            repeat(4) {
+                if (!device.hasObject(By.textStartsWith("Từ ghi nhanh"))) device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, 1f)
+            }
             assertTrue("source link", device.wait(Until.hasObject(By.textStartsWith("Từ ghi nhanh")), 5_000))
             shot("20b-item-source")
             device.findObject(By.text("Xong")).click()

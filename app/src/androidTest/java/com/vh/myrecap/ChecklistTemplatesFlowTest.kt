@@ -14,7 +14,10 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 
 /** Settings → Mẫu checklist: a delete asks first, "Không" keeps the template, "Xoá" removes it and Undo brings it back. */
@@ -25,6 +28,14 @@ class ChecklistTemplatesFlowTest {
     private val device = UiDevice.getInstance(instrumentation)
     private val app = MyRecapApp.from(context)
     private var saved: List<ChecklistTemplate> = emptyList()
+
+    @get:Rule
+    val failureShot = object : TestWatcher() {
+        override fun failed(e: Throwable?, description: Description) {
+            device.executeShellCommand("mkdir -p /data/local/tmp/myrecap-shots")
+            device.executeShellCommand("screencap -p /data/local/tmp/myrecap-shots/fail-${description.methodName}.png")
+        }
+    }
 
     @Before
     fun setUp() {
@@ -47,6 +58,7 @@ class ChecklistTemplatesFlowTest {
             assertTrue("agenda", device.wait(Until.hasObject(By.desc("Cài đặt")), 10_000))
             device.findObject(By.desc("Cài đặt")).click()
             assertTrue("settings", device.wait(Until.hasObject(By.textStartsWith("Quản lý mẫu checklist")), 10_000) || scrollTo("Quản lý mẫu checklist"))
+            Thread.sleep(700) // let the scroll settle before tapping
             device.findObject(By.textStartsWith("Quản lý mẫu checklist")).click()
             assertTrue("screen", device.wait(Until.hasObject(By.text("Ra cửa hàng")), 5_000))
 
