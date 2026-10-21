@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.R
+import com.vh.myrecap.core.Checklist
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemText
@@ -147,6 +148,7 @@ object Reminders {
             item.recurrence?.label,
             item.place,
             item.details.ifBlank { null },
+            Checklist.remainingLabel(item, show = 4).ifEmpty { null },
         )
             .joinToString(" · ")
         val builder = NotificationCompat.Builder(context, MyRecapApp.CHANNEL_REMINDERS)

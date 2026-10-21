@@ -59,6 +59,8 @@ data class Item(
     val important: Boolean = false,
     /** Tasks and appointments only: a colour tag ([ItemTag] key) that draws the eye; changes no reminder. */
     val tag: String? = null,
+    /** Tasks and appointments only: things to remember; a repeating item starts each occurrence unticked. Private. */
+    val checklist: List<ChecklistEntry> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -79,6 +81,7 @@ data class Item(
         .putOpt("recurrence", recurrence?.name)
         .apply { if (important) put("important", true) }
         .apply { if (itemTag != null) put("tag", tag) }
+        .apply { if (checklist.isNotEmpty()) put("checklist", Checklist.encode(checklist)) }
 
     companion object {
         fun fromJson(o: JSONObject) = Item(
@@ -100,6 +103,7 @@ data class Item(
             recurrence = o.optStringOrNull("recurrence")?.let { r -> Recurrence.entries.firstOrNull { it.name == r } },
             important = o.optBoolean("important", false),
             tag = ItemTag.fromKey(o.optStringOrNull("tag"))?.key,
+            checklist = Checklist.decode(o.optJSONArray("checklist")),
         )
     }
 }

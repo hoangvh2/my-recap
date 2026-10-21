@@ -5,6 +5,8 @@ import com.vh.myrecap.core.InterviewerSpeech
 import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
+import com.vh.myrecap.core.ChecklistTemplate
+import com.vh.myrecap.core.ChecklistTemplates
 import com.vh.myrecap.core.QuickTemplate
 import com.vh.myrecap.core.QuickTemplates
 import com.vh.myrecap.core.SegmenterConfig
@@ -67,6 +69,8 @@ data class AppSettings(
     val homeTab: Int = 0,
     /** Saved quick-add lines; the most used one of each kind is offered first and on the widget. */
     val quickTemplates: List<QuickTemplate> = QuickTemplates.DEFAULTS,
+    /** Checklist templates (Cài đặt → Mẫu checklist); one tap in quick add creates a task or appointment from one. */
+    val checklistTemplates: List<ChecklistTemplate> = ChecklistTemplates.DEFAULTS,
     /** "Person / place / word → tag" rules applied to new tasks and appointments. */
     val tagRules: List<TagRule> = emptyList(),
     /** Repeats of an important item wait for the morning instead of ringing overnight. */
@@ -157,6 +161,7 @@ class SettingsRepository(context: Context) {
             themeMode = enumPref("themeMode", d.themeMode),
             homeTab = prefs.getInt("homeTab", d.homeTab),
             quickTemplates = QuickTemplates.decode(prefs.getString("quickTemplates", null)) ?: d.quickTemplates,
+            checklistTemplates = ChecklistTemplates.decode(prefs.getString("checklistTemplates", null)) ?: d.checklistTemplates,
             tagRules = TagRules.decode(prefs.getString("tagRules", null)) ?: d.tagRules,
             quietNags = prefs.getBoolean("quietNags", d.quietNags),
             autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
@@ -197,6 +202,7 @@ class SettingsRepository(context: Context) {
             .putString("themeMode", s.themeMode.name)
             .putInt("homeTab", s.homeTab)
             .putString("quickTemplates", QuickTemplates.encode(s.quickTemplates))
+            .putString("checklistTemplates", ChecklistTemplates.encode(s.checklistTemplates))
             .putString("tagRules", TagRules.encode(s.tagRules))
             .putBoolean("quietNags", s.quietNags)
             .putString("autoBackupUri", s.autoBackupUri)

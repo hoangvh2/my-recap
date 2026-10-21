@@ -146,6 +146,7 @@ private fun AppRoot(vm: AppViewModel) {
             is Screen.ItemEdit -> ItemEditScreen(vm, target.id, target.type)
             Screen.Settings -> SettingsScreen(vm)
             Screen.Templates -> TemplatesScreen(vm)
+            Screen.ChecklistTemplates -> ChecklistTemplatesScreen(vm)
             Screen.Search -> SearchScreen(vm)
             Screen.Spending -> SpendingScreen(vm)
             Screen.Weekly -> WeeklyRecapScreen(vm)

@@ -20,6 +20,10 @@ import com.vh.myrecap.core.ShareNotice
 import com.vh.myrecap.core.SharedItem
 import com.vh.myrecap.core.ApiException
 import com.vh.myrecap.core.BackupException
+import com.vh.myrecap.core.Checklist
+import com.vh.myrecap.core.ChecklistEntry
+import com.vh.myrecap.core.ChecklistTemplate
+import com.vh.myrecap.core.ChecklistTemplates
 import com.vh.myrecap.core.ClipText
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.QuickTemplate
@@ -28,6 +32,8 @@ import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemTag
 import com.vh.myrecap.core.TagFilter
 import com.vh.myrecap.core.TagRules
+import com.vh.myrecap.core.Recurrence
+import com.vh.myrecap.core.canChecklist
 import com.vh.myrecap.core.canHaveTag
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Prompts
@@ -59,6 +65,16 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** What a tap in an item's checklist does. */
+sealed interface ChecklistOp {
+    data class Toggle(val entryId: String) : ChecklistOp
+    data object All : ChecklistOp
+    data object Reset : ChecklistOp
+}
+
+/** The item as it was before a checklist change, with the words for the Undo bar. */
+data class ChecklistUndo(val before: Item, val message: String)
+
 sealed interface Screen {
     data object Home : Screen
     data class Detail(val id: String) : Screen
@@ -71,6 +87,8 @@ sealed interface Screen {
     data object Settings : Screen
     /** Saved quick-add lines: list, search, add, edit. */
     data object Templates : Screen
+    /** Checklist templates: list, add, edit, delete. */
+    data object ChecklistTemplates : Screen
     data object Search : Screen
     data object Spending : Screen
     data object Weekly : Screen
@@ -187,6 +205,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openSettings() = push(Screen.Settings)
     fun openTemplates() = push(Screen.Templates)
+    fun openChecklistTemplates() = push(Screen.ChecklistTemplates)
     fun openSearch() = push(Screen.Search)
     fun openSpending() = push(Screen.Spending)
     fun openWeekly() = push(Screen.Weekly)
@@ -450,8 +469,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     /** Saves a typed quick-add as a confirmed item (the user saw what was understood), with its reminder. */
-    fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result) = lasting {
-        val item = TagRules.applyToNew(settings.value.tagRules, parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis()))
+    fun quickAdd(parsed: com.vh.myrecap.core.QuickAdd.Result, checklist: List<String> = emptyList()) = lasting {
+        val made = parsed.toItem(com.vh.myrecap.data.ItemStore.newId(), System.currentTimeMillis())
+        val item = TagRules.applyToNew(
+            settings.value.tagRules,
+            if (checklist.isNotEmpty() && made.type.canChecklist()) made.copy(checklist = Checklist.entriesFrom(checklist)) else made,
+        )
         app.items.upsert(item)
         Reminders.sync(app, item)
         withContext(Dispatchers.Main) { lastAddedItem = item }
@@ -465,6 +488,102 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
         quickAdd(parsed)
         templateUsed(template)
+    }
+
+    /** A new item for the editor to start from (a checklist template without its own time); taken once. */
+    private var draftItem: Item? = null
+
+    fun takeDraft(): Item? = draftItem.also { draftItem = null }
+
+    /**
+     * One tap on a checklist template. One with its own time or repeat is created at once (with Undo); one
+     * without opens the editor, so the day and the customer can be chosen.
+     */
+    fun addFromChecklistTemplate(t: ChecklistTemplate) {
+        val now = System.currentTimeMillis()
+        val item = ChecklistTemplates.instantiate(t, com.vh.myrecap.data.ItemStore.newId(), now, ZoneId.systemDefault())
+        updateSettings { it.copy(checklistTemplates = ChecklistTemplates.used(it.checklistTemplates, t.id, now)) }
+        if (!ChecklistTemplates.isScheduled(t)) {
+            draftItem = item
+            newItem(item.type)
+            return
+        }
+        lasting {
+            val toSave = TagRules.applyToNew(settings.value.tagRules, item)
+            app.items.upsert(toSave)
+            Reminders.sync(app, toSave)
+            withContext(Dispatchers.Main) { lastAddedItem = toSave }
+        }
+    }
+
+    /** Message for the form when the template is not valid; null once saved. [selfId]: the template being edited. */
+    fun saveChecklistTemplate(selfId: String?, name: String, lines: String, type: ItemType, recurrence: Recurrence?, time: String?): String? {
+        val check = ChecklistTemplates.validate(settings.value.checklistTemplates, name, lines, type, recurrence, time, selfId)
+        val t = check.template ?: return check.error
+        updateSettings { s ->
+            s.copy(checklistTemplates = if (selfId != null) ChecklistTemplates.update(s.checklistTemplates, t) else ChecklistTemplates.add(s.checklistTemplates, t))
+        }
+        return null
+    }
+
+    /** From the editor: saves the checklist of the item being edited as a template named like the title. */
+    fun saveChecklistAsTemplate(title: String, entries: List<ChecklistEntry>) {
+        val check = ChecklistTemplates.validate(settings.value.checklistTemplates, title, entries.joinToString("\n") { it.text }, ItemType.TASK, null, null)
+        val t = check.template
+        if (t == null) return say(check.error ?: "Chưa lưu được mẫu")
+        updateSettings { s -> s.copy(checklistTemplates = ChecklistTemplates.add(s.checklistTemplates, t)) }
+        say("Đã lưu mẫu “${t.name}”")
+    }
+
+    fun removeChecklistTemplate(id: String) =
+        updateSettings { s -> s.copy(checklistTemplates = ChecklistTemplates.remove(s.checklistTemplates, id)) }
+
+    fun restoreChecklistTemplate(index: Int, t: ChecklistTemplate) =
+        updateSettings { s -> s.copy(checklistTemplates = ChecklistTemplates.restore(s.checklistTemplates, index, t)) }
+
+    fun restoreDefaultChecklistTemplates() =
+        updateSettings { s -> s.copy(checklistTemplates = ChecklistTemplates.restoreDefaults(s.checklistTemplates)) }
+
+    /** What to undo after the checklist of an item changed in a way worth undoing (finished by the last tick, "Đặt lại"). */
+    var lastChecklistChange by mutableStateOf<ChecklistUndo?>(null)
+        private set
+
+    fun checklist(id: String, op: ChecklistOp) = io {
+        val before = app.items.get(id) ?: return@io
+        val next = when (op) {
+            is ChecklistOp.Toggle -> Checklist.toggle(before, op.entryId)
+            ChecklistOp.All -> Checklist.tickAll(before)
+            ChecklistOp.Reset -> Checklist.reset(before)
+        }
+        if (next == before) return@io
+        val complete = Checklist.progress(next).complete
+        when {
+            // The last tick finishes it (a repeating one comes back tomorrow with nothing ticked).
+            complete && before.status == ItemStatus.OPEN && before.type.canChecklist() -> {
+                app.items.upsert(next)
+                applyDone(id, true)
+                withContext(Dispatchers.Main) { lastChecklistChange = ChecklistUndo(before, "Đã đủ “${before.title}”") }
+            }
+            // Unticking a line on a finished item opens it again.
+            before.status == ItemStatus.DONE && !complete -> {
+                val reopened = next.copy(status = ItemStatus.OPEN, doneAt = null)
+                app.items.upsert(reopened)
+                Reminders.sync(app, reopened)
+            }
+            else -> {
+                app.items.upsert(next)
+                if (op == ChecklistOp.Reset) withContext(Dispatchers.Main) { lastChecklistChange = ChecklistUndo(before, "Đã đặt lại “${before.title}”") }
+            }
+        }
+    }
+
+    fun undoChecklistChange(undo: ChecklistUndo) {
+        if (lastChecklistChange == undo) lastChecklistChange = null
+        saveItem(undo.before)
+    }
+
+    fun clearChecklistChange(undo: ChecklistUndo) {
+        if (lastChecklistChange == undo) lastChecklistChange = null
     }
 
     /** Counts a use, so the most used line of each kind is the one the empty box and the widget offer. */

@@ -21,7 +21,9 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import com.vh.myrecap.core.Checklist
 import com.vh.myrecap.core.ItemTag
+import com.vh.myrecap.core.canChecklist
 import com.vh.myrecap.core.canHaveTag
 import com.vh.myrecap.core.itemTag
 import androidx.compose.foundation.layout.Arrangement
@@ -133,6 +135,7 @@ fun ItemRow(
     modifier: Modifier = Modifier,
     onDelete: (() -> Unit)? = null,
     onTag: ((ItemTag?) -> Unit)? = null,
+    onChecklist: ((ChecklistOp) -> Unit)? = null,
 ) {
     val share = LocalShareInfo.current
     // Someone else's item: their name on it, an indigo edge, and no actions (only the owner changes it).
@@ -149,13 +152,22 @@ fun ItemRow(
     val canTag = onTag != null && owner == null && item.type.canHaveTag()
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    // A checklist (mine only): the chip opens a card under the row; finishing with lines missing asks once.
+    val cl = Checklist.progress(item)
+    val showChecklist = owner == null && item.type.canChecklist() && cl.total > 0
+    var checklistOpen by remember { mutableStateOf(false) }
+    var confirmFinish by remember { mutableStateOf(false) }
+    val askDone: (Boolean) -> Unit = { next ->
+        if (next && showChecklist && !cl.complete) confirmFinish = true else onToggleDone?.invoke(next)
+    }
+    val askDoneNow by rememberUpdatedState(askDone)
     val doneNow by rememberUpdatedState(done)
     val toggleNow by rememberUpdatedState(onToggleDone)
     val deleteNow by rememberUpdatedState(onDelete)
     val swipe = rememberSwipeToDismissBoxState(
         confirmValueChange = { target ->
             when (target) {
-                SwipeToDismissBoxValue.StartToEnd -> toggleNow?.let { haptic.performHapticFeedback(HapticFeedbackType.LongPress); it(!doneNow) }
+                SwipeToDismissBoxValue.StartToEnd -> if (toggleNow != null) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); askDoneNow(!doneNow) }
                 SwipeToDismissBoxValue.EndToStart -> if (deleteNow != null) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); confirmDelete = true }
                 SwipeToDismissBoxValue.Settled -> Unit
             }
@@ -164,6 +176,7 @@ fun ItemRow(
     )
     val rowShape = RoundedCornerShape(18.dp)
     val row: @Composable () -> Unit = {
+        Column {
         Surface(
             shape = rowShape,
             color = if (owner != null) OtherTint.copy(alpha = 0.07f) else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -178,7 +191,7 @@ fun ItemRow(
                 )
                 .semantics(mergeDescendants = true) {
                     val actions = buildList {
-                        if (canDone) add(CustomAccessibilityAction(if (done) "Mở lại" else "Đánh dấu xong") { onToggleDone?.invoke(!done); true })
+                        if (canDone) add(CustomAccessibilityAction(if (done) "Mở lại" else "Đánh dấu xong") { askDone(!done); true })
                         if (canDelete) add(CustomAccessibilityAction("Xoá") { confirmDelete = true; true })
                         if (canTag) add(CustomAccessibilityAction("Gắn thẻ") { menu = true; true })
                     }
@@ -228,6 +241,19 @@ fun ItemRow(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        if (showChecklist && !cl.complete) {
+                            Text(
+                                Checklist.remainingLabel(item),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (showChecklist) {
+                        Spacer(Modifier.width(8.dp))
+                        ChecklistChip(item, checklistOpen, if (onChecklist != null) ({ checklistOpen = !checklistOpen }) else null)
                     }
                     item.amount?.let {
                         Spacer(Modifier.width(10.dp))
@@ -242,6 +268,23 @@ fun ItemRow(
                 }
             }
         }
+        // Outside the merged row semantics above, so each line is its own checkbox for TalkBack.
+        if (showChecklist && checklistOpen && onChecklist != null) {
+            Surface(shape = rowShape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                ChecklistPanel(item, onChecklist)
+            }
+        }
+        }
+    }
+    if (confirmFinish) {
+        ConfirmDialog(
+            title = "Còn ${cl.remaining.size} mục chưa có. Xong luôn?",
+            text = Checklist.remainingLabel(item, show = 5),
+            confirmLabel = "Xong luôn",
+            destructive = false,
+            onConfirm = { onToggleDone?.invoke(true) },
+            onDismiss = { confirmFinish = false },
+        )
     }
     if (confirmDelete) {
         ConfirmDialog(
@@ -319,6 +362,12 @@ fun rememberItemUndo(vm: AppViewModel): SnackbarHostState {
         val label = if (amount != null) "Đã ghi chi tiêu “${item.title}” · ${Money.format(amount)}" else "Đã thêm “${item.title}”"
         val result = host.showSnackbar(label, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
         if (result == SnackbarResult.ActionPerformed) vm.undoAddItem(item) else vm.clearAddedItem(item)
+    }
+    val changed = vm.lastChecklistChange
+    LaunchedEffect(changed) {
+        val change = changed ?: return@LaunchedEffect
+        val result = host.showSnackbar(change.message, actionLabel = "Hoàn tác", duration = SnackbarDuration.Short)
+        if (result == SnackbarResult.ActionPerformed) vm.undoChecklistChange(change) else vm.clearChecklistChange(change)
     }
     return host
 }
