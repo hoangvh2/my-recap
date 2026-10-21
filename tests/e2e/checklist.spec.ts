@@ -164,7 +164,7 @@ test("finishing something with lines still missing asks once; the last tick fini
   await r.getByRole("button", { name: /^Checklist 0\/3/ }).click();
   for (const name of ["Vé máy bay", "Sạc dự phòng"]) await r.getByRole("checkbox", { name }).check();
   await expect(r).toBeVisible();
-  await r.getByRole("checkbox", { name: "Laptop" }).check();
+  await r.getByRole("checkbox", { name: "Laptop" }).click();
   await expect(page.getByText("Đã đủ: Chuẩn bị đi Hà Nội")).toBeVisible();
   await expect(r).toHaveCount(0); // finished, so it leaves today's list
   await page.getByRole("button", { name: "Hoàn tác" }).click();
