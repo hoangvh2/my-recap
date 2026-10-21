@@ -4,8 +4,9 @@ import { buildIcs } from "../lib/ics";
 import { applyAutoTag, tagRules } from "../lib/autotag";
 import { formatVnd, parseVnd } from "../lib/money";
 import { useStore } from "../lib/store";
-import { EXPENSE_CATEGORIES, MAX, RECURRENCES, RECURRENCE_LABEL, TYPES, TYPE_LABEL, type Item, type ItemTag, type ItemType, type Recurrence } from "../lib/model";
+import { EXPENSE_CATEGORIES, MAX, RECURRENCES, RECURRENCE_LABEL, TYPES, TYPE_LABEL, type ChecklistEntry, type Item, type ItemTag, type ItemType, type Recurrence } from "../lib/model";
 import { saveFile } from "./download";
+import { ChecklistEditor } from "./Checklist";
 import { Icon } from "./icons";
 import { useAudiences } from "./hooks";
 import { TagCornerButton, TagMenu } from "./TagUI";
@@ -41,6 +42,7 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
   const [licenseId, setLicenseId] = useState<string | undefined>(item.licenseId);
   const [important, setImportant] = useState(item.important === true);
   const [tag, setTag] = useState<ItemTag | undefined>(item.tag);
+  const [checklist, setChecklist] = useState<ChecklistEntry[]>(item.checklist ?? []);
   // Once the person has chosen (including "Không thẻ"), the auto-tag rules stay out of it.
   const [tagTouched, setTagTouched] = useState(false);
   const [tagMenu, setTagMenu] = useState(false);
@@ -98,6 +100,8 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
       }
       if (important) out.important = true;
       if (tag) out.tag = tag;
+      const lines = checklist.filter((e) => e.text.trim());
+      if (lines.length > 0) out.checklist = lines.map((e) => ({ ...e, text: e.text.trim() }));
       if (place.trim()) out.place = place.trim().slice(0, MAX.place);
       if (person.trim()) out.person = person.trim().slice(0, MAX.person);
     }
@@ -191,6 +195,8 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
             )}
           </>
         )}
+
+        {dated && <ChecklistEditor entries={checklist} onChange={setChecklist} title={title} onNeedTitle={setTitle} />}
 
         {!wasDraft && <EditorShareRow item={{ ...item, type }} value={audience ?? sharedWith} onChange={setAudienceDraft} />}
 

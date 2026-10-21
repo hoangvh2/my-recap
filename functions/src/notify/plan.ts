@@ -199,6 +199,14 @@ function titleOf(priority: Priority, head: string, text: string): string {
   return oneLine(`${LEVEL_ICON[priority]} ${urgent}${head} · ${text}`, MAX_TITLE);
 }
 
+/** "Còn 3 mục: Ví · Chìa khoá · Sạc" for a task or appointment whose checklist is not all ticked; null otherwise. */
+function missingLine(item: Item): string | null {
+  const left = (item.checklist ?? []).filter((e) => e.done !== true);
+  if (left.length === 0) return null;
+  const shown = left.slice(0, 4).map((e) => escapeHtml(oneLine(e.text, 40)));
+  return `<b>Còn ${left.length} mục:</b> ${shown.join(" · ")}${left.length > shown.length ? ` · +${left.length - shown.length}` : ""}`;
+}
+
 function reminderMessage(d: Due, input: PlanInput): Message {
   const { settings: s, nowMs } = input;
   const item = d.item;
@@ -208,7 +216,8 @@ function reminderMessage(d: Due, input: PlanInput): Message {
       : item.type === "EVENT"
         ? `${clock(d.occ, s.zone)} – ${clock(d.occ + HOUR_MS, s.zone)} · ${dayText(d.occ, nowMs, s.zone)}`
         : `${d.kind === "late" ? "Hạn " : ""}${clock(d.occ, s.zone)} · ${dayText(d.occ, nowMs, s.zone)}`;
-  const lines = [`<b>${escapeHtml(when)}</b>`, ...itemLines(item, input.names)];
+  const missing = missingLine(item);
+  const lines = [`<b>${escapeHtml(when)}</b>`, ...itemLines(item, input.names), ...(missing ? [missing] : [])];
   const doneLink = item.type === "TASK" && input.appUrl;
   if (item.type === "TASK") lines.push(doneLink ? "<i>Làm xong thì bấm “✅ Đã xong” bên dưới.</i>" : "<i>Xong thì mở app đánh dấu xong.</i>");
   if (d.priority === 2) lines.push(item.type === "EVENT" ? "<i>Nhắc lại mỗi 5 phút đến khi bấm Xác nhận; tự dừng khi đến giờ hẹn.</i>" : "<i>Nhắc lại mỗi 5 phút đến khi bấm Xác nhận hoặc Đã xong (tối đa 30 phút).</i>");
@@ -327,7 +336,9 @@ function entriesOn(items: readonly Item[], dayStart: number, dayEnd: number, zon
 function entryLine(e: Entry, zone: string, names: ReadonlyMap<string, string>): string {
   const time = e.item.allDay ? "Cả ngày" : clock(e.occ, zone);
   const flag = e.item.important ? "❗ " : "";
+  const left = (e.item.checklist ?? []).filter((c) => c.done !== true).length;
   const extra = [e.item.place, e.item.customerId ? names.get(e.item.customerId) : undefined].filter(Boolean).map((x) => escapeHtml(oneLine(x!, 40)));
+  if (left > 0) extra.push(`còn ${left} mục`);
   return `• <b>${time}</b> ${flag}${escapeHtml(oneLine(e.item.title, 70))}${extra.length ? ` <i>(${extra.join(" · ")})</i>` : ""}`;
 }
 

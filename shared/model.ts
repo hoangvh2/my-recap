@@ -12,6 +12,18 @@ export const ITEM_TAGS: readonly ItemTag[] = ["red", "yellow", "orange", "blue",
 /** Only tasks and appointments can carry a tag. */
 export const canTag = (type: ItemType): boolean => type === "TASK" || type === "EVENT";
 
+/** One line of a checklist on a task or appointment ("Ví", "Chìa khoá"). `done` is absent until it is ticked. */
+export interface ChecklistEntry {
+  id: string;
+  text: string;
+  done?: boolean;
+}
+/** Same limits as the Firestore rules and the editor. */
+export const CHECKLIST_MAX_ENTRIES = 40;
+export const CHECKLIST_MAX_TEXT = 80;
+/** Only tasks and appointments can carry a checklist. */
+export const canChecklist = (type: ItemType): boolean => type === "TASK" || type === "EVENT";
+
 /** One thing the secretary keeps. Same shape as the Android app and the Firestore rules. */
 export interface Item {
   id: string;
@@ -39,6 +51,8 @@ export interface Item {
   important?: boolean;
   /** Personal colour tag (tasks and appointments only). Not shared with other people. */
   tag?: ItemTag;
+  /** Things to remember for this task or appointment. A repeating one starts each occurrence unticked. Private (never shared). */
+  checklist?: ChecklistEntry[];
 }
 
 export interface Capture {
