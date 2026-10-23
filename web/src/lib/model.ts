@@ -10,8 +10,10 @@ export const RECURRENCE_LABEL: Record<Recurrence, string> = {
   WEEKDAYS: "Ngày làm việc",
   WEEKLY: "Hằng tuần",
   MONTHLY: "Hằng tháng",
+  LUNAR_MONTHLY: "Hằng tháng theo Âm",
+  LUNAR_YEARLY: "Hằng năm theo Âm",
 };
-export const RECURRENCES: Recurrence[] = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY"];
+export const RECURRENCES: Recurrence[] = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY", "LUNAR_MONTHLY", "LUNAR_YEARLY"];
 
 export const EXPENSE_CATEGORIES = [
   "Ăn uống", "Di chuyển", "Mua sắm", "Hoá đơn", "Sức khoẻ", "Giải trí", "Giáo dục", "Gia đình", "Công việc", "Khác",

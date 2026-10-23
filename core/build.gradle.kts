@@ -13,6 +13,12 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
+// The same holiday schedule file serves the web app, so it is copied rather than duplicated.
+sourceSets.main {
+    resources.srcDir(layout.projectDirectory.dir("../shared"))
+    resources.include("holidays-vn.json")
+}
+
 dependencies {
     // Android ships org.json in the platform; plain JVM (unit tests) needs the artifact.
     compileOnly("org.json:json:20240303")

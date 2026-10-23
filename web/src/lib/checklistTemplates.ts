@@ -1,5 +1,5 @@
 import { entriesFrom, parseLines } from "./checklist";
-import { CHECKLIST_MAX_ENTRIES, type Item, type ItemType, type Recurrence } from "./model";
+import { CHECKLIST_MAX_ENTRIES, RECURRENCES, RECURRENCE_LABEL, type Item, type ItemType, type Recurrence } from "./model";
 import { nextAfter, startOfDay } from "./schedule";
 import { createStore } from "./store";
 import { fold } from "./views";
@@ -91,7 +91,7 @@ export function matching(list: ChecklistTemplate[], query: string): ChecklistTem
 
 /** "Mỗi ngày 07:30", "Lịch hẹn · 14:00", "Việc không hẹn giờ": what using the template creates. */
 export function scheduleLabel(t: Pick<ChecklistTemplate, "type" | "recurrence" | "time">): string {
-  const rec = t.recurrence ? ({ DAILY: "Hằng ngày", WEEKDAYS: "Ngày làm việc", WEEKLY: "Hằng tuần", MONTHLY: "Hằng tháng" } as const)[t.recurrence] : "";
+  const rec = t.recurrence ? RECURRENCE_LABEL[t.recurrence] : "";
   const parts = [t.type === "EVENT" ? "Lịch hẹn" : "Việc", rec, t.time ?? ""].filter(Boolean);
   return parts.join(" · ");
 }
@@ -132,7 +132,7 @@ function load(): ChecklistTemplate[] {
       const items = r.items.filter((x): x is string => typeof x === "string" && x.trim() !== "").slice(0, CHECKLIST_MAX_ENTRIES);
       if (items.length === 0) return [];
       const out: ChecklistTemplate = { id: r.id, name: r.name.trim().slice(0, MAX_NAME), items, type: r.type === "EVENT" ? "EVENT" : "TASK", uses: Number(r.uses) || 0, lastUsed: Number(r.lastUsed) || 0 };
-      if (r.recurrence === "DAILY" || r.recurrence === "WEEKDAYS" || r.recurrence === "WEEKLY" || r.recurrence === "MONTHLY") out.recurrence = r.recurrence;
+      if (r.recurrence && (RECURRENCES as readonly string[]).includes(r.recurrence)) out.recurrence = r.recurrence;
       if (typeof r.time === "string" && TIME.test(r.time)) out.time = r.time;
       return [out];
     });

@@ -22,6 +22,11 @@ object Schedule {
             Recurrence.WEEKLY -> z.plusWeeks(1)
             // Day 31 becomes the month's last day (30, 28…) and stays there; acceptable for reminders.
             Recurrence.MONTHLY -> z.plusMonths(1)
+            Recurrence.LUNAR_MONTHLY, Recurrence.LUNAR_YEARLY -> {
+                val d = Lunar.nextOccurrence(z.toLocalDate(), rule)
+                // Outside the supported years (1900-2199) fall back to the solar equivalent.
+                if (d != null) z.with(d) else if (rule == Recurrence.LUNAR_YEARLY) z.plusYears(1) else z.plusMonths(1)
+            }
         }
         return n.toInstant().toEpochMilli()
     }

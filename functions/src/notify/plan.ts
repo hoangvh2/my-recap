@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { DateTime } from "luxon";
+import { nextLunarOccurrence } from "../../../shared/lunar";
 import type { Item, License, Prefs, Recurrence } from "../../../shared/model";
 import { dueNudges } from "../../../shared/renewals";
 import { inQuietHours, type NotifySettings } from "./settings";
@@ -90,6 +91,13 @@ function step(d: DateTime, rule: Recurrence): DateTime {
       return d.plus({ weeks: 1 });
     case "MONTHLY":
       return d.plus({ months: 1 });
+    case "LUNAR_MONTHLY":
+    case "LUNAR_YEARLY": {
+      const iso = nextLunarOccurrence(d.toISODate() ?? "", rule);
+      if (!iso) return rule === "LUNAR_YEARLY" ? d.plus({ years: 1 }) : d.plus({ months: 1 });
+      const [year, month, day] = iso.split("-").map(Number);
+      return d.set({ year, month, day });
+    }
   }
 }
 

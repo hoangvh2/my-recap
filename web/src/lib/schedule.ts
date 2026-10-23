@@ -1,3 +1,4 @@
+import { nextLunarOccurrence } from "../../../shared/lunar";
 import { reset } from "./checklist";
 import type { Item, Recurrence } from "./model";
 
@@ -28,6 +29,14 @@ export function next(at: number, rule: Recurrence): number {
       d.setMonth(d.getMonth() + 1);
       const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
       d.setDate(Math.min(day, last));
+      break;
+    }
+    case "LUNAR_MONTHLY":
+    case "LUNAR_YEARLY": {
+      const iso = nextLunarOccurrence(`${String(d.getFullYear()).padStart(4, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`, rule);
+      if (iso) d.setFullYear(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+      else if (rule === "LUNAR_YEARLY") d.setFullYear(d.getFullYear() + 1);
+      else d.setMonth(d.getMonth() + 1);
       break;
     }
   }

@@ -10,7 +10,8 @@ const MILESTONE_HOUR = 9;
 const EVENT_LENGTH_MIN = 60;
 const TASK_LENGTH_MIN = 30;
 
-const RRULE: Record<Recurrence, string> = {
+/** A lunar repeat has no iCalendar rule: the feed shows its next date only, and moves on as the item does. */
+const RRULE: Partial<Record<Recurrence, string>> = {
   DAILY: "FREQ=DAILY",
   WEEKDAYS: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
   WEEKLY: "FREQ=WEEKLY",

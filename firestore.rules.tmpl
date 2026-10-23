@@ -60,7 +60,7 @@ service cloud.firestore {
         && (!('checklist' in d) || d.checklist == null
             || (d.checklist is list && d.checklist.size() <= 40 && d.type in ['TASK', 'EVENT']))
         && (!('recurrence' in d) || d.recurrence == null
-            || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY']);
+            || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY', 'LUNAR_MONTHLY', 'LUNAR_YEARLY']);
     }
 
     function optDate(d, k) {
