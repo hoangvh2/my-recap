@@ -132,12 +132,12 @@ fun SettingsScreen(vm: AppViewModel) {
                 Hint("Tự động theo chế độ sáng/tối của điện thoại. Màu sắc giữ nguyên bảng màu của app.")
             }
 
-            Section("Lịch Âm & ngày lễ") {
-                LunarSection(vm, s, update)
-            }
-
             Section("Mẫu nhập nhanh") {
                 TemplatesSection(vm, s)
+            }
+
+            Section("Lịch Âm & ngày lễ") {
+                LunarSection(vm, s, update)
             }
             Section("Mẫu checklist") {
                 Hint("Danh sách cần nhớ (ra khỏi nhà mang gì, giao hàng, chuẩn bị họp). Một chạm ở ô gõ nhanh là tạo việc kèm checklist.")
