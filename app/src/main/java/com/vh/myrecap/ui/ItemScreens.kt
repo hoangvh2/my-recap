@@ -96,6 +96,7 @@ import com.vh.myrecap.core.Share
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
 import com.vh.myrecap.core.Recurrence
 import com.vh.myrecap.core.canChecklist
@@ -454,6 +455,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     var edit by remember(original.id) { mutableStateOf(original) }
     var amountText by remember(original.id) { mutableStateOf(original.amount?.toString().orEmpty()) }
     var pickDate by remember { mutableStateOf(false) }
+    var pickLunar by remember { mutableStateOf(false) }
     var pickTime by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -586,6 +588,13 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     onPickTime = { pickTime = true },
                     onClear = { edit = edit.copy(whenAt = null, allDay = false) },
                 )
+                if (edit.type == ItemType.TASK || edit.type == ItemType.EVENT) {
+                    LunarWhenRow(
+                        date = edit.whenAt?.let { localDate(it) },
+                        showLunar = settings.lunar.show || edit.recurrence == Recurrence.LUNAR_MONTHLY || edit.recurrence == Recurrence.LUNAR_YEARLY,
+                        onPickLunar = { pickLunar = true },
+                    )
+                }
                 ReminderHint(current)
                 if ((edit.type == ItemType.TASK || edit.type == ItemType.EVENT) && edit.whenAt != null) {
                     RepeatRow(edit.recurrence) { edit = edit.copy(recurrence = it) }
@@ -687,6 +696,20 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             dismissButton = { TextButton(onClick = { pickDate = false }) { Text("Huỷ") } },
         ) { DatePicker(state = state) }
     }
+    if (pickLunar) {
+        LunarDateDialog(
+            initial = edit.whenAt?.let { localDate(it) },
+            onDismiss = { pickLunar = false },
+            onPick = { date ->
+                pickLunar = false
+                val time = edit.whenAt?.takeIf { !edit.allDay }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
+                edit = edit.copy(
+                    whenAt = (if (time != null) date.atTime(time) else date.atStartOfDay()).atZone(zone).toInstant().toEpochMilli(),
+                    allDay = time == null,
+                )
+            },
+        )
+    }
     if (pickTime) {
         val now = edit.whenAt?.takeIf { !edit.allDay }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() } ?: LocalTime.of(9, 0)
         val state = rememberTimePickerState(initialHour = now.hour, initialMinute = now.minute, is24Hour = true)
@@ -719,7 +742,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     if (confirmDelete) {
         ConfirmDialog(
             title = "Xoá mục này?",
-            text = current.title,
+            text = LunarText.deleteBody(current.title, current.recurrence),
             confirmLabel = "Xoá",
             destructive = true,
             onConfirm = {

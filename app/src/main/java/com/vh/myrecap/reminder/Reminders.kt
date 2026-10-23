@@ -44,7 +44,7 @@ object Reminders {
         setAlarm(context, am, at, pending)
     }
 
-    private fun setAlarm(context: Context, am: AlarmManager, at: Long, pending: PendingIntent) {
+    internal fun setAlarm(context: Context, am: AlarmManager, at: Long, pending: PendingIntent) {
         try {
             if (canExact(context)) {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
@@ -115,6 +115,7 @@ object Reminders {
         val all = items.list()
         all.forEach { sync(context, it) }
         restoreFollowUps(context, all)
+        LunarReminders.sync(context)
     }
 
     private fun alarmIntent(context: Context, itemId: String): PendingIntent = PendingIntent.getBroadcast(
@@ -211,6 +212,11 @@ class ReminderReceiver : BroadcastReceiver() {
 
     private fun handle(context: Context, intent: Intent) {
         val items = MyRecapApp.from(context).items
+        if (LunarReminders.isLunarNotice(intent)) {
+            LunarReminders.show(context, intent)
+            LunarReminders.sync(context) // plan again so the next notice is armed even if the app is never opened
+            return
+        }
         when (intent.action) {
             Reminders.ACTION_FIRE -> {
                 val item = intent.getStringExtra(Reminders.EXTRA_ITEM)?.let { items.get(it) } ?: return

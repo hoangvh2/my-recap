@@ -85,6 +85,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vh.myrecap.core.InterviewerSpeech
 import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.VadSensitivity
+import com.vh.myrecap.core.Holidays
+import com.vh.myrecap.core.LunarPrefs
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
 import com.vh.myrecap.core.ItemTag
@@ -128,6 +130,10 @@ fun SettingsScreen(vm: AppViewModel) {
             Section("Giao diện") {
                 ChoiceRow(ThemeMode.entries, s.themeMode, { it.label }) { m -> update { it.copy(themeMode = m) } }
                 Hint("Tự động theo chế độ sáng/tối của điện thoại. Màu sắc giữ nguyên bảng màu của app.")
+            }
+
+            Section("Lịch Âm & ngày lễ") {
+                LunarSection(vm, s, update)
             }
 
             Section("Mẫu nhập nhanh") {
@@ -762,4 +768,37 @@ private fun TagRulesSection(s: AppSettings, update: ((AppSettings) -> AppSetting
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Thêm quy tắc") }
     }
+}
+
+@Composable
+private fun LunarSection(vm: AppViewModel, s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
+    val l = s.lunar
+    val data = remember(s.holidayJson) { Holidays.newest(s.holidayJson) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    SwitchRow("Hiện ngày Âm", l.show) { v -> update { it.copy(lunar = it.lunar.copy(show = v)) } }
+    Hint("Ngày Âm nhỏ cạnh ngày Dương ở Hôm nay, Lịch và khi sửa việc.")
+    SwitchRow("Đánh dấu ngày lễ & nghỉ nhà nước", l.holidays) { v -> update { it.copy(lunar = it.lunar.copy(holidays = v)) } }
+    Hint("Tết, Giỗ Tổ, 30/4, 1/5, Quốc khánh, cả ngày nghỉ bù.")
+    SwitchRow("Banner và thông báo “Sắp nghỉ”", l.banner) { v -> update { it.copy(lunar = it.lunar.copy(banner = v)) } }
+    Text("Báo trước", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ChoiceRow(LunarPrefs.LEAD_CHOICES, l.lead, { "$it ngày" }) { n -> update { it.copy(lunar = it.lunar.copy(lead = n)) } }
+    Hint("Tết luôn báo trước ít nhất 14 ngày.")
+    SwitchRow("Mùng 1 và Rằm hằng tháng", l.monthly) { v -> update { it.copy(lunar = it.lunar.copy(monthly = v)) } }
+    Hint("Đánh dấu trên lịch và nhắc từ 18:00 hôm trước để chuẩn bị đồ cúng.")
+    if (l.dismissed.isNotEmpty()) {
+        TextButton(onClick = { update { it.copy(lunar = it.lunar.copy(dismissed = emptySet())) } }) { Text("Hiện lại thông báo đã ẩn (${l.dismissed.size})") }
+    }
+    Hint("Lịch nghỉ cập nhật ngày ${data.updated.split("-").reversed().joinToString("/")}. Ngày nghỉ bù và hoán đổi do nhà nước công bố từng năm.")
+    OutlinedButton(
+        enabled = !busy,
+        onClick = {
+            busy = true
+            vm.refreshHolidays { found ->
+                busy = false
+                message = if (found) "Đã cập nhật lịch nghỉ mới" else "Lịch nghỉ đang là bản mới nhất hoặc chưa tải được"
+            }
+        },
+    ) { Text(if (busy) "Đang kiểm tra…" else "Kiểm tra bản mới") }
+    message?.let { Hint(it) }
 }

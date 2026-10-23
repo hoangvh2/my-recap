@@ -59,6 +59,9 @@ enum class DayKind { LEGAL, EXTRA, WEEKEND }
 
 data class HolidayAhead(val holiday: Holiday, val daysUntil: Int)
 
+/** The schedule file: overrides and the day it was last updated. */
+data class HolidayData(val updated: String, val overrides: List<HolidayOverride>)
+
 object Holidays {
     private fun weekend(d: LocalDate) = d.dayOfWeek == DayOfWeek.SATURDAY || d.dayOfWeek == DayOfWeek.SUNDAY
 
@@ -150,6 +153,24 @@ object Holidays {
     }
 
     /** The bundled file (core/src/main/resources/holidays-vn.json, copied from shared/ by the build). */
-    fun bundled(): List<HolidayOverride> =
-        Holidays::class.java.getResourceAsStream("/holidays-vn.json")?.use { parseOverrides(it.readBytes().toString(Charsets.UTF_8)) } ?: emptyList()
+    fun bundledJson(): String? = Holidays::class.java.getResourceAsStream("/holidays-vn.json")?.use { it.readBytes().toString(Charsets.UTF_8) }
+
+    fun bundled(): List<HolidayOverride> = parseOverrides(bundledJson())
+
+    /** A schedule file's overrides with the date it was last updated ("2026-10-23"; blank when unknown). */
+    fun parseData(json: String?): HolidayData {
+        val updated = try {
+            if (json.isNullOrBlank()) "" else JSONObject(json).optString("updated")
+        } catch (_: Exception) {
+            ""
+        }
+        return HolidayData(updated, parseOverrides(json))
+    }
+
+    /** The bundled schedule, or the one downloaded earlier when it is newer. */
+    fun newest(downloadedJson: String?): HolidayData {
+        val bundled = parseData(bundledJson())
+        val downloaded = parseData(downloadedJson)
+        return if (downloaded.overrides.isNotEmpty() && downloaded.updated > bundled.updated) downloaded else bundled
+    }
 }

@@ -48,6 +48,7 @@ import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.StorageStats
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
+import com.vh.myrecap.reminder.HolidayUpdater
 import com.vh.myrecap.reminder.Reminders
 import com.vh.myrecap.recorder.RecordingService
 import com.vh.myrecap.settings.AppSettings
@@ -868,6 +869,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateSettings(transform: (AppSettings) -> AppSettings) = app.settings.update(transform)
+
+    /** Looks for a newer official holiday schedule on the site; [done] gets true when one was found. */
+    fun refreshHolidays(done: (Boolean) -> Unit) {
+        viewModelScope.launch { done(HolidayUpdater.refresh(app.settings)) }
+    }
 
     suspend fun testConnection(config: ProviderConfig): ConnectionResult = withContext(Dispatchers.IO) {
         if (!config.isComplete) return@withContext ConnectionResult(false, "Thiếu API key hoặc tên model")

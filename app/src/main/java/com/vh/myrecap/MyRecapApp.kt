@@ -33,6 +33,8 @@ import com.vh.myrecap.data.RecState
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.SessionStore
 import com.vh.myrecap.data.StorageJanitor
+import com.vh.myrecap.reminder.HolidayUpdater
+import com.vh.myrecap.reminder.LunarReminders
 import com.vh.myrecap.reminder.Reminders
 import com.vh.myrecap.recorder.RecorderState
 import com.vh.myrecap.settings.SettingsRepository
@@ -76,6 +78,11 @@ class MyRecapApp : Application() {
             items.migrateLegacy()
             StorageJanitor.run(store, settings.current, cacheDir)
             Reminders.syncAll(this@MyRecapApp)
+            // A newer official holiday schedule may be on the site; the notices are planned again when it arrives.
+            HolidayUpdater.refresh(settings)
+        }
+        appScope.launch {
+            settings.settings.map { it.lunar to it.holidayJson }.distinctUntilChanged().drop(1).collect { LunarReminders.sync(this@MyRecapApp) }
         }
         // Keep the home-screen widget's counts in step with the data.
         appScope.launch {
