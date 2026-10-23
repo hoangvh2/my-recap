@@ -33,7 +33,7 @@ test("calendar: the month view shows solar and lunar dates and the repeat shows 
 
   await page.getByRole("radio", { name: "Tháng", exact: true }).click();
   await expect(page.getByText("Tháng 4/2027", { exact: true })).toBeVisible();
-  await expect(page.getByRole("gridcell", { name: /26 .*20 tháng 3 Âm/ })).toBeVisible();
+  await expect(page.getByRole("gridcell", { name: /26\/4\/2027, 20 tháng 3 Âm/ })).toBeVisible();
   await page.getByRole("button", { name: "Tháng sau" }).click();
   await expect(page.getByText("Tháng 5/2027", { exact: true })).toBeVisible();
   expectNoProblems(problems);
