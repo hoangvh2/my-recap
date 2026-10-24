@@ -1,3 +1,4 @@
+import { deleteBody } from "../lib/format";
 import { deleteItems, saveItem, setDone } from "../data";
 import { createStore, useStore } from "../lib/store";
 import type { Item } from "../lib/model";
@@ -51,7 +52,7 @@ export function Hosts() {
             showToast(`Đã xong: ${item.title}`, { label: "Hoàn tác", run: () => setDone(uid, item, false).catch(fail) });
           }}
           onDelete={async (item) => {
-            if (!(await confirmDialog({ title: "Xoá mục này?", body: item.title, ok: "Xoá", danger: true }))) return;
+            if (!(await confirmDialog({ title: "Xoá mục này?", body: deleteBody(item), ok: "Xoá", danger: true }))) return;
             editing.set(null);
             deleteItems(uid, [item.id]).catch(fail);
             showToast(`Đã xoá: ${item.title}`, { label: "Hoàn tác", run: () => saveItem(uid, item).catch(fail) });

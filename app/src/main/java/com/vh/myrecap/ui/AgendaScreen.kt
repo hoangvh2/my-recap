@@ -72,9 +72,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vh.myrecap.core.Holidays
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.Lunar
+import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
 import com.vh.myrecap.core.OwnerFilter
 import com.vh.myrecap.core.SharedItem
@@ -83,6 +86,7 @@ import com.vh.myrecap.core.WeeklyRecap
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
+import com.vh.myrecap.settings.AppSettings
 import com.vh.myrecap.ui.theme.Brand
 import java.time.LocalDate
 import java.time.YearMonth
@@ -102,6 +106,7 @@ fun AgendaTab(vm: AppViewModel) {
     val recorder by vm.recorder.collectAsStateWithLifecycle()
     val resumeTick by vm.resumeTick.collectAsStateWithLifecycle()
     var filterIndex by rememberSaveable { mutableStateOf(0) }
+    var monthView by rememberSaveable { mutableStateOf(false) }
     var micDenied by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
     val undo = rememberItemUndo(vm)
@@ -140,7 +145,11 @@ fun AgendaTab(vm: AppViewModel) {
                 title = {
                     Column {
                         Text("Thư ký", style = MaterialTheme.typography.titleLarge)
-                        Text(todayLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            todayLabel() + if (settings.lunar.show) " · " + LunarText.chip(Lunar.toLunar(LocalDate.now())) else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
                 actions = {
@@ -168,6 +177,7 @@ fun AgendaTab(vm: AppViewModel) {
             }
             item(key = "setup-$resumeTick") { SetupCard(settings, vm) }
             item(key = "share-notices") { ShareNoticeCards(vm) }
+            item(key = "holiday-banners") { HolidayBanners(vm, settings) }
 
             if (pendingMemos.isNotEmpty() || drafts.isNotEmpty()) {
                 item { SectionLabel("Chờ xử lý") }
@@ -212,7 +222,11 @@ fun AgendaTab(vm: AppViewModel) {
             if (!nothingTagged) when (filter) {
                 null -> overview(shown, vm, onShowExpenses = { filterIndex = FILTERS.indexOf(ItemType.EXPENSE) })
                 ItemType.TASK -> taskList(shown.filter { it.type == ItemType.TASK }, vm)
-                ItemType.EVENT -> eventList(shown.filter { it.type == ItemType.EVENT }, vm)
+                ItemType.EVENT -> {
+                    item(key = "calendar-view") { CalendarViewSwitch(monthView) { monthView = it } }
+                    if (monthView) item(key = "month-calendar") { MonthCalendar(shown, vm, settings) }
+                    else eventList(shown.filter { it.type == ItemType.EVENT }, vm, settings)
+                }
                 ItemType.EXPENSE -> item { ExpenseView(mine.filter { it.type == ItemType.EXPENSE }, vm) }
                 ItemType.NOTE -> noteList(saved.filter { it.type == ItemType.NOTE }, vm)
             }
@@ -473,15 +487,16 @@ private fun LazyListScope.taskList(tasks: List<Item>, vm: AppViewModel) {
     doneGroup(tasks.filter { it.status == ItemStatus.DONE }.sortedByDescending { it.doneAt ?: 0 }, vm)
 }
 
-private fun LazyListScope.eventList(events: List<Item>, vm: AppViewModel) {
+private fun LazyListScope.eventList(events: List<Item>, vm: AppViewModel, settings: AppSettings) {
     if (events.isEmpty()) {
         item { EmptyState(Icons.Rounded.Inbox, "Chưa có lịch hẹn", "Nói “thứ Năm tuần sau 9 giờ gặp khách ở văn phòng” khi ghi nhanh.") }
         return
     }
     val now = System.currentTimeMillis()
     val upcoming = events.filter { it.status == ItemStatus.OPEN && (it.whenAt == null || !isOverdue(it, now)) }.sortedBy(::dueKey)
-    for ((day, group) in upcoming.groupBy { it.whenAt?.let { w -> dayLabel(localDate(w)) } ?: "Chưa có ngày" }) {
-        itemGroup(day, group, vm)
+    val data = Holidays.newest(settings.holidayJson)
+    for ((day, group) in upcoming.groupBy { it.whenAt?.let { w -> localDate(w) } }) {
+        itemGroup(if (day == null) "Chưa có ngày" else dayLabel(day) + LunarText.dayExtras(day, settings.lunar, data.overrides), group, vm)
     }
     doneGroup(events.filter { it !in upcoming }.sortedByDescending { it.whenAt ?: 0 }, vm, label = "Đã qua")
 }

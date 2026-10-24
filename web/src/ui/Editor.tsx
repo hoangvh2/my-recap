@@ -12,6 +12,7 @@ import { useAudiences } from "./hooks";
 import { TagCornerButton, TagMenu } from "./TagUI";
 import { CustomerPicker, LicensePicker } from "./pickers";
 import { EditorShareRow } from "./Sharing";
+import { DateField } from "./Lunar";
 import { isShareable } from "../../../shared/share";
 
 export interface EditorProps {
@@ -176,7 +177,7 @@ export function Editor({ item, isNew, onSave, onDelete, onDone, onClose }: Edito
         {dated && (
           <>
             <div class="two">
-              <label>{type === "TASK" ? "Hạn (tuỳ chọn)" : "Ngày"}<input type="date" value={date} onInput={(e) => setDate((e.target as HTMLInputElement).value)} /></label>
+              <DateField label={type === "TASK" ? "Hạn (tuỳ chọn)" : "Ngày"} date={date} onDate={setDate} startLunar={repeat === "LUNAR_MONTHLY" || repeat === "LUNAR_YEARLY"} />
               <label>Giờ<input type="time" value={time} disabled={allDay} onInput={(e) => setTime((e.target as HTMLInputElement).value)} /></label>
             </div>
             <label class="check-row"><input type="checkbox" checked={allDay} onChange={(e) => setAllDay((e.target as HTMLInputElement).checked)} /> Cả ngày</label>

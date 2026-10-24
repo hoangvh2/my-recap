@@ -166,7 +166,7 @@ export { SettingsError };
 
 // ---------------------------------------------------------------- Firestore
 
-const RECURRING = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY"];
+const RECURRING = ["DAILY", "WEEKDAYS", "WEEKLY", "MONTHLY", "LUNAR_MONTHLY", "LUNAR_YEARLY"];
 const LOG_TTL_MS = 14 * DAY_MS;
 
 export class FirestoreNotifyStore implements NotifyStore {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { deleteItems, saveChecklist, saveItem, setDone } from "../data";
 import { chipLabel, progress, remainingLabel, reset, tickAll, toggleEntry } from "../lib/checklist";
-import { whenLabel } from "../lib/format";
+import { deleteBody, whenLabel } from "../lib/format";
 import { formatVnd } from "../lib/money";
 import { canTag, RECURRENCE_LABEL, type Item, type ItemTag } from "../lib/model";
 import { isHorizontalSwipe, swipeCommit, swipeOffset, type SwipeAction } from "../lib/swipe";
@@ -86,7 +86,7 @@ export function ItemRow(props: {
   };
   /** Asks first, always: a swipe or a key press must not delete on its own. */
   const remove = async () => {
-    const ok = await confirmDialog({ title: "Xoá mục này?", body: item.title, ok: "Xoá", danger: true });
+    const ok = await confirmDialog({ title: "Xoá mục này?", body: deleteBody(item), ok: "Xoá", danger: true });
     if (!ok) return;
     deleteItems(uid, [item.id]).catch(failToast);
     showToast(`Đã xoá: ${item.title}`, { label: "Hoàn tác", run: () => saveItem(uid, item).catch(failToast) });

@@ -1,3 +1,4 @@
+import { LunarSettings } from "./Lunar";
 import { useEffect, useState } from "preact/hooks";
 import { addDays, formatDate } from "../../../shared/dates";
 import { calendarToken, feedUrl } from "../api";
@@ -194,6 +195,10 @@ export function Settings({ email }: { email: string }) {
           </div>
           <p class="hint">“Tự động” đổi theo cài đặt Sáng/Tối của điện thoại. Lựa chọn được nhớ trên máy này.</p>
         </div>
+      </Section>
+
+      <Section title="Lịch Âm & ngày lễ">
+        <LunarSettings />
       </Section>
 
       <Section title="Mẫu checklist">

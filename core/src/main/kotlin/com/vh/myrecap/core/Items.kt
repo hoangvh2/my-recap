@@ -24,6 +24,10 @@ enum class Recurrence(val label: String) {
     WEEKDAYS("Ngày làm việc"),
     WEEKLY("Hằng tuần"),
     MONTHLY("Hằng tháng"),
+
+    /** Repeats on the Vietnamese lunar calendar (mùng 1, rằm, ngày giỗ); the lunar date is read from the item's date. */
+    LUNAR_MONTHLY("Hằng tháng theo Âm"),
+    LUNAR_YEARLY("Hằng năm theo Âm"),
 }
 
 /** DRAFT items were proposed by the AI and wait for the user's confirmation; nothing else counts them. */

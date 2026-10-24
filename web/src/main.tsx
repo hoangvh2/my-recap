@@ -2,6 +2,7 @@ import { render } from "preact";
 import "./styles.css";
 import { blockZoom } from "./lib/nozoom";
 import { applyTheme, themeMode } from "./lib/theme";
+import { refreshHolidayData } from "./lib/lunarCfg";
 import { App } from "./ui/App";
 
 blockZoom();
@@ -17,4 +18,6 @@ if (canonical && location.host !== canonical) {
   location.replace(`https://${canonical}${location.pathname}${location.search}${location.hash}`);
 } else {
   render(<App />, document.getElementById("app")!);
+  // The official holiday schedule can change without a new release; failing to fetch it is fine.
+  void refreshHolidayData();
 }

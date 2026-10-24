@@ -13,6 +13,8 @@ import { received as receivedStore } from "../share";
 import { NoticeBanner, OwnerFilterBar, useOwnerFilter } from "./Sharing";
 import { NudgeRow, useLicenseActions } from "./actions";
 import { Capture } from "./Capture";
+import { HolidayBanner, useLunarCfg } from "./Lunar";
+import { lunarAt, lunarChip } from "../lib/lunarText";
 import { TagFilterBar, useTagFilter } from "./TagUI";
 import { QuickAdd } from "./QuickAdd";
 import { TriageCard } from "./Triage";
@@ -36,6 +38,7 @@ export function Today() {
   const due = useMemo(() => dueNudges(open, ctx), [open, ctx]);
   const soon = useMemo(() => upcomingNudges(open, ctx, 14), [open, ctx]);
   const now = useNow();
+  const lunarCfg = useLunarCfg();
   const rec = useStore(receivedStore);
   const [who, setWho] = useOwnerFilter();
   const recIds = useMemo(() => new Set(rec.map((d) => d.id)), [rec]);
@@ -57,8 +60,9 @@ export function Today() {
 
   return (
     <>
-      <TopBar title="Hôm nay" sub={todayLabel()} right={<><button class="icon-btn" aria-label="Tìm kiếm" onClick={openSearch}><Icon name="search" /></button><Link to={to.settings} class="icon-btn" label="Cài đặt"><Icon name="cog" /></Link></>} />
+      <TopBar title="Hôm nay" sub={`${todayLabel(now)}${lunarCfg.prefs.show ? ` · ${lunarChip(lunarAt(now))}` : ""}`} right={<><button class="icon-btn" aria-label="Tìm kiếm" onClick={openSearch}><Icon name="search" /></button><Link to={to.settings} class="icon-btn" label="Cài đặt"><Icon name="cog" /></Link></>} />
       <NoticeBanner />
+      <HolidayBanner now={now} />
       <Capture />
       <QuickAdd />
       <Review />

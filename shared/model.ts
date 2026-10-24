@@ -4,7 +4,8 @@ import type { ISODate } from "./dates";
 
 export type ItemType = "TASK" | "EVENT" | "EXPENSE" | "NOTE";
 export type ItemStatus = "DRAFT" | "OPEN" | "DONE";
-export type Recurrence = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY";
+/** The two LUNAR_* rules repeat on the Vietnamese lunar calendar (giỗ, mùng 1, rằm); the date is read from `whenAt`. */
+export type Recurrence = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY" | "LUNAR_MONTHLY" | "LUNAR_YEARLY";
 
 /** A visual-only mark that draws the eye to a task or appointment; unlike `important` it never changes reminders. */
 export type ItemTag = "red" | "yellow" | "orange" | "blue" | "purple";

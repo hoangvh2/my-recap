@@ -1,4 +1,4 @@
-import type { Item } from "./model";
+import { RECURRENCE_LABEL, type Item } from "./model";
 import { startOfDay } from "./schedule";
 
 const WEEKDAY = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
@@ -21,6 +21,11 @@ export function dayLabel(t: number, now = Date.now()): string {
 export function whenLabel(item: Item, now = Date.now()): string | null {
   if (item.whenAt === undefined) return null;
   return item.allDay ? dayLabel(item.whenAt, now) : `${dayLabel(item.whenAt, now)} ${clock(item.whenAt)}`;
+}
+
+/** Body of the "Xoá mục này?" dialog: the title, and a warning when a repeating item takes its later occurrences with it. */
+export function deleteBody(item: Pick<Item, "title" | "recurrence">): string {
+  return item.recurrence ? `${item.title}\nViệc này lặp lại (${RECURRENCE_LABEL[item.recurrence].toLowerCase()}). Xoá sẽ bỏ cả các lần sau.` : item.title;
 }
 
 export function todayLabel(now = Date.now()): string {

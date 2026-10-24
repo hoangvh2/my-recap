@@ -2,6 +2,7 @@ package com.vh.myrecap.settings
 
 import android.content.Context
 import com.vh.myrecap.core.InterviewerSpeech
+import com.vh.myrecap.core.LunarPrefs
 import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.ProviderKind
@@ -75,6 +76,10 @@ data class AppSettings(
     val tagRules: List<TagRule> = emptyList(),
     /** Repeats of an important item wait for the morning instead of ringing overnight. */
     val quietNags: Boolean = true,
+    /** Lunar date, state holidays, "Sắp nghỉ" banner and notice, mùng 1 / rằm. */
+    val lunar: LunarPrefs = LunarPrefs(),
+    /** A newer holiday schedule file downloaded from the site (blank: use the bundled one). */
+    val holidayJson: String = "",
 
     /** Folder (SAF tree URI) for the weekly automatic backup; blank = off. */
     val autoBackupUri: String = "",
@@ -164,6 +169,15 @@ class SettingsRepository(context: Context) {
             checklistTemplates = ChecklistTemplates.decode(prefs.getString("checklistTemplates", null)) ?: d.checklistTemplates,
             tagRules = TagRules.decode(prefs.getString("tagRules", null)) ?: d.tagRules,
             quietNags = prefs.getBoolean("quietNags", d.quietNags),
+            lunar = LunarPrefs(
+                show = prefs.getBoolean("lunarShow", d.lunar.show),
+                holidays = prefs.getBoolean("lunarHolidays", d.lunar.holidays),
+                banner = prefs.getBoolean("lunarBanner", d.lunar.banner),
+                lead = prefs.getInt("lunarLead", d.lunar.lead).takeIf { it in LunarPrefs.LEAD_CHOICES } ?: d.lunar.lead,
+                monthly = prefs.getBoolean("lunarMonthly", d.lunar.monthly),
+                dismissed = (prefs.getString("lunarDismissed", "") ?: "").split(',').filter { it.isNotBlank() }.toSet(),
+            ),
+            holidayJson = prefs.getString("holidayJson", null) ?: d.holidayJson,
             autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
             autoBackupError = prefs.getString("autoBackupError", null) ?: d.autoBackupError,
             lastBackupAt = prefs.getLong("lastBackupAt", d.lastBackupAt),
@@ -205,6 +219,13 @@ class SettingsRepository(context: Context) {
             .putString("checklistTemplates", ChecklistTemplates.encode(s.checklistTemplates))
             .putString("tagRules", TagRules.encode(s.tagRules))
             .putBoolean("quietNags", s.quietNags)
+            .putBoolean("lunarShow", s.lunar.show)
+            .putBoolean("lunarHolidays", s.lunar.holidays)
+            .putBoolean("lunarBanner", s.lunar.banner)
+            .putInt("lunarLead", s.lunar.lead)
+            .putBoolean("lunarMonthly", s.lunar.monthly)
+            .putString("lunarDismissed", s.lunar.dismissed.joinToString(","))
+            .putString("holidayJson", s.holidayJson)
             .putString("autoBackupUri", s.autoBackupUri)
             .putString("autoBackupError", s.autoBackupError)
             .putLong("lastBackupAt", s.lastBackupAt)

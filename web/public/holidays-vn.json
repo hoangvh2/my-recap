@@ -1,0 +1,11 @@
+{
+  "updated": "2026-10-23",
+  "_comment": "Official schedules that differ from the plain rule in shared/holidays.ts. Add one entry per holiday per year when the government announces it; the app picks the file up without a new release. Entries marked (press) were taken from news reports of the notice and should be checked against the notice itself.",
+  "periods": [
+    { "id": "tet-duong-lich", "year": 2026, "from": "2026-01-01", "to": "2026-01-04", "workdays": ["2026-01-10"], "source": "Công chức, viên chức nghỉ 4 ngày, làm bù thứ Bảy 10/1 (press)" },
+    { "id": "tet-nguyen-dan", "year": 2026, "from": "2026-02-14", "to": "2026-02-22", "source": "Bộ Nội vụ, Thủ tướng đồng ý: nghỉ 9 ngày 14/2 đến 22/2/2026 (press)" },
+    { "id": "quoc-khanh", "year": 2026, "from": "2026-08-29", "to": "2026-09-02", "workdays": ["2026-08-22"], "source": "Thông báo 9441/TB-BNV: nghỉ 1/9 và 2/9, làm bù thứ Bảy 22/8 (press)" },
+    { "id": "tet-nguyen-dan", "year": 2027, "from": "2027-02-04", "to": "2027-02-10", "source": "Thông báo 11483/TB-BNV (9/10/2026): nghỉ 7 ngày, 28 tháng Chạp đến mùng 5 (press); quyết định của Thủ tướng chưa kiểm chứng" },
+    { "id": "quoc-khanh", "year": 2027, "from": "2027-09-02", "to": "2027-09-05", "source": "Thông báo 11483/TB-BNV (9/10/2026): nghỉ 2/9 và 3/9 (press)" }
+  ]
+}

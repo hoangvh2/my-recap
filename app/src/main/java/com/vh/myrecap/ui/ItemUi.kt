@@ -65,6 +65,7 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemExtraction
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
 import java.time.Instant
 import java.time.LocalDate
@@ -289,7 +290,7 @@ fun ItemRow(
     if (confirmDelete) {
         ConfirmDialog(
             title = "Xoá mục này?",
-            text = item.title,
+            text = LunarText.deleteBody(item.title, item.recurrence),
             confirmLabel = "Xoá",
             destructive = true,
             onConfirm = { onDelete?.invoke() },

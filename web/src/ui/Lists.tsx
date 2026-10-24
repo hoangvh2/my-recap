@@ -4,6 +4,7 @@ import { formatVnd } from "../lib/money";
 import type { Item } from "../lib/model";
 import { agenda, expensesOfMonth, monthKey, overview, shiftMonth } from "../lib/views";
 import { Icon } from "./icons";
+import { MonthCalendar, dayExtras, useLunarCfg } from "./Lunar";
 import { ItemRow } from "./ItemRow";
 import { useReceivedMap } from "./hooks";
 import { SpendingPanel } from "./Spending";
@@ -68,8 +69,10 @@ export function Tasks({ items, ...h }: { items: Item[] } & Handlers) {
 /** "Lịch": every dated task and appointment by day, overdue tasks first. */
 export function Events({ items, ...h }: { items: Item[] } & Handlers) {
   const [showPast, setShowPast] = useState(false);
+  const [view, setView] = useState<"list" | "month">("list");
   const now = Date.now();
   const rec = useReceivedMap();
+  const lunarCfg = useLunarCfg();
   const a = useMemo(() => agenda(items, now, (i) => rec.has(i.id)), [items, now, rec]);
   const groups = new Map<string, Item[]>();
   for (const e of a.ahead) {
@@ -79,13 +82,22 @@ export function Events({ items, ...h }: { items: Item[] } & Handlers) {
   const past = a.past.slice(0, 50);
   return (
     <>
+      <div class="seg seg2 view-switch" role="radiogroup" aria-label="Kiểu xem lịch">
+        <button type="button" role="radio" aria-checked={view === "list"} class={view === "list" ? "on" : ""} onClick={() => setView("list")}>Danh sách</button>
+        <button type="button" role="radio" aria-checked={view === "month"} class={view === "month" ? "on" : ""} onClick={() => setView("month")}>Tháng</button>
+      </div>
+      {view === "month" && <MonthCalendar items={items} {...h} />}
+      {view === "list" && (
+        <>
       <Section title="Quá hạn" tone="warn" items={a.overdue} {...h} />
-      {[...groups].map(([day, list]) => <Section key={day} title={day} items={list} {...h} showDate={false} />)}
+      {[...groups].map(([day, list]) => <Section key={day} title={`${day}${dayExtras(list[0].whenAt!, lunarCfg.prefs, lunarCfg.overrides)}`} items={list} {...h} showDate={false} />)}
       {a.ahead.length === 0 && a.overdue.length === 0 && <Empty>Chưa có lịch hay việc có hạn sắp tới.</Empty>}
       {past.length > 0 && (
         <>
           <button class="btn text" onClick={() => setShowPast(!showPast)}>{showPast ? "Ẩn" : "Hiện"} lịch đã qua ({past.length})</button>
           {showPast && <Section title="Đã qua" items={past} {...h} />}
+        </>
+      )}
         </>
       )}
     </>
