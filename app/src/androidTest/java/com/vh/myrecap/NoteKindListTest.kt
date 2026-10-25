@@ -81,7 +81,20 @@ class NoteKindListTest {
         throw AssertionError("notes tab chip not found")
     }
 
-    private fun shows(text: String) = device.wait(Until.hasObject(By.textContains(text)), 5_000)
+    private fun shows(text: String) = find(By.textContains(text)) != null
+
+    /** Looks for [selector], swiping the list down a few times and then back up: the small test screen cannot show it all at once. */
+    private fun find(selector: androidx.test.uiautomator.BySelector): androidx.test.uiautomator.UiObject2? {
+        val w = device.displayWidth
+        val h = device.displayHeight
+        repeat(9) { attempt ->
+            device.wait(Until.hasObject(selector), 1_500)
+            device.findObject(selector)?.let { return it }
+            if (attempt < 4) device.swipe(w / 2, h * 3 / 4, w / 2, h / 3, 25) else device.swipe(w / 2, h / 3, w / 2, h * 3 / 4, 25)
+            Thread.sleep(300)
+        }
+        return device.findObject(selector)
+    }
 
     @Test
     fun filterNarrowsByKindAndTickMarksARead() {
@@ -89,21 +102,21 @@ class NoteKindListTest {
             assertTrue("home", shows("Ghi nhanh"))
             openNotesTab()
             assertTrue("place note", shows(place))
-            assertTrue("kind line", device.hasObject(By.textContains("📍 Địa điểm · bún chả")))
-            assertTrue(device.hasObject(By.textContains(read)))
-            assertTrue(device.hasObject(By.textContains(plain)))
+            assertTrue("kind line", shows("📍 Địa điểm · bún chả"))
+            assertTrue("read note", shows(read))
+            assertTrue("plain note", shows(plain))
 
             // Only the reading list.
-            device.findObject(By.text("📖 Đọc sau")).click()
+            checkNotNull(find(By.text("📖 Đọc sau"))) { "kind chip" }.click()
             assertTrue("gone", device.wait(Until.gone(By.textContains(place)), 5_000))
-            assertTrue(device.hasObject(By.textContains(read)))
+            assertTrue("read stays", shows(read))
             assertFalse(device.hasObject(By.textContains(plain)))
 
             // The tick marks it read; with "Chưa xong" on, it then leaves the list.
-            device.findObject(By.desc("Đánh dấu đã đọc: $read")).click()
+            checkNotNull(find(By.desc("Đánh dấu đã đọc: $read"))) { "tick" }.click()
             assertTrue("saved", waitFor { app.items.get("nkl-read")?.attrs?.get("read") == "1" })
             assertEquals("1", app.items.get("nkl-read")!!.attrs["read"])
-            device.findObject(By.text("Chưa xong")).click()
+            checkNotNull(find(By.text("Chưa xong"))) { "pending chip" }.click()
             assertTrue("filtered out", device.wait(Until.gone(By.textContains(read)), 5_000))
         }
     }
