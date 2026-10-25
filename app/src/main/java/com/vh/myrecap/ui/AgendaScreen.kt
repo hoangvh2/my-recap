@@ -449,7 +449,7 @@ private fun LazyListScope.itemGroup(label: String, list: List<Item>, vm: AppView
     if (list.isEmpty()) return
     item(key = "label-$label") { SectionLabel(label, trailing = trailing) }
     items(list, key = { "$label-${it.id}" }) { item ->
-        ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) }, onChecklist = { vm.checklist(item.id, it) })
+        ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) }, onChecklist = { vm.checklist(item.id, it) }, onNoteFlag = { vm.setNoteFlag(item.id, it) })
     }
 }
 

@@ -1,6 +1,7 @@
 package com.vh.myrecap.core
 
 import org.json.JSONObject
+import java.net.URLEncoder
 
 /**
  * What a note is about, so it can be shown and filtered by what it is: a place to eat, an article to read later,
@@ -85,3 +86,46 @@ val Item.noteKind: NoteKind? get() = NoteKind.fromKey(kind)
 
 /** Whether the note's "finished with" flag (read, visited, watched) is set. */
 val Item.noteDone: Boolean get() = noteKind?.doneFlag?.let { attrs[it] == "1" } == true
+
+/** Where a note's buttons lead. Only web links are ever opened, whatever was stored. */
+object NoteLinks {
+    fun isWebLink(url: String?): Boolean = url != null && Regex("""^https?://\S+$""", RegexOption.IGNORE_CASE).matches(url.trim())
+
+    private fun enc(s: String) = URLEncoder.encode(s.trim(), "UTF-8")
+
+    /** The Google Maps search for a place name or address; works in the browser when no map app answers. */
+    fun mapsSearchUrl(place: String): String = "https://www.google.com/maps/search/?api=1&query=" + enc(place)
+
+    /** The `geo:` link map apps answer to. */
+    fun geoUri(place: String): String = "geo:0,0?q=" + enc(place)
+
+    /** The link behind a note's "Mở link" button, or null when there is none worth opening. */
+    fun openUrl(item: Item): String? = item.url?.trim()?.takeIf { isWebLink(it) }
+
+    /** The place a note's map button searches: its address, else its title when it is a place note. */
+    fun mapsQuery(item: Item): String? =
+        item.place?.trim()?.takeIf { it.isNotEmpty() } ?: item.title.trim().takeIf { it.isNotEmpty() && item.noteKind == NoteKind.PLACE }
+
+    /** True when the stored link is itself a Google Maps link, which points at the exact spot. */
+    fun isMapsLink(url: String?): Boolean = isWebLink(url) && ShareIntake.sourceOf(url!!.trim()) == "Google Maps"
+}
+
+/** The note with its "finished with" flag (read, visited, watched) set or cleared; other notes are unchanged. */
+fun Item.withNoteDone(on: Boolean): Item {
+    val flag = noteKind?.doneFlag ?: return this
+    return copy(attrs = if (on) attrs + (flag to "1") else attrs - flag)
+}
+
+/** "Chưa đọc" for the flag "Đã đọc". */
+val NoteField.offLabel: String get() = if (label.startsWith("Đã ")) "Chưa " + label.removePrefix("Đã ") else "Chưa: $label"
+
+/**
+ * The line a list shows under a note's title: its kind and the values it keeps, then where it stands.
+ * "📍 Địa điểm · bún chả · 60k · Chưa đến". Null for a plain note.
+ */
+fun Item.noteKindLine(): String? {
+    val kind = noteKind?.takeIf { type == ItemType.NOTE } ?: return null
+    val values = kind.fields.filter { !it.flag }.mapNotNull { attrs[it.key]?.takeIf(String::isNotBlank) }
+    val flag = kind.fields.firstOrNull { it.flag }?.let { if (attrs[it.key] == "1") it.label else it.offLabel }
+    return (listOf("${kind.glyph} ${kind.label}") + values + listOfNotNull(flag)).joinToString(" · ")
+}

@@ -63,7 +63,7 @@ class ShareReceiveFlowTest {
     fun sharedTextOpensFilledNoteAndLeavingAsksFirst() {
         ActivityScenario.launch<MainActivity>(share()).use {
             assertTrue("editor", device.wait(Until.hasObject(By.text(title)), 15_000))
-            assertTrue("address", device.hasObject(By.text("5 Lê Lợi, Q.1")))
+            assertTrue("address", seesAfterScrolling("5 Lê Lợi, Q.1"))
 
             // "Không": the note stays on screen and nothing is saved.
             device.pressBack()
@@ -92,7 +92,55 @@ class ShareReceiveFlowTest {
             assertEquals(ItemType.NOTE, note.type)
             assertEquals("5 Lê Lợi, Q.1", note.place)
             assertTrue(note.details.contains("https://example.invalid/post/1"))
+            // The address makes it a place note, and the link is kept in its own field too.
+            assertEquals("place", note.kind)
+            assertEquals("https://example.invalid/post/1", note.url)
         }
+    }
+
+    @Test
+    fun aSharedArticleIsReadLaterAndTheKindCanBeChangedBeforeSaving() {
+        val tipTitle = "Mẹo pin test chia sẻ"
+        try {
+            val tip = Intent(context, MainActivity::class.java)
+                .setAction(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, tipTitle)
+                .putExtra(Intent.EXTRA_TEXT, "Tắt 5G khi không cần\nhttps://example.invalid/tip/1")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ActivityScenario.launch<MainActivity>(tip).use {
+                assertTrue("editor", device.wait(Until.hasObject(By.text(tipTitle)), 15_000))
+                assertTrue("kind chips", device.hasObject(By.text("📖 Đọc sau")))
+                // Saved as shared: read later, with the source.
+                device.findObject(By.text("Lưu")).click()
+                assertTrue("saved", waitFor(10_000) { app.items.list().any { it.title == tipTitle } })
+                val note = app.items.list().first { it.title == tipTitle }
+                assertEquals("read", note.kind)
+                assertEquals("https://example.invalid/tip/1", note.url)
+                assertEquals("example.invalid", note.attrs["source"])
+            }
+            app.items.list().filter { it.title == tipTitle }.forEach { app.items.delete(it.id) }
+            ActivityScenario.launch<MainActivity>(tip).use {
+                assertTrue("editor", device.wait(Until.hasObject(By.text(tipTitle)), 15_000))
+                device.findObject(By.text("▶ Video")).click()
+                device.findObject(By.text("Lưu")).click()
+                assertTrue("saved", waitFor(10_000) { app.items.list().any { it.title == tipTitle } })
+                val note = app.items.list().first { it.title == tipTitle }
+                assertEquals("video", note.kind)
+                assertTrue("a kind's old values are dropped", note.attrs.isEmpty())
+            }
+        } finally {
+            app.items.list().filter { it.title == tipTitle }.forEach { app.items.delete(it.id) }
+        }
+    }
+
+    /** The form is taller than the small test screen: look, and if it is not in view yet scroll down a little and look again. */
+    private fun seesAfterScrolling(text: String): Boolean {
+        repeat(5) {
+            if (device.hasObject(By.text(text))) return true
+            device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
+        }
+        return device.hasObject(By.text(text))
     }
 
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {
