@@ -129,3 +129,25 @@ fun Item.noteKindLine(): String? {
     val flag = kind.fields.firstOrNull { it.flag }?.let { if (attrs[it.key] == "1") it.label else it.offLabel }
     return (listOf("${kind.glyph} ${kind.label}") + values + listOfNotNull(flag)).joinToString(" · ")
 }
+
+/** What the notes list is narrowed to: one kind, and/or only the notes not yet read, visited or watched. */
+data class NoteFilter(val kind: NoteKind? = null, val pending: Boolean = false) {
+    val active: Boolean get() = kind != null || pending
+
+    fun matches(item: Item): Boolean =
+        (kind == null || item.noteKind == kind) && (!pending || (item.noteKind?.doneFlag != null && !item.noteDone))
+
+    fun apply(items: List<Item>): List<Item> = if (active) items.filter(::matches) else items
+
+    companion object {
+        /** Kinds in use among [notes], in menu order; the filter row only offers these. */
+        fun available(notes: List<Item>): List<NoteKind> = NoteKind.entries.filter { k -> notes.any { it.noteKind == k } }
+    }
+}
+
+/** The words of a note that search should match beyond title and body: link, kind name and the kind's text values. */
+fun Item.noteSearchText(): String {
+    val kind = noteKind?.takeIf { type == ItemType.NOTE } ?: return ""
+    val values = kind.fields.filter { !it.flag }.mapNotNull { attrs[it.key] }
+    return (listOfNotNull(url, kind.label) + values).joinToString(" ")
+}

@@ -19,7 +19,7 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.NoteKinds
-import com.vh.myrecap.core.noteKind
+import com.vh.myrecap.core.noteSearchText
 import com.vh.myrecap.core.TextSearch
 import kotlinx.coroutines.flow.Flow
 
@@ -107,10 +107,7 @@ data class ItemEntity(
             kind = item.kind,
             url = item.url,
             attrs = item.attrs.takeIf { it.isNotEmpty() }?.let { NoteKinds.encode(it).toString() },
-            search = TextSearch.fold(
-                (listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote, item.url, item.noteKind?.label) +
-                    item.attrs.filterKeys { k -> item.noteKind?.fields?.firstOrNull { it.key == k }?.flag == false }.values).joinToString(" "),
-            ),
+            search = TextSearch.fold(listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote, item.noteSearchText()).joinToString(" ")),
         )
     }
 }

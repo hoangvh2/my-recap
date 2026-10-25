@@ -77,7 +77,6 @@ import com.vh.myrecap.core.NoteLinks
 import com.vh.myrecap.core.noteDone
 import com.vh.myrecap.core.noteKind
 import com.vh.myrecap.core.noteKindLine
-import com.vh.myrecap.core.offLabel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -122,6 +121,9 @@ fun isOverdue(item: Item, now: Long = System.currentTimeMillis()): Boolean {
     if (item.status != ItemStatus.OPEN || item.type == ItemType.NOTE || item.type == ItemType.EXPENSE) return false
     return if (item.allDay) localDate(at).isBefore(LocalDate.now(zone)) else at < now
 }
+
+/** What the tick on a note does, for TalkBack: "Đánh dấu đã đọc", or "Bỏ đánh dấu đã đọc" when it is already set. */
+internal fun noteFlagAction(label: String, done: Boolean): String = (if (done) "Bỏ đánh dấu " else "Đánh dấu ") + label.replaceFirstChar { it.lowercase() }
 
 /** Secondary line of an item row. */
 fun itemSubtitle(item: Item): String = listOfNotNull(
@@ -218,7 +220,7 @@ fun ItemRow(
                         if (canTag) add(CustomAccessibilityAction("Gắn thẻ") { menu = true; true })
                         if (noteMap) add(CustomAccessibilityAction("Mở bản đồ") { openNoteMap(context, item); true })
                         if (noteLink) add(CustomAccessibilityAction("Mở link") { openNoteLink(context, item); true })
-                        if (noteFlag != null) add(CustomAccessibilityAction(if (noteDone) noteFlag.offLabel else noteFlag.label) { onNoteFlag?.invoke(!noteDone); true })
+                        if (noteFlag != null) add(CustomAccessibilityAction(noteFlagAction(noteFlag.label, noteDone)) { onNoteFlag?.invoke(!noteDone); true })
                     }
                     if (actions.isNotEmpty()) customActions = actions
                     if (tag != null) stateDescription = "Thẻ ${tag.label}"
@@ -285,7 +287,7 @@ fun ItemRow(
                         IconButton(onClick = { onNoteFlag?.invoke(!noteDone) }) {
                             Icon(
                                 if (noteDone) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-                                contentDescription = (if (noteDone) noteFlag.offLabel else noteFlag.label) + ": ${item.title}",
+                                contentDescription = noteFlagAction(noteFlag.label, noteDone) + ": ${item.title}",
                                 tint = if (noteDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

@@ -5,7 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
@@ -25,6 +28,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.NoteKind
+import com.vh.myrecap.core.NoteFilter
 import com.vh.myrecap.core.NoteKinds
 import com.vh.myrecap.core.NoteLinks
 import com.vh.myrecap.core.noteKind
@@ -85,6 +89,27 @@ fun NoteKindFields(edit: Item, onChange: (Item) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/** Chips above the notes list: one per kind in use, plus "Chưa xong" for the ones not yet read, visited or watched. */
+@Composable
+fun NoteFilterRow(notes: List<Item>, filter: NoteFilter, onChange: (NoteFilter) -> Unit, modifier: Modifier = Modifier) {
+    val kinds = NoteFilter.available(notes)
+    if (kinds.isEmpty() && !filter.active) return
+    Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        kinds.forEach { k ->
+            FilterChip(
+                selected = filter.kind == k,
+                onClick = { onChange(filter.copy(kind = if (filter.kind == k) null else k)) },
+                label = { Text("${k.glyph} ${k.label}") },
+            )
+        }
+        FilterChip(
+            selected = filter.pending,
+            onClick = { onChange(filter.copy(pending = !filter.pending)) },
+            label = { Text("Chưa xong") },
+        )
     }
 }
 
