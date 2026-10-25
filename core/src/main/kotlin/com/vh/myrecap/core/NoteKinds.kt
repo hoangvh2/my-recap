@@ -125,9 +125,19 @@ val NoteField.offLabel: String get() = if (label.startsWith("Đã ")) "Chưa " +
  */
 fun Item.noteKindLine(): String? {
     val kind = noteKind?.takeIf { type == ItemType.NOTE } ?: return null
-    val values = kind.fields.filter { !it.flag }.mapNotNull { attrs[it.key]?.takeIf(String::isNotBlank) }
-    val flag = kind.fields.firstOrNull { it.flag }?.let { if (attrs[it.key] == "1") it.label else it.offLabel }
-    return (listOf("${kind.glyph} ${kind.label}") + values + listOfNotNull(flag)).joinToString(" · ")
+    return (listOf("${kind.glyph} ${kind.label}") + noteValues() + listOfNotNull(noteState())).joinToString(" · ")
+}
+
+/** The text values a kind note keeps (dish, price, topic ...), in the order the kind lists them. Empty for a plain note. */
+fun Item.noteValues(): List<String> {
+    val kind = noteKind?.takeIf { type == ItemType.NOTE } ?: return emptyList()
+    return kind.fields.filter { !it.flag }.mapNotNull { attrs[it.key]?.takeIf(String::isNotBlank) }
+}
+
+/** Where a kind note stands: "Đã đến", "Chưa đọc" ... Null for a plain note. */
+fun Item.noteState(): String? {
+    val kind = noteKind?.takeIf { type == ItemType.NOTE } ?: return null
+    return kind.fields.firstOrNull { it.flag }?.let { if (attrs[it.key] == "1") it.label else it.offLabel }
 }
 
 /** What the notes list is narrowed to: one kind, and/or only the notes not yet read, visited or watched. */

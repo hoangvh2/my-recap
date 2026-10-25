@@ -7,6 +7,13 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import com.vh.myrecap.core.noteDone
+import com.vh.myrecap.core.noteState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -163,5 +170,26 @@ private fun startOrToast(context: Context, intent: Intent) {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
         Toast.makeText(context, "Không có ứng dụng để mở link này", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Under a note's title: its kind and where it stands as two small pills ("Địa điểm", "Chưa đến"). */
+@Composable
+fun NoteKindTags(item: Item, kind: NoteKind) {
+    val style = noteKindStyle(kind)
+    val c = MaterialTheme.colorScheme
+    val done = item.noteDone
+    Row(Modifier.padding(top = 4.dp, bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        TagPill(kind.label, style.container, style.content)
+        item.noteState()?.let { state ->
+            if (done) TagPill(state, c.primaryContainer, c.onPrimaryContainer) else TagPill(state, c.surfaceContainerHighest, c.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun TagPill(text: String, container: Color, content: Color) {
+    Surface(shape = RoundedCornerShape(50), color = container) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = content, maxLines = 1, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
     }
 }
