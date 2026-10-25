@@ -13,6 +13,7 @@ import com.vh.myrecap.ui.MainActivity
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -62,13 +63,20 @@ class NoteKindListTest {
 
     private fun openNotesTab() {
         // The type chips scroll sideways; on the small test screen "Ghi chú" may start out of view.
-        repeat(4) {
-            val chip = device.findObject(By.textStartsWith("Ghi chú").clickable(true))
-            if (chip != null) {
-                chip.click()
+        val row = device.wait(Until.findObject(By.textStartsWith("Tổng quan")), 5_000)
+            ?: device.findObject(By.textStartsWith("Việc")) ?: device.findObject(By.textStartsWith("Chi tiêu"))
+        assertNotNull("filter chips not on screen", row)
+        val y = row!!.visibleBounds.centerY()
+        val w = device.displayWidth
+        repeat(6) { attempt ->
+            device.wait(Until.hasObject(By.textStartsWith("Ghi chú")), 1_000)
+            // Other texts can start with "Ghi chú" too: take the one on the chip row.
+            device.findObjects(By.textStartsWith("Ghi chú")).firstOrNull { kotlin.math.abs(it.visibleBounds.centerY() - y) < 40 }?.let {
+                it.click()
                 return
             }
-            device.swipe(device.displayWidth - 20, device.displayHeight / 3, 20, device.displayHeight / 3, 10)
+            if (attempt < 2) device.swipe(w / 4, y, w * 3 / 4, y, 20) else device.swipe(w * 3 / 4, y, w / 4, y, 20)
+            Thread.sleep(400)
         }
         throw AssertionError("notes tab chip not found")
     }
