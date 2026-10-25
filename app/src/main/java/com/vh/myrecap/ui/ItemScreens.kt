@@ -595,7 +595,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                 }
             }
             if (edit.type == ItemType.NOTE) {
-                NoteKindEditor(edit) { edit = it }
+                NoteKindChips(edit) { edit = it }
             }
             if (edit.type == ItemType.EXPENSE) {
                 OutlinedTextField(
@@ -661,6 +661,9 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            if (edit.type == ItemType.NOTE) {
+                NoteKindFields(edit) { edit = it }
             }
             if (edit.type.canChecklist()) {
                 ChecklistEditor(

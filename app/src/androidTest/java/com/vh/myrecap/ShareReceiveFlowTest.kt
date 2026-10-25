@@ -63,7 +63,7 @@ class ShareReceiveFlowTest {
     fun sharedTextOpensFilledNoteAndLeavingAsksFirst() {
         ActivityScenario.launch<MainActivity>(share()).use {
             assertTrue("editor", device.wait(Until.hasObject(By.text(title)), 15_000))
-            assertTrue("address", device.hasObject(By.text("5 Lê Lợi, Q.1")))
+            assertTrue("address", seesAfterScrolling("5 Lê Lợi, Q.1"))
 
             // "Không": the note stays on screen and nothing is saved.
             device.pressBack()
@@ -132,6 +132,15 @@ class ShareReceiveFlowTest {
         } finally {
             app.items.list().filter { it.title == tipTitle }.forEach { app.items.delete(it.id) }
         }
+    }
+
+    /** The form is taller than the small test screen: look, and if it is not in view yet scroll down a little and look again. */
+    private fun seesAfterScrolling(text: String): Boolean {
+        repeat(5) {
+            if (device.hasObject(By.text(text))) return true
+            device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
+        }
+        return device.hasObject(By.text(text))
     }
 
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {

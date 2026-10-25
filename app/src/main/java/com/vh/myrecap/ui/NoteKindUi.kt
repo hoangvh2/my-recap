@@ -29,14 +29,11 @@ import com.vh.myrecap.core.NoteKinds
 import com.vh.myrecap.core.NoteLinks
 import com.vh.myrecap.core.noteKind
 
-/**
- * The editor part of a note's kind: a row of kind chips ("Thường" for none), then the link and the few values the
- * kind keeps. Values of a kind the note had before stay in the form while editing; saving keeps only the current kind's.
- */
+/** The kind chips at the top of a note's form ("Thường" for none). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NoteKindEditor(edit: Item, onChange: (Item) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+fun NoteKindChips(edit: Item, onChange: (Item) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Loại ghi chú", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = edit.noteKind == null, onClick = { onChange(edit.copy(kind = null)) }, label = { Text("Thường") })
@@ -48,7 +45,18 @@ fun NoteKindEditor(edit: Item, onChange: (Item) -> Unit) {
                 )
             }
         }
-        val kind = edit.noteKind ?: return@Column
+    }
+}
+
+/**
+ * The link and the few values the kind keeps, below the address so a place note shows its address first. Values of a
+ * kind the note had before stay in the form while editing; saving keeps only the current kind's.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun NoteKindFields(edit: Item, onChange: (Item) -> Unit) {
+    val kind = edit.noteKind ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedTextField(
             value = edit.url.orEmpty(),
             onValueChange = { onChange(edit.copy(url = it.take(NoteKinds.MAX_URL).ifEmpty { null })) },
