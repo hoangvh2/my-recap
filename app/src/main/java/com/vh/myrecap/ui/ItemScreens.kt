@@ -99,6 +99,9 @@ import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.NoteKind
+import com.vh.myrecap.core.NoteKinds
+import com.vh.myrecap.core.noteKind
 import com.vh.myrecap.core.Recurrence
 import com.vh.myrecap.core.canChecklist
 import com.vh.myrecap.core.canHaveTag
@@ -122,12 +125,15 @@ private fun Item.withType(t: ItemType): Item = when (t) {
         important = false,
         tag = null,
         checklist = emptyList(),
+        kind = null,
+        url = null,
+        attrs = emptyMap(),
         whenAt = whenAt ?: LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli(),
         allDay = if (whenAt == null) true else allDay,
         category = category ?: "Khác",
     )
     ItemType.NOTE -> copy(type = t, amount = null, category = null, recurrence = null, important = false, tag = null, checklist = emptyList())
-    else -> copy(type = t, amount = null, category = null)
+    else -> copy(type = t, amount = null, category = null, kind = null, url = null, attrs = emptyMap())
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -480,7 +486,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
         amount = if (edit.type == ItemType.EXPENSE) parsedAmount else null,
         title = edit.title.trim(),
         checklist = if (edit.type.canChecklist()) edit.checklist.filter { it.text.isNotBlank() }.map { it.copy(text = it.text.trim()) } else emptyList(),
-    )
+    ).let { NoteKinds.clean(it) }
     val isNew = id == null
     val isDraft = original.status == ItemStatus.DRAFT
     val canShare = account is Account.SignedIn && !isDraft && Share.isShareable(current.copy(status = ItemStatus.OPEN))
@@ -496,6 +502,9 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             title = if (edit.title == base.title) more.title else edit.title,
             details = if (edit.details == base.details) more.details else edit.details,
             place = if (edit.place == base.place) more.place else edit.place,
+            // The page can change what the link is (a short map link turns out to be a place); only if still as shared.
+            kind = if (edit.kind == base.kind?.key) more.kind?.key else edit.kind,
+            attrs = if (edit.attrs == base.attrs) more.attrs else edit.attrs,
         )
     }
     val valid = current.title.isNotBlank() && (current.type != ItemType.EXPENSE || parsedAmount != null)
@@ -585,6 +594,9 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     TagFormButton(edit.itemTag, onPick = { edit = edit.copy(tag = it?.key) })
                 }
             }
+            if (edit.type == ItemType.NOTE) {
+                NoteKindEditor(edit) { edit = it }
+            }
             if (edit.type == ItemType.EXPENSE) {
                 OutlinedTextField(
                     value = amountText,
@@ -632,7 +644,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     )
                 }
             }
-            if (edit.type == ItemType.EVENT || edit.place != null || shared != null) {
+            if (edit.type == ItemType.EVENT || edit.place != null || shared != null || edit.noteKind == NoteKind.PLACE) {
                 OutlinedTextField(
                     value = edit.place.orEmpty(),
                     onValueChange = { edit = edit.copy(place = it.ifEmpty { null }) },

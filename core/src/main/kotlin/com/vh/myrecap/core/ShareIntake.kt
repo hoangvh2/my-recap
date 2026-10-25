@@ -37,6 +37,10 @@ object ShareIntake {
         /** What the note is about, guessed from the link and the place; the person can change it in the editor. */
         val kind: NoteKind? get() = kindOf(url, source, place)
 
+        /** The kind's own values the share already tells: where an article came from. */
+        val attrs: Map<String, String>
+            get() = if (kind == NoteKind.READ && source != null) mapOf("source" to source) else emptyMap()
+
         /** The note body: what was written, the page's description, then the source and link. The link is also kept in [url] for notes with a kind; the editor shows it from there later. */
         val details: String
             get() = listOfNotNull(
@@ -58,7 +62,7 @@ object ShareIntake {
                     createdAt = now,
                     kind = k?.key,
                     url = url.takeIf { k != null },
-                    attrs = if (k == NoteKind.READ && source != null) mapOf("source" to source) else emptyMap(),
+                    attrs = attrs,
                 ),
             )
         }

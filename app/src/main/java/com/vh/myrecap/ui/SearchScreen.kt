@@ -142,7 +142,7 @@ fun SearchScreen(vm: AppViewModel) {
                     if (r.items.isNotEmpty()) {
                         item { SectionLabel("Việc, lịch, chi tiêu, ghi chú", trailing = "${r.items.size}") }
                         items(r.items, key = { "i-${it.id}" }) { item ->
-                            ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onChecklist = { vm.checklist(item.id, it) })
+                            ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onChecklist = { vm.checklist(item.id, it) }, onNoteFlag = { vm.setNoteFlag(item.id, it) })
                         }
                     }
                     if (r.memos.isNotEmpty()) {

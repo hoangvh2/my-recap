@@ -38,6 +38,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -67,6 +72,12 @@ import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.NoteKind
+import com.vh.myrecap.core.NoteLinks
+import com.vh.myrecap.core.noteDone
+import com.vh.myrecap.core.noteKind
+import com.vh.myrecap.core.noteKindLine
+import com.vh.myrecap.core.offLabel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -114,6 +125,7 @@ fun isOverdue(item: Item, now: Long = System.currentTimeMillis()): Boolean {
 
 /** Secondary line of an item row. */
 fun itemSubtitle(item: Item): String = listOfNotNull(
+    item.noteKindLine(),
     if (item.type == ItemType.EXPENSE) item.category else whenLabel(item),
     item.recurrence?.label?.lowercase()?.let { "lặp $it" },
     if (item.type == ItemType.EXPENSE) whenLabel(item)?.substringBefore(" · ") else null,
@@ -137,8 +149,11 @@ fun ItemRow(
     onDelete: (() -> Unit)? = null,
     onTag: ((ItemTag?) -> Unit)? = null,
     onChecklist: ((ChecklistOp) -> Unit)? = null,
+    /** A note with a kind: marks it read, visited or watched (or not). Null leaves the tick out. */
+    onNoteFlag: ((Boolean) -> Unit)? = null,
 ) {
     val share = LocalShareInfo.current
+    val context = LocalContext.current
     // Someone else's item: their name on it, an indigo edge, and no actions (only the owner changes it).
     val owner = share.owners[item.id]
     val audience = share.audiences[item.id]
@@ -151,6 +166,12 @@ fun ItemRow(
     val canDone = actionable && onToggleDone != null && owner == null
     val canDelete = onDelete != null && owner == null
     val canTag = onTag != null && owner == null && item.type.canHaveTag()
+    // A note with a kind gets quick buttons: the map or the link, and the read/visited/watched tick.
+    val noteKind = item.noteKind.takeIf { item.type == ItemType.NOTE && owner == null }
+    val noteMap = noteKind == NoteKind.PLACE && (NoteLinks.mapsQuery(item) != null || NoteLinks.isMapsLink(item.url))
+    val noteLink = noteKind != null && !noteMap && NoteLinks.openUrl(item) != null
+    val noteFlag = noteKind?.fields?.firstOrNull { it.flag }?.takeIf { onNoteFlag != null }
+    val noteDone = item.noteDone
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     // A checklist (mine only): the chip opens a card under the row; finishing with lines missing asks once.
@@ -195,6 +216,9 @@ fun ItemRow(
                         if (canDone) add(CustomAccessibilityAction(if (done) "Mở lại" else "Đánh dấu xong") { askDone(!done); true })
                         if (canDelete) add(CustomAccessibilityAction("Xoá") { confirmDelete = true; true })
                         if (canTag) add(CustomAccessibilityAction("Gắn thẻ") { menu = true; true })
+                        if (noteMap) add(CustomAccessibilityAction("Mở bản đồ") { openNoteMap(context, item); true })
+                        if (noteLink) add(CustomAccessibilityAction("Mở link") { openNoteLink(context, item); true })
+                        if (noteFlag != null) add(CustomAccessibilityAction(if (noteDone) noteFlag.offLabel else noteFlag.label) { onNoteFlag?.invoke(!noteDone); true })
                     }
                     if (actions.isNotEmpty()) customActions = actions
                     if (tag != null) stateDescription = "Thẻ ${tag.label}"
@@ -249,6 +273,20 @@ fun ItemRow(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (noteMap) {
+                        IconButton(onClick = { openNoteMap(context, item) }) { Icon(Icons.Rounded.Place, contentDescription = "Mở bản đồ: ${item.title}") }
+                    } else if (noteLink) {
+                        IconButton(onClick = { openNoteLink(context, item) }) { Icon(Icons.Rounded.Link, contentDescription = "Mở link: ${item.title}") }
+                    }
+                    if (noteFlag != null) {
+                        IconButton(onClick = { onNoteFlag?.invoke(!noteDone) }) {
+                            Icon(
+                                if (noteDone) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                                contentDescription = (if (noteDone) noteFlag.offLabel else noteFlag.label) + ": ${item.title}",
+                                tint = if (noteDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }

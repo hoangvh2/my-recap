@@ -63,4 +63,37 @@ class NoteKindsTest {
         assertFalse(note(attrs = emptyMap()).noteDone)
         assertEquals("read", NoteKind.READ.doneFlag)
     }
+
+    @Test
+    fun mapsButtonUsesTheAddressAndOnlyWebLinksOpen() {
+        val n = note().copy(place = "24 Lê Văn Hưu, Hai Bà Trưng")
+        assertEquals("24 Lê Văn Hưu, Hai Bà Trưng", NoteLinks.mapsQuery(n))
+        assertEquals("Quán Hương Liên", NoteLinks.mapsQuery(note()))
+        assertNull(NoteLinks.mapsQuery(note(kind = "read")))
+        assertEquals("https://www.google.com/maps/search/?api=1&query=24+L%C3%AA+V%C4%83n", NoteLinks.mapsSearchUrl("24 Lê Văn"))
+        assertEquals("geo:0,0?q=Ph%E1%BB%9F", NoteLinks.geoUri("Phở"))
+        assertTrue(NoteLinks.isMapsLink("https://maps.app.goo.gl/abc"))
+        assertFalse(NoteLinks.isMapsLink("https://vnexpress.net/a"))
+        assertEquals("https://maps.app.goo.gl/abc", NoteLinks.openUrl(note()))
+        assertNull(NoteLinks.openUrl(note(url = "intent://evil#Intent;end")))
+        assertNull(NoteLinks.openUrl(note(url = "file:///etc/passwd")))
+        assertNull(NoteLinks.openUrl(note(url = null)))
+    }
+
+    @Test
+    fun listLineShowsKindValuesAndWhereItStands() {
+        assertEquals("📍 Địa điểm · bún chả · Đã đến", note().noteKindLine())
+        assertEquals("📍 Địa điểm · Chưa đến", note(attrs = emptyMap()).noteKindLine())
+        assertEquals("📖 Đọc sau · mẹo · Chưa đọc", note(kind = "read", attrs = mapOf("topic" to "mẹo")).noteKindLine())
+        assertNull(note(kind = null).noteKindLine())
+        assertNull(note(type = ItemType.TASK).noteKindLine())
+    }
+
+    @Test
+    fun doneFlagTogglesOnlyWhereTheKindHasOne() {
+        val read = note(kind = "read", attrs = mapOf("topic" to "mẹo"))
+        assertEquals(mapOf("topic" to "mẹo", "read" to "1"), read.withNoteDone(true).attrs)
+        assertEquals(mapOf("topic" to "mẹo"), read.withNoteDone(true).withNoteDone(false).attrs)
+        assertEquals(note(kind = null), note(kind = null).withNoteDone(true))
+    }
 }

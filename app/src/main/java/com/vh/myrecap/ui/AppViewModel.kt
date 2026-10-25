@@ -43,6 +43,7 @@ import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.LinkMeta
 import com.vh.myrecap.core.LinkPreview
 import com.vh.myrecap.core.ShareIntake
+import com.vh.myrecap.core.withNoteDone
 import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.core.TextSearch
 import com.vh.myrecap.core.Triage
@@ -491,6 +492,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val toSave = if (app.items.get(item.id) == null) TagRules.applyToNew(settings.value.tagRules, item) else item
         app.items.upsert(toSave)
         Reminders.sync(app, toSave)
+    }
+
+    /** Marks a note with a kind as read, visited or watched (or clears it). */
+    fun setNoteFlag(id: String, on: Boolean) = io {
+        app.items.update(id) { it.withNoteDone(on) }
     }
 
     /** Sets or clears the colour tag of a task or appointment (null = none). */
