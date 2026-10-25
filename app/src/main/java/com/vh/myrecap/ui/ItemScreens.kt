@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -433,9 +434,15 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     val context = LocalContext.current
     val items by vm.items.collectAsStateWithLifecycle()
     val stored = id?.let { i -> items.firstOrNull { it.id == i } }
-    val template = remember(id) {
+    // Text or a link shared from another app starts a new note that is already filled in.
+    val liveShare = if (id == null) vm.sharedNote else null
+    // Kept while the screen slides out after saving, when the ViewModel has already let go of it.
+    val lastShare = remember { arrayOfNulls<AppViewModel.SharedNote>(1) }
+    if (liveShare != null) lastShare[0] = liveShare
+    val shared = lastShare[0]
+    val template = remember(id, shared?.id) {
         // A checklist template without its own time starts the editor with its lines already filled.
-        vm.takeDraft() ?: Item(
+        shared?.let { it.draft.toItem(it.id, System.currentTimeMillis()) } ?: vm.takeDraft() ?: Item(
             id = ItemStore.newId(),
             type = newType,
             status = ItemStatus.OPEN,
@@ -478,7 +485,19 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     val isDraft = original.status == ItemStatus.DRAFT
     val canShare = account is Account.SignedIn && !isDraft && Share.isShareable(current.copy(status = ItemStatus.OPEN))
     val audienceChanged = canShare && audience.toSet() != sharedWith.toSet()
-    val dirty = current != original.copy(title = original.title.trim()) || audienceChanged
+    // What was shared is not saved yet: leaving asks first, even before any edit.
+    val dirty = current != original.copy(title = original.title.trim()) || audienceChanged || shared != null
+    // The page's own title, description and place arrive after the editor opens; only fields still as shared are replaced.
+    val enriched = shared?.enriched
+    LaunchedEffect(enriched) {
+        val base = shared?.draft ?: return@LaunchedEffect
+        val more = enriched ?: return@LaunchedEffect
+        edit = edit.copy(
+            title = if (edit.title == base.title) more.title else edit.title,
+            details = if (edit.details == base.details) more.details else edit.details,
+            place = if (edit.place == base.place) more.place else edit.place,
+        )
+    }
     val valid = current.title.isNotBlank() && (current.type != ItemType.EXPENSE || parsedAmount != null)
 
     fun save(status: ItemStatus = if (isDraft) ItemStatus.OPEN else current.status) {
@@ -546,6 +565,12 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             TypeSelector(edit.type, { edit = edit.withType(it) })
+            if (shared?.loading == true) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text("Đang lấy tiêu đề từ link…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 OutlinedTextField(
                     value = edit.title,
@@ -607,7 +632,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                     )
                 }
             }
-            if (edit.type == ItemType.EVENT || edit.place != null) {
+            if (edit.type == ItemType.EVENT || edit.place != null || shared != null) {
                 OutlinedTextField(
                     value = edit.place.orEmpty(),
                     onValueChange = { edit = edit.copy(place = it.ifEmpty { null }) },
@@ -754,8 +779,8 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
     }
     if (confirmLeave) {
         ConfirmDialog(
-            title = "Bỏ thay đổi?",
-            text = "Những gì bạn vừa sửa sẽ không được lưu.",
+            title = if (shared != null) "Bỏ ghi chú này?" else "Bỏ thay đổi?",
+            text = if (shared != null) "Nội dung bạn vừa chia sẻ sẽ không được lưu." else "Những gì bạn vừa sửa sẽ không được lưu.",
             confirmLabel = "Bỏ",
             destructive = true,
             onConfirm = vm::back,
