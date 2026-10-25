@@ -307,7 +307,9 @@ test("calendar subscription: a secret link serves reminders and tasks, can be re
   expect(text).toContain("Việc: Gửi báo giá cho ABC · Công ty ABC");
   expect(text).toContain("Gia hạn · Chốt hợp đồng gia hạn: Công ty ABC (Phần mềm kế toán)");
   expect(text).toContain("UID:lacc-END@myrecap");
-  expect(text).not.toContain("0901");
+  // The customer's phone stays out of the feed. (Not just "0901": a licence expiring on 1 September writes DTEND:…0901.)
+  expect(text).not.toContain("0901 234 567");
+  expect(text).not.toContain("0901234567");
 
   // A wrong address gives nothing away.
   expect((await request.get(url.replace(/.{5}\.ics$/, "AAAAA.ics"))).status()).toBe(404);

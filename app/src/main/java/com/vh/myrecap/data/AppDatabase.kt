@@ -18,6 +18,8 @@ import com.vh.myrecap.core.Recurrence
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.NoteKinds
+import com.vh.myrecap.core.noteKind
 import com.vh.myrecap.core.TextSearch
 import kotlinx.coroutines.flow.Flow
 
@@ -51,6 +53,10 @@ data class ItemEntity(
     val tag: String? = null,
     /** Added in schema 5: the checklist as JSON ([Checklist.encode]); null when there is none. */
     val checklist: String? = null,
+    /** Added in schema 6: note kind key, link and the kind's values as JSON ([NoteKinds.encode]). */
+    val kind: String? = null,
+    val url: String? = null,
+    val attrs: String? = null,
 ) {
     fun toItem() = Item(
         id = id,
@@ -72,6 +78,9 @@ data class ItemEntity(
         important = important,
         tag = tag,
         checklist = checklist?.let { runCatching { Checklist.decode(org.json.JSONArray(it)) }.getOrDefault(emptyList()) } ?: emptyList(),
+        kind = kind,
+        url = url,
+        attrs = attrs?.let { runCatching { NoteKinds.decode(org.json.JSONObject(it)) }.getOrDefault(emptyMap()) } ?: emptyMap(),
     )
 
     companion object {
@@ -95,7 +104,13 @@ data class ItemEntity(
             important = item.important,
             tag = item.tag,
             checklist = item.checklist.takeIf { it.isNotEmpty() }?.let { Checklist.encode(it).toString() },
-            search = TextSearch.fold(listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote).joinToString(" ")),
+            kind = item.kind,
+            url = item.url,
+            attrs = item.attrs.takeIf { it.isNotEmpty() }?.let { NoteKinds.encode(it).toString() },
+            search = TextSearch.fold(
+                (listOfNotNull(item.title, item.details, item.category, item.place, item.person, item.quote, item.url, item.noteKind?.label) +
+                    item.attrs.filterKeys { k -> item.noteKind?.fields?.firstOrNull { it.key == k }?.flag == false }.values).joinToString(" "),
+            ),
         )
     }
 }
@@ -150,7 +165,7 @@ abstract class ItemDao {
  * Schema changes must add a [androidx.room.migration.Migration]; there is deliberately no
  * destructive fallback, so a missing migration fails loudly instead of wiping the user's data.
  */
-@Database(entities = [ItemEntity::class], version = 5, exportSchema = false)
+@Database(entities = [ItemEntity::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun items(): ItemDao
 
@@ -183,8 +198,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v6: note kind, link and the kind's values. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE items ADD COLUMN kind TEXT")
+                db.execSQL("ALTER TABLE items ADD COLUMN url TEXT")
+                db.execSQL("ALTER TABLE items ADD COLUMN attrs TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = "myrecap.db"): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
 
         /** For tests. */
         fun inMemory(context: Context): AppDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()

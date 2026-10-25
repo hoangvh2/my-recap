@@ -356,6 +356,19 @@ describe("notifications", () => {
   });
 });
 
+describe("note kinds", () => {
+  it("a note can carry a known kind, a link up to 500 characters and at most 8 values; nothing else can", async () => {
+    const attrs = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`k${i}`, "v"]));
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/nk1"), item({ id: "nk1", type: "NOTE", kind: "place", url: "https://maps.app.goo.gl/x", attrs: { dish: "bún chả", visited: "1" } })));
+    await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/nk2"), item({ id: "nk2", type: "NOTE", kind: "read", attrs: attrs(8) })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/nk3"), item({ id: "nk3", type: "NOTE", kind: "recipe" })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/nk4"), item({ id: "nk4", type: "NOTE", url: "x".repeat(501) })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/nk5"), item({ id: "nk5", type: "NOTE", attrs: attrs(9) })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/nk6"), item({ id: "nk6", type: "TASK", kind: "place" })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/nk7"), item({ id: "nk7", type: "EVENT", url: "https://a.vn" })));
+  });
+});
+
 describe("calendar feed tokens", () => {
   it("are server-only: no client can read, list or write them", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

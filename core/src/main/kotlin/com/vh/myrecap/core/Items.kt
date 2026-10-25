@@ -65,6 +65,12 @@ data class Item(
     val tag: String? = null,
     /** Tasks and appointments only: things to remember; a repeating item starts each occurrence unticked. Private. */
     val checklist: List<ChecklistEntry> = emptyList(),
+    /** Notes only: what the note is about ([NoteKind] key); null for a plain note. */
+    val kind: String? = null,
+    /** Notes only: the link the note came from, kept apart from [details]. */
+    val url: String? = null,
+    /** Notes only: the few values the [kind] keeps (dish, price, channel…); see [NoteKinds.cleanAttrs]. */
+    val attrs: Map<String, String> = emptyMap(),
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("id", id)
@@ -86,6 +92,9 @@ data class Item(
         .apply { if (important) put("important", true) }
         .apply { if (itemTag != null) put("tag", tag) }
         .apply { if (checklist.isNotEmpty()) put("checklist", Checklist.encode(checklist)) }
+        .apply { if (noteKind != null) put("kind", kind) }
+        .putOpt("url", url?.takeIf { it.isNotEmpty() })
+        .apply { if (attrs.isNotEmpty()) put("attrs", NoteKinds.encode(attrs)) }
 
     companion object {
         fun fromJson(o: JSONObject) = Item(
@@ -108,6 +117,9 @@ data class Item(
             important = o.optBoolean("important", false),
             tag = ItemTag.fromKey(o.optStringOrNull("tag"))?.key,
             checklist = Checklist.decode(o.optJSONArray("checklist")),
+            kind = NoteKind.fromKey(o.optStringOrNull("kind"))?.key,
+            url = o.optStringOrNull("url"),
+            attrs = NoteKinds.decode(o.optJSONObject("attrs")),
         )
     }
 }
