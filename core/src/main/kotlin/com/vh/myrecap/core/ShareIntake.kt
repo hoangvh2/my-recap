@@ -34,7 +34,10 @@ object ShareIntake {
         val place: String?,
         val description: String? = null,
     ) {
-        /** The note body: what was written, the page's description, then the source and link. */
+        /** What the note is about, guessed from the link and the place; the person can change it in the editor. */
+        val kind: NoteKind? get() = kindOf(url, source, place)
+
+        /** The note body: what was written, the page's description, then the source and link. The link is also kept in [url] for notes with a kind; the editor shows it from there later. */
         val details: String
             get() = listOfNotNull(
                 body.takeIf { it.isNotBlank() && it != title },
@@ -42,15 +45,23 @@ object ShareIntake {
                 url?.let { u -> (source?.let { "Nguồn: $it\n" } ?: "") + u },
             ).joinToString("\n\n")
 
-        fun toItem(id: String, now: Long) = Item(
-            id = id,
-            type = ItemType.NOTE,
-            status = ItemStatus.OPEN,
-            title = title,
-            details = details,
-            place = place,
-            createdAt = now,
-        )
+        fun toItem(id: String, now: Long): Item {
+            val k = kind
+            return NoteKinds.clean(
+                Item(
+                    id = id,
+                    type = ItemType.NOTE,
+                    status = ItemStatus.OPEN,
+                    title = title,
+                    details = details,
+                    place = place,
+                    createdAt = now,
+                    kind = k?.key,
+                    url = url.takeIf { k != null },
+                    attrs = if (k == NoteKind.READ && source != null) mapOf("source" to source) else emptyMap(),
+                ),
+            )
+        }
     }
 
     private val URL_RE = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)
@@ -105,6 +116,26 @@ object ShareIntake {
             place = place,
         )
     }
+
+    /**
+     * Guesses the kind of note a shared link makes: a map link or an address is a place, YouTube/TikTok and
+     * Facebook/Instagram reels are videos, any other page is something to read later. Shop links and a text with
+     * no link stay plain notes (those kinds come later).
+     */
+    fun kindOf(url: String?, source: String?, place: String?): NoteKind? {
+        if (source == "Google Maps") return NoteKind.PLACE
+        if (url == null) return if (place != null) NoteKind.PLACE else null
+        return when {
+            source == "Shopee" -> null
+            source == "YouTube" || source == "TikTok" || isSocialVideo(url, source) -> NoteKind.VIDEO
+            place != null -> NoteKind.PLACE
+            else -> NoteKind.READ
+        }
+    }
+
+    private fun isSocialVideo(url: String, source: String?): Boolean =
+        (source == "Facebook" || source == "Instagram") &&
+            (hostOf(url) == "fb.watch" || Regex("""/(reels?|videos?|watch)(/|\?|$)|/share/[rv]/""").containsMatchIn(url.lowercase()))
 
     /** "Facebook", "YouTube"… or the bare host for anything else. */
     fun sourceOf(url: String): String? {

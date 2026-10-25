@@ -16,6 +16,7 @@ class ShareIntakeTest {
         assertTrue(d.titleGuessed)
         assertEquals("Facebook", d.source)
         assertEquals("Nguồn: Facebook\nhttps://www.facebook.com/share/v/1AbCdEf/", d.details)
+        assertEquals(NoteKind.VIDEO, d.kind)
     }
 
     @Test
@@ -28,6 +29,8 @@ class ShareIntakeTest {
         assertFalse(d.titleGuessed)
         assertEquals("12 Nguyễn Trãi, Quận 1", d.place)
         assertTrue(d.details.startsWith("Quán ngon."))
+        assertEquals(NoteKind.VIDEO, d.kind)
+        assertEquals("https://fb.watch/abc/", d.url)
         assertTrue(d.details.endsWith("https://fb.watch/abc/"))
     }
 
@@ -121,5 +124,43 @@ class ShareIntakeTest {
         assertEquals(ItemType.NOTE, i.type)
         assertEquals(ItemStatus.OPEN, i.status)
         assertEquals("Quán A", i.title)
+    }
+
+    private fun item(vararg text: String) = parse(null, *text).toItem("id", 1L)
+
+    @Test
+    fun mapsLinkMakesAPlaceNoteWithItsLink() {
+        val i = item("https://www.google.com/maps/place/Qu%C3%A1n+A/@1,2,17z")
+        assertEquals("place", i.kind)
+        assertEquals("https://www.google.com/maps/place/Qu%C3%A1n+A/@1,2,17z", i.url)
+        assertEquals("Quán A", i.place)
+        assertTrue("the link stays visible in the body until the editor shows it from url", i.details.contains("http"))
+    }
+
+    @Test
+    fun facebookPostIsReadLaterWithItsSourceAndReelsAreVideos() {
+        val post = item("Mẹo hay\nhttps://www.facebook.com/groups/1/posts/2/")
+        assertEquals("read", post.kind)
+        assertEquals(mapOf("source" to "Facebook"), post.attrs)
+        assertEquals("https://www.facebook.com/groups/1/posts/2/", post.url)
+        assertEquals("video", item("https://www.facebook.com/reel/123").kind)
+        assertEquals("video", item("https://fb.watch/abc/").kind)
+        assertEquals("video", item("https://youtu.be/xyz").kind)
+        assertEquals("video", item("https://www.tiktok.com/@a/video/1").kind)
+    }
+
+    @Test
+    fun anAddressInAPostMakesItAPlaceAndOtherPagesAreRead() {
+        assertEquals("place", item("Quán ngon\n📍 5 Lê Lợi, Q.1\nhttps://www.facebook.com/posts/9").kind)
+        assertEquals("read", item("https://vnexpress.net/bai-viet-1.html").kind)
+    }
+
+    @Test
+    fun shopLinksAndPlainTextStayPlainNotes() {
+        val shop = item("https://shopee.vn/abc")
+        assertNull(shop.kind)
+        assertTrue(shop.details.contains("https://shopee.vn/abc"))
+        assertNull(item("Nhớ mua sữa").kind)
+        assertNull(item("Nhớ mua sữa").url)
     }
 }
