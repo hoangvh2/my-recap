@@ -40,6 +40,9 @@ import com.vh.myrecap.core.Prompts
 import com.vh.myrecap.core.ProviderConfig
 import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
+import com.vh.myrecap.core.LinkMeta
+import com.vh.myrecap.core.LinkPreview
+import com.vh.myrecap.core.ShareIntake
 import com.vh.myrecap.core.ShareText
 import com.vh.myrecap.core.TextSearch
 import com.vh.myrecap.core.Triage
@@ -219,7 +222,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openShared(id: String) = push(Screen.Shared(id))
     fun openContacts() = push(Screen.Contacts)
     fun openContact(uid: String) = push(Screen.ContactDetail(uid))
-    fun newItem(type: ItemType) = push(Screen.ItemEdit(null, type))
+    fun newItem(type: ItemType) {
+        sharedNote = null
+        push(Screen.ItemEdit(null, type))
+    }
+
+    /**
+     * A note started from what another app shared. The editor opens at once with what the share already says;
+     * the page's own title, description and place are filled in when the lookup (on this phone, free) answers.
+     */
+    class SharedNote(
+        val id: String,
+        val draft: ShareIntake.Draft,
+        /** The draft plus what the page said; null until the lookup answers or when there is nothing to look up. */
+        val enriched: ShareIntake.Draft? = null,
+        val loading: Boolean = false,
+    )
+
+    var sharedNote by mutableStateOf<SharedNote?>(null)
+        private set
+
+    fun receiveShare(subject: String?, texts: List<CharSequence?>) {
+        val draft = ShareIntake.parse(subject, texts)
+        if (draft.url == null && draft.body.isBlank() && subject.isNullOrBlank()) return // nothing to keep
+        val note = SharedNote(ItemStore.newId(), draft, loading = draft.url != null)
+        sharedNote = note
+        stack.clear()
+        stack.add(Screen.Home)
+        setHomeTab(0)
+        stack.add(Screen.ItemEdit(null, ItemType.NOTE))
+        val url = draft.url ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val meta = LinkPreview.fetch(url) ?: LinkMeta()
+            // A later share replaced this one: its answer is no longer wanted.
+            if (sharedNote?.id == note.id) sharedNote = SharedNote(note.id, draft, ShareIntake.enrich(draft, meta), loading = false)
+        }
+    }
 
     /** A reader opened from a notification replaces the reader already open, not stacks on it. */
     fun replaceTop(target: Screen) {
@@ -227,6 +265,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun back() {
+        val top = stack.lastOrNull()
+        if (top is Screen.ItemEdit && top.id == null) sharedNote = null
         if (stack.size > 1) stack.removeAt(stack.size - 1)
     }
 
@@ -303,6 +343,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun requestQuickCapture(title: String? = null, noteContext: String? = null) {
         if (RecorderState.ui.value.active) return // already recording: the recording screen is showing
         pendingMemo = if (title != null && noteContext != null) title to noteContext else null
+        sharedNote = null
         stack.clear()
         stack.add(Screen.Home)
         setHomeTab(0)

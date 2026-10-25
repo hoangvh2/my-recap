@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Build
 import android.graphics.Color
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -78,12 +79,28 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra(EXTRA_SESSION_ID)?.let { vm.openSession(it) }
         intent?.getStringExtra(EXTRA_ITEM_ID)?.let { vm.openItem(it) }
         intent?.getStringExtra(EXTRA_SHARE_ID)?.let { vm.openShared(it) }
+        if (intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE) receiveShare(intent)
         if (intent?.action == ACTION_CONTACTS) vm.openContacts()
         if (intent?.action == ACTION_QUICK_CAPTURE) vm.requestQuickCapture()
         if (intent?.action == ACTION_CALL_NOTE) {
             NotificationManagerCompat.from(this).cancel(CallReceiver.NOTIFICATION_ID)
             vm.requestQuickCapture(intent.getStringExtra(EXTRA_NOTE_TITLE), intent.getStringExtra(EXTRA_NOTE_CONTEXT))
         }
+    }
+
+    /** Text or a link shared from another app becomes a note in the editor. */
+    private fun receiveShare(intent: Intent) {
+        if (RecorderState.ui.value.active) {
+            // The recording screen owns the display; do not pull the person out of a recording.
+            Toast.makeText(this, "Đang ghi âm, hãy chia sẻ lại sau khi dừng", Toast.LENGTH_LONG).show()
+            return
+        }
+        val texts = if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+            intent.getCharSequenceArrayListExtra(Intent.EXTRA_TEXT).orEmpty()
+        } else {
+            listOf(intent.getCharSequenceExtra(Intent.EXTRA_TEXT))
+        }
+        vm.receiveShare(intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: intent.getStringExtra(Intent.EXTRA_TITLE), texts)
     }
 
     companion object {
