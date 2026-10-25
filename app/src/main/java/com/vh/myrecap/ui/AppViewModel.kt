@@ -42,6 +42,7 @@ import com.vh.myrecap.core.Providers
 import com.vh.myrecap.core.SessionMode
 import com.vh.myrecap.core.LinkMeta
 import com.vh.myrecap.core.LinkPreview
+import com.vh.myrecap.core.NoteAi
 import com.vh.myrecap.core.ShareIntake
 import com.vh.myrecap.core.withNoteDone
 import com.vh.myrecap.core.ShareText
@@ -680,6 +681,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeTemplate(index: Int) =
         updateSettings { s -> s.copy(quickTemplates = s.quickTemplates.filterIndexed { i, _ -> i != index }) }
+
+    /** True while the model reads a note for "Tóm tắt bằng AI". */
+    var noteAiBusy by mutableStateOf(false)
+        private set
+
+    /** The model's suggestion for the note with that id, waiting for the person to use or drop it. */
+    var noteAiResult by mutableStateOf<Pair<String, NoteAi.Suggestion>?>(null)
+        private set
+
+    fun clearNoteAi() {
+        noteAiResult = null
+    }
+
+    /**
+     * Sends one note's own text to the AI the owner configured, and keeps the answer as a suggestion for the editor.
+     * Only runs on a tap; nothing is saved or changed until the person chooses "Dùng".
+     */
+    fun suggestForNote(item: Item) {
+        if (noteAiBusy) return
+        noteAiBusy = true
+        noteAiResult = null
+        io {
+            try {
+                val config = app.settings.current.summaryConfig()
+                if (!config.isComplete) return@io toast("Chưa cấu hình AI (API key/model) trong Cài đặt")
+                val raw = try {
+                    Providers.textGenerator(config).generate(NoteAi.system(), NoteAi.userMessage(item))
+                } catch (e: ApiException) {
+                    if (e.emptyResult) "" else throw e
+                }
+                val suggestion = NoteAi.parse(raw) ?: return@io toast("AI không tìm được gì để đề xuất, thử lại sau")
+                noteAiResult = item.id to suggestion
+            } catch (e: ApiException) {
+                toast(e.message ?: "Lỗi dịch vụ AI")
+            } finally {
+                noteAiBusy = false
+            }
+        }
+    }
 
     /** The summary whose follow-ups are being extracted, to disable its button meanwhile. */
     var extractingActionsFor by mutableStateOf<String?>(null)

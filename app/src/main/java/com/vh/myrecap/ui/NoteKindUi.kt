@@ -19,7 +19,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,6 +93,25 @@ fun NoteKindFields(edit: Item, onChange: (Item) -> Unit) {
         }
     }
 }
+
+/** The "Tóm tắt bằng AI" button under a note's body. It only runs on a tap and only sends this note's text. */
+@Composable
+fun NoteAiButton(item: Item, busy: Boolean, onClick: () -> Unit) {
+    val ready = item.details.trim().length >= MIN_AI_TEXT
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(onClick = onClick, enabled = ready && !busy, modifier = Modifier.fillMaxWidth()) {
+            if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text("✨ Tóm tắt bằng AI")
+        }
+        Text(
+            if (ready) "Gửi nội dung ghi chú này cho AI của bạn khi bạn bấm. Kết quả chỉ là đề xuất, bạn chọn dùng hay bỏ."
+            else "Dán nội dung bài (từ $MIN_AI_TEXT ký tự) vào ô Nội dung để AI tóm tắt. AI không tự mở link.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private const val MIN_AI_TEXT = 40
 
 /** Chips above the notes list: one per kind in use, plus "Chưa xong" for the ones not yet read, visited or watched. */
 @Composable

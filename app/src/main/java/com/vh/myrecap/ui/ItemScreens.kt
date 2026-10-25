@@ -99,6 +99,7 @@ import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.NoteAi
 import com.vh.myrecap.core.NoteKind
 import com.vh.myrecap.core.NoteKinds
 import com.vh.myrecap.core.noteKind
@@ -683,6 +684,9 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (edit.type == ItemType.NOTE) {
+                NoteAiButton(edit, busy = vm.noteAiBusy, onClick = { vm.suggestForNote(current) })
+            }
 
             if ((edit.type == ItemType.EVENT || edit.type == ItemType.TASK) && edit.whenAt != null) {
                 OutlinedButton(onClick = { addToCalendar(context, current) }, modifier = Modifier.fillMaxWidth()) {
@@ -699,6 +703,17 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
         }
     }
 
+    val aiSuggestion = vm.noteAiResult?.takeIf { it.first == original.id }?.second
+    if (aiSuggestion != null) {
+        ConfirmDialog(
+            title = "AI đề xuất",
+            text = NoteAi.preview(aiSuggestion) + "\n\nChỉ điền vào chỗ còn trống, không ghi đè phần bạn đã viết.",
+            confirmLabel = "Dùng",
+            destructive = false,
+            onConfirm = { edit = NoteAi.apply(edit, aiSuggestion) },
+            onDismiss = { vm.clearNoteAi() },
+        )
+    }
     if (picking) {
         SharePickerDialog(
             contacts = contacts,
