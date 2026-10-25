@@ -37,12 +37,12 @@ object ShareIntake {
         /** What the note is about, guessed from the link and the place; the person can change it in the editor. */
         val kind: NoteKind? get() = kindOf(url, source, place)
 
-        /** The note body: what was written, the page's description, then the link. A note with a kind keeps its link in [url]. */
+        /** The note body: what was written, the page's description, then the source and link. The link is also kept in [url] for notes with a kind; the editor shows it from there later. */
         val details: String
             get() = listOfNotNull(
                 body.takeIf { it.isNotBlank() && it != title },
                 description?.takeIf { it.isNotBlank() && !body.contains(it) && it != title },
-                url?.takeIf { kind == null }?.let { u -> (source?.let { "Nguồn: $it\n" } ?: "") + u },
+                url?.let { u -> (source?.let { "Nguồn: $it\n" } ?: "") + u },
             ).joinToString("\n\n")
 
         fun toItem(id: String, now: Long): Item {

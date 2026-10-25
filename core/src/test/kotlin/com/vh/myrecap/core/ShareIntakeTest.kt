@@ -15,7 +15,7 @@ class ShareIntakeTest {
         assertEquals("Link từ Facebook", d.title)
         assertTrue(d.titleGuessed)
         assertEquals("Facebook", d.source)
-        assertEquals("", d.details)
+        assertEquals("Nguồn: Facebook\nhttps://www.facebook.com/share/v/1AbCdEf/", d.details)
         assertEquals(NoteKind.VIDEO, d.kind)
     }
 
@@ -31,7 +31,7 @@ class ShareIntakeTest {
         assertTrue(d.details.startsWith("Quán ngon."))
         assertEquals(NoteKind.VIDEO, d.kind)
         assertEquals("https://fb.watch/abc/", d.url)
-        assertFalse(d.details.contains("https://fb.watch/abc/"))
+        assertTrue(d.details.endsWith("https://fb.watch/abc/"))
     }
 
     @Test
@@ -134,7 +134,7 @@ class ShareIntakeTest {
         assertEquals("place", i.kind)
         assertEquals("https://www.google.com/maps/place/Qu%C3%A1n+A/@1,2,17z", i.url)
         assertEquals("Quán A", i.place)
-        assertFalse("the link is kept in url, not repeated in the body", i.details.contains("http"))
+        assertTrue("the link stays visible in the body until the editor shows it from url", i.details.contains("http"))
     }
 
     @Test
