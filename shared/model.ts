@@ -25,6 +25,15 @@ export const CHECKLIST_MAX_TEXT = 80;
 /** Only tasks and appointments can carry a checklist. */
 export const canChecklist = (type: ItemType): boolean => type === "TASK" || type === "EVENT";
 
+/** What a note is about. Same keys as the Android app and the Firestore rules; an unknown key shows as a plain note. */
+export type NoteKind = "place" | "read" | "video";
+export const NOTE_KINDS: readonly NoteKind[] = ["place", "read", "video"];
+export const NOTE_URL_MAX = 500;
+export const NOTE_ATTRS_MAX = 8;
+export const NOTE_ATTR_VALUE_MAX = 200;
+/** Only notes carry a kind, link and values. */
+export const canKind = (type: ItemType): boolean => type === "NOTE";
+
 /** One thing the secretary keeps. Same shape as the Android app and the Firestore rules. */
 export interface Item {
   id: string;
@@ -54,6 +63,12 @@ export interface Item {
   tag?: ItemTag;
   /** Things to remember for this task or appointment. A repeating one starts each occurrence unticked. Private (never shared). */
   checklist?: ChecklistEntry[];
+  /** Notes only: what the note is about; absent for a plain note. */
+  kind?: NoteKind;
+  /** Notes only: the link the note came from. */
+  url?: string;
+  /** Notes only: the few values the kind keeps (dish, price, channel…), at most 8, each at most 200 characters. */
+  attrs?: Record<string, string>;
 }
 
 export interface Capture {

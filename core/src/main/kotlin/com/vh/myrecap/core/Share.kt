@@ -194,7 +194,7 @@ object CloudItem {
         } else {
             emptyList()
         },
-    )
+    ).let { NoteKinds.clean(it) }
 
     /**
      * Fields to write, merged into the stored document so fields this app does not know (the web's customer
@@ -222,6 +222,9 @@ object CloudItem {
             "important" to if (c.important) true else null,
             "tag" to c.tag,
             "checklist" to c.checklist.takeIf { it.isNotEmpty() }?.let { Checklist.toCloud(it) },
+            "kind" to c.kind,
+            "url" to c.url,
+            "attrs" to c.attrs.takeIf { it.isNotEmpty() },
         )
     }
 
@@ -248,6 +251,10 @@ object CloudItem {
             important = m["important"] as? Boolean ?: false,
             tag = ItemTag.fromKey(m["tag"] as? String)?.key?.takeIf { type.canHaveTag() },
             checklist = if (type.canChecklist()) Checklist.fromCloud(m["checklist"]) else emptyList(),
+            kind = NoteKind.fromKey(m["kind"] as? String)?.key?.takeIf { type == ItemType.NOTE },
+            url = (m["url"] as? String)?.takeIf { type == ItemType.NOTE },
+            attrs = if (type == ItemType.NOTE) (m["attrs"] as? Map<*, *>)?.entries
+                ?.mapNotNull { (k, v) -> if (k is String && v is String) k to v else null }?.toMap().orEmpty() else emptyMap(),
         )
     }
 

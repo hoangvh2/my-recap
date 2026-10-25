@@ -34,7 +34,7 @@ service cloud.firestore {
       return d.keys().hasAll(['id', 'type', 'status', 'title', 'details', 'allDay', 'createdAt'])
         && d.keys().hasOnly(['id', 'type', 'status', 'title', 'details', 'whenAt', 'allDay', 'amount',
                              'category', 'place', 'person', 'sourceId', 'quote', 'createdAt', 'doneAt', 'recurrence',
-                             'customerId', 'licenseId', 'important', 'tag', 'checklist'])
+                             'customerId', 'licenseId', 'important', 'tag', 'checklist', 'kind', 'url', 'attrs'])
         && id.matches('^[A-Za-z0-9_-]{1,64}$')
         && d.id == id
         && d.type in ['TASK', 'EVENT', 'EXPENSE', 'NOTE']
@@ -59,6 +59,12 @@ service cloud.firestore {
             || (d.tag in ['red', 'yellow', 'orange', 'blue', 'purple'] && d.type in ['TASK', 'EVENT']))
         && (!('checklist' in d) || d.checklist == null
             || (d.checklist is list && d.checklist.size() <= 40 && d.type in ['TASK', 'EVENT']))
+        && (!('kind' in d) || d.kind == null
+            || (d.kind in ['place', 'read', 'video'] && d.type == 'NOTE'))
+        && (!('url' in d) || d.url == null
+            || (d.url is string && d.url.size() <= 500 && d.type == 'NOTE'))
+        && (!('attrs' in d) || d.attrs == null
+            || (d.attrs is map && d.attrs.size() <= 8 && d.type == 'NOTE'))
         && (!('recurrence' in d) || d.recurrence == null
             || d.recurrence in ['DAILY', 'WEEKDAYS', 'WEEKLY', 'MONTHLY', 'LUNAR_MONTHLY', 'LUNAR_YEARLY']);
     }
