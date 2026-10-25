@@ -96,4 +96,28 @@ class NoteKindsTest {
         assertEquals(mapOf("topic" to "mẹo"), read.withNoteDone(true).withNoteDone(false).attrs)
         assertEquals(note(kind = null), note(kind = null).withNoteDone(true))
     }
+
+    @Test
+    fun filterNarrowsByKindAndByNotYetDone() {
+        val place = note()
+        val readNew = note(kind = "read", attrs = mapOf("topic" to "mẹo"))
+        val readDone = note(kind = "read", attrs = mapOf("read" to "1"))
+        val plain = note(kind = null)
+        val all = listOf(place, readNew, readDone, plain)
+        assertEquals(all, NoteFilter().apply(all))
+        assertEquals(listOf(readNew, readDone), NoteFilter(kind = NoteKind.READ).apply(all))
+        assertEquals(listOf(readNew), NoteFilter(kind = NoteKind.READ, pending = true).apply(all))
+        assertEquals("a plain note has nothing to finish", listOf(readNew), NoteFilter(pending = true).apply(all))
+        assertEquals(listOf(NoteKind.PLACE, NoteKind.READ), NoteFilter.available(all))
+    }
+
+    @Test
+    fun searchTextHasLinkKindNameAndTextValuesButNotFlags() {
+        val text = note().noteSearchText()
+        assertTrue(text.contains("https://maps.app.goo.gl/abc"))
+        assertTrue(text.contains("Địa điểm"))
+        assertTrue(text.contains("bún chả"))
+        assertFalse(text.contains("1"))
+        assertEquals("", note(kind = null).noteSearchText())
+    }
 }

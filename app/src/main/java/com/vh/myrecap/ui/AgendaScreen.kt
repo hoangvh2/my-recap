@@ -79,6 +79,8 @@ import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.Lunar
 import com.vh.myrecap.core.LunarText
 import com.vh.myrecap.core.Money
+import com.vh.myrecap.core.NoteFilter
+import com.vh.myrecap.core.NoteKind
 import com.vh.myrecap.core.OwnerFilter
 import com.vh.myrecap.core.SharedItem
 import com.vh.myrecap.core.Triage
@@ -106,6 +108,8 @@ fun AgendaTab(vm: AppViewModel) {
     val recorder by vm.recorder.collectAsStateWithLifecycle()
     val resumeTick by vm.resumeTick.collectAsStateWithLifecycle()
     var filterIndex by rememberSaveable { mutableStateOf(0) }
+    var noteKindKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var notePending by rememberSaveable { mutableStateOf(false) }
     var monthView by rememberSaveable { mutableStateOf(false) }
     var micDenied by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
@@ -228,7 +232,14 @@ fun AgendaTab(vm: AppViewModel) {
                     else eventList(shown.filter { it.type == ItemType.EVENT }, vm, settings)
                 }
                 ItemType.EXPENSE -> item { ExpenseView(mine.filter { it.type == ItemType.EXPENSE }, vm) }
-                ItemType.NOTE -> noteList(saved.filter { it.type == ItemType.NOTE }, vm)
+                ItemType.NOTE -> {
+                    val notes = saved.filter { it.type == ItemType.NOTE }
+                    val noteFilter = NoteFilter(NoteKind.fromKey(noteKindKey), notePending)
+                    item(key = "note-filter") {
+                        NoteFilterRow(notes, noteFilter, { noteKindKey = it.kind?.key; notePending = it.pending }, Modifier.padding(top = 8.dp))
+                    }
+                    noteList(noteFilter.apply(notes), vm, filtered = noteFilter.active)
+                }
             }
         }
     }
@@ -501,7 +512,13 @@ private fun LazyListScope.eventList(events: List<Item>, vm: AppViewModel, settin
     doneGroup(events.filter { it !in upcoming }.sortedByDescending { it.whenAt ?: 0 }, vm, label = "Đã qua")
 }
 
-private fun LazyListScope.noteList(notes: List<Item>, vm: AppViewModel) {
+private fun LazyListScope.noteList(notes: List<Item>, vm: AppViewModel, filtered: Boolean = false) {
+    if (notes.isEmpty() && filtered) {
+        item(key = "note-filter-empty") {
+            Text("Không có ghi chú nào khớp bộ lọc.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
+        }
+        return
+    }
     if (notes.isEmpty()) {
         item { EmptyState(Icons.Rounded.Inbox, "Chưa có ghi chú", "Ý tưởng, thông tin cần nhớ… nói ra khi ghi nhanh.") }
         return
