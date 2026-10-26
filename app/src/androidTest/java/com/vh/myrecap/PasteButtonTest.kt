@@ -66,4 +66,26 @@ class PasteButtonTest {
         }
         setClipboard(null)
     }
+
+    /** The usual case: the text is copied in another app, so the clipboard changes while this app is in the background. */
+    @Test
+    fun textCopiedInAnotherAppShowsTheButtonWhenComingBack() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            assertTrue("home", device.wait(Until.hasObject(By.desc("Tìm kiếm")), 10_000))
+            device.findObject(By.desc("Tìm kiếm")).click()
+            assertTrue("search field", device.wait(Until.hasObject(By.clazz("android.widget.EditText")), 5_000))
+            setClipboard(null)
+            device.pressHome()
+            Thread.sleep(1_000)
+            setClipboard(pasted)
+            val back = context.packageManager.getLaunchIntentForPackage(context.packageName)!!.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(back)
+            assertTrue("search field again", device.wait(Until.hasObject(By.clazz("android.widget.EditText")), 10_000))
+            device.findObject(By.clazz("android.widget.EditText")).click()
+            assertTrue("paste button", device.wait(Until.hasObject(By.text("Dán")), 10_000))
+            device.findObject(By.text("Dán")).click()
+            assertTrue("text pasted", device.wait(Until.hasObject(By.textContains(pasted)), 5_000))
+        }
+        setClipboard(null)
+    }
 }

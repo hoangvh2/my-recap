@@ -127,24 +127,33 @@ class SecretaryFlowTest {
 
     /** Taps a filter chip, swiping the chip row sideways until it is on screen. */
     private fun clickChip(label: String) {
-        val row = device.findObject(By.textStartsWith("Tổng quan")) ?: device.findObject(By.textStartsWith("Chi tiêu"))
-            ?: device.findObject(By.textStartsWith("Việc"))
-        assertNotNull("filter chips not on screen", row)
-        val y = row!!.visibleBounds.centerY()
         val w = device.displayWidth
-        repeat(8) { attempt ->
-            // Wait briefly: Compose updates the accessibility tree a moment after a swipe.
-            if (device.wait(Until.hasObject(By.textStartsWith(label)), 1_000)) {
+        val labels = listOf("Tổng quan", "Việc", "Lịch hẹn", "Chi tiêu", "Ghi chú")
+        repeat(10) { attempt ->
+            try {
+                // Wait briefly: Compose updates the accessibility tree a moment after a swipe.
+                device.wait(Until.hasObject(By.textStartsWith(label)), 1_000)
                 device.findObject(By.textStartsWith(label))?.let {
                     it.click()
                     return
                 }
+                // Look for the row again each time: it may have moved, and a node found earlier can go stale.
+                val y = labels.firstNotNullOfOrNull { device.findObject(By.textStartsWith(it)) }?.visibleBounds?.centerY()
+                if (y != null) {
+                    // Scroll back to the start first, then towards the end.
+                    if (attempt < 4) device.swipe(w / 4, y, w * 3 / 4, y, 20) else device.swipe(w * 3 / 4, y, w / 4, y, 20)
+                }
+            } catch (e: androidx.test.uiautomator.StaleObjectException) {
+                // The tree changed under us; look again.
             }
-            // Scroll back to the start first, then towards the end.
-            if (attempt < 3) device.swipe(w / 4, y, w * 3 / 4, y, 20) else device.swipe(w * 3 / 4, y, w / 4, y, 20)
             Thread.sleep(400)
         }
-        throw AssertionError("chip $label not found")
+        // Say where the app is: the failure screenshot of an earlier run showed the launcher, not the app.
+        val focus = device.executeShellCommand("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }?.trim()
+        val crash = device.executeShellCommand("logcat -d -b crash -t 40").takeLast(1_500)
+        val packages = device.executeShellCommand("logcat -d -t 400 -s ActivityManager:I WindowManager:I").lineSequence()
+            .filter { "com.vh.myrecap" in it && ("died" in it || "Killing" in it || "Force" in it || "finish" in it.lowercase()) }.take(6).joinToString("\n")
+        throw AssertionError("chip $label not found. focus=$focus\ncrash=$crash\nam=$packages")
     }
 
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {
