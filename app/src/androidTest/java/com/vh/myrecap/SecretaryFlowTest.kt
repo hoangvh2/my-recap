@@ -148,7 +148,12 @@ class SecretaryFlowTest {
             }
             Thread.sleep(400)
         }
-        throw AssertionError("chip $label not found")
+        // Say where the app is: the failure screenshot of an earlier run showed the launcher, not the app.
+        val focus = device.executeShellCommand("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }?.trim()
+        val crash = device.executeShellCommand("logcat -d -b crash -t 40").takeLast(1_500)
+        val packages = device.executeShellCommand("logcat -d -t 400 -s ActivityManager:I WindowManager:I").lineSequence()
+            .filter { "com.vh.myrecap" in it && ("died" in it || "Killing" in it || "Force" in it || "finish" in it.lowercase()) }.take(6).joinToString("\n")
+        throw AssertionError("chip $label not found. focus=$focus\ncrash=$crash\nam=$packages")
     }
 
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {
