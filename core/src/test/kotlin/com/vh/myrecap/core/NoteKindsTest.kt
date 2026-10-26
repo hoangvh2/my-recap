@@ -85,6 +85,11 @@ class NoteKindsTest {
         assertEquals("📍 Địa điểm · bún chả · Đã đến", note().noteKindLine())
         assertEquals("📍 Địa điểm · Chưa đến", note(attrs = emptyMap()).noteKindLine())
         assertEquals("📖 Đọc sau · mẹo · Chưa đọc", note(kind = "read", attrs = mapOf("topic" to "mẹo")).noteKindLine())
+        assertEquals(listOf("bún chả"), note().noteValues())
+        assertEquals("Đã đến", note().noteState())
+        assertEquals("Chưa đọc", note(kind = "read", attrs = emptyMap()).noteState())
+        assertEquals(emptyList<String>(), note(kind = null).noteValues())
+        assertNull(note(kind = null).noteState())
         assertNull(note(kind = null).noteKindLine())
         assertNull(note(type = ItemType.TASK).noteKindLine())
     }

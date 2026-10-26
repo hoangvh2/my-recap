@@ -21,7 +21,11 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,7 +65,15 @@ class MainActivity : ComponentActivity() {
                 )
                 onDispose {}
             }
-            MyRecapTheme(mode) { ProvideShareInfo(vm) { AppRoot(vm) } }
+            MyRecapTheme(mode) {
+                ProvideShareInfo(vm) {
+                    Box(Modifier.fillMaxSize()) {
+                        AppRoot(vm)
+                        // Paste without the long press: a button over the keyboard when the clipboard has text.
+                        PasteButton(Modifier.align(Alignment.BottomEnd))
+                    }
+                }
+            }
         }
     }
 

@@ -102,7 +102,8 @@ class NoteKindListTest {
             assertTrue("home", shows("Ghi nhanh"))
             openNotesTab()
             assertTrue("place note", shows(place))
-            assertTrue("kind line", shows("📍 Địa điểm · bún chả"))
+            assertTrue("place value", shows("bún chả"))
+            assertTrue("where it stands", shows("Chưa đến"))
             assertTrue("read note", shows(read))
             assertTrue("plain note", shows(plain))
 

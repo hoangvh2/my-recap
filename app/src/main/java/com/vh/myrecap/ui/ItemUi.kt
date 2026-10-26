@@ -1,6 +1,7 @@
 package com.vh.myrecap.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -39,7 +40,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Place
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.platform.LocalContext
@@ -77,6 +80,7 @@ import com.vh.myrecap.core.NoteLinks
 import com.vh.myrecap.core.noteDone
 import com.vh.myrecap.core.noteKind
 import com.vh.myrecap.core.noteKindLine
+import com.vh.myrecap.core.noteValues
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -91,6 +95,17 @@ fun typeStyle(type: ItemType): ModeStyle {
         ItemType.EVENT -> ModeStyle(Icons.Rounded.Event, c.secondaryContainer, c.onSecondaryContainer)
         ItemType.EXPENSE -> ModeStyle(Icons.Rounded.Payments, Color(0x2EF5A524), Color(0xFF8A5A00))
         ItemType.NOTE -> ModeStyle(Icons.Rounded.Lightbulb, c.tertiaryContainer, c.onTertiaryContainer)
+    }
+}
+
+/** One icon and colour pair per note kind, so a place, an article and a video look different at a glance. */
+@Composable
+fun noteKindStyle(kind: NoteKind): ModeStyle {
+    val dark = isSystemInDarkTheme()
+    return when (kind) {
+        NoteKind.PLACE -> ModeStyle(Icons.Rounded.Place, if (dark) Color(0x40FF6B6B) else Color(0x26E5484D), if (dark) Color(0xFFFFB4B4) else Color(0xFFB4232A))
+        NoteKind.READ -> ModeStyle(Icons.Rounded.Bookmark, if (dark) Color(0x4060A5FA) else Color(0x262F6FEB), if (dark) Color(0xFFB4D2FF) else Color(0xFF1D4FBF))
+        NoteKind.VIDEO -> ModeStyle(Icons.Rounded.PlayCircle, if (dark) Color(0x40E879C6) else Color(0x26D6409F), if (dark) Color(0xFFFFC0EA) else Color(0xFFA3237A))
     }
 }
 
@@ -126,8 +141,9 @@ fun isOverdue(item: Item, now: Long = System.currentTimeMillis()): Boolean {
 internal fun noteFlagAction(label: String, done: Boolean): String = (if (done) "Bỏ đánh dấu " else "Đánh dấu ") + label.replaceFirstChar { it.lowercase() }
 
 /** Secondary line of an item row. */
-fun itemSubtitle(item: Item): String = listOfNotNull(
-    item.noteKindLine(),
+fun itemSubtitle(item: Item, kindTags: Boolean = false): String = listOfNotNull(
+    // With tags the kind and where it stands show as pills, so only the values stay in the text.
+    if (kindTags) item.noteValues().joinToString(" · ").ifEmpty { null } else item.noteKindLine(),
     if (item.type == ItemType.EXPENSE) item.category else whenLabel(item),
     item.recurrence?.label?.lowercase()?.let { "lặp $it" },
     if (item.type == ItemType.EXPENSE) whenLabel(item)?.substringBefore(" · ") else null,
@@ -159,7 +175,8 @@ fun ItemRow(
     // Someone else's item: their name on it, an indigo edge, and no actions (only the owner changes it).
     val owner = share.owners[item.id]
     val audience = share.audiences[item.id]
-    val style = typeStyle(item.type)
+    val kindOfNote = item.noteKind.takeIf { item.type == ItemType.NOTE }
+    val style = kindOfNote?.let { noteKindStyle(it) } ?: typeStyle(item.type)
     val haptic = LocalHapticFeedback.current
     val done = item.status == ItemStatus.DONE
     val overdue = isOverdue(item)
@@ -198,13 +215,13 @@ fun ItemRow(
             false // the row snaps back; a delete waits for the dialog, then the list drops it
         },
     )
-    val rowShape = RoundedCornerShape(18.dp)
+    val rowShape = RoundedCornerShape(20.dp)
     val row: @Composable () -> Unit = {
         Column {
         Surface(
             shape = rowShape,
             color = if (owner != null) OtherTint.copy(alpha = 0.07f) else MaterialTheme.colorScheme.surfaceContainerLow,
-            border = if (owner != null) BorderStroke(1.dp, OtherTint.copy(alpha = 0.35f)) else null,
+            border = BorderStroke(1.dp, if (owner != null) OtherTint.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(rowShape)
@@ -248,7 +265,7 @@ fun ItemRow(
                             overflow = TextOverflow.Ellipsis,
                             textDecoration = if (done) TextDecoration.LineThrough else null,
                             color = when {
-                                done -> MaterialTheme.colorScheme.onSurfaceVariant
+                                done || (kindOfNote != null && item.noteDone) -> MaterialTheme.colorScheme.onSurfaceVariant
                                 item.important -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.onSurface
                             },
@@ -258,7 +275,8 @@ fun ItemRow(
                                 if (owner != null) OwnerChip(owner) else AudienceChip(audience!!)
                             }
                         }
-                        val sub = itemSubtitle(item)
+                        if (kindOfNote != null) NoteKindTags(item, kindOfNote)
+                        val sub = itemSubtitle(item, kindTags = kindOfNote != null)
                         if (sub.isNotEmpty()) {
                             Text(
                                 sub,
@@ -279,9 +297,9 @@ fun ItemRow(
                         }
                     }
                     if (noteMap) {
-                        IconButton(onClick = { openNoteMap(context, item) }) { Icon(Icons.Rounded.Place, contentDescription = "Mở bản đồ: ${item.title}") }
+                        IconButton(onClick = { openNoteMap(context, item) }) { Icon(Icons.Rounded.Place, contentDescription = "Mở bản đồ: ${item.title}", tint = style.content) }
                     } else if (noteLink) {
-                        IconButton(onClick = { openNoteLink(context, item) }) { Icon(Icons.Rounded.Link, contentDescription = "Mở link: ${item.title}") }
+                        IconButton(onClick = { openNoteLink(context, item) }) { Icon(Icons.Rounded.Link, contentDescription = "Mở link: ${item.title}", tint = style.content) }
                     }
                     if (noteFlag != null) {
                         IconButton(onClick = { onNoteFlag?.invoke(!noteDone) }) {
