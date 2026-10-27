@@ -72,24 +72,24 @@ class StudySessionFlowTest {
         val launch = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(launch).use {
             assertTrue("row", device.wait(Until.hasObject(By.textStartsWith("Học thử phiên")), 10_000))
-            device.findObject(By.descStartsWith("Checklist 0/2")).click()
+            tap { device.findObject(By.descStartsWith("Checklist 0/2")) }
             expectShowing("start button", By.textStartsWith("Bắt đầu học"))
-            device.findObject(By.textStartsWith("Bắt đầu học")).click()
+            tap { device.findObject(By.textStartsWith("Bắt đầu học")) }
             expectShowing("running", By.textStartsWith("Đang học"), diagnose = true)
             assertNotNull(StudyEngine.active.value)
             assertEquals(itemId, StudyEngine.active.value?.itemId)
 
             // "Huỷ": the session keeps running.
-            device.findObject(By.text("Kết thúc")).click()
+            tap { device.findObject(By.text("Kết thúc")) }
             assertTrue("dialog", device.wait(Until.hasObject(By.text("Kết thúc phiên học?")), 5_000))
-            device.findObject(By.text("Huỷ")).click()
+            tap { device.findObject(By.text("Huỷ")) }
             assertTrue(device.wait(Until.gone(By.text("Kết thúc phiên học?")), 5_000))
             assertNotNull(StudyEngine.active.value)
 
             // "Kết thúc": it stops.
-            device.findObject(By.text("Kết thúc")).click()
+            tap { device.findObject(By.text("Kết thúc")) }
             assertTrue(device.wait(Until.hasObject(By.text("Kết thúc phiên học?")), 5_000))
-            device.findObjects(By.text("Kết thúc")).last().click()
+            tap { device.findObjects(By.text("Kết thúc")).lastOrNull() }
             assertTrue("stopped", waitFor(5_000) { StudyEngine.active.value == null })
             expectShowing("start offered again", By.textStartsWith("Bắt đầu học"))
             assertNull(StudyEngine.active.value)
@@ -104,6 +104,20 @@ class StudySessionFlowTest {
             if (device.wait(Until.hasObject(selector), 800)) return true
         }
         return false
+    }
+
+    /** Finds the node again and taps it; the screen redraws while the session starts and stops, which makes a found node stale. */
+    private fun tap(find: () -> androidx.test.uiautomator.UiObject2?) {
+        var last: Exception? = null
+        repeat(6) {
+            try {
+                find()?.let { node -> node.click(); return }
+            } catch (e: androidx.test.uiautomator.StaleObjectException) {
+                last = e
+            }
+            Thread.sleep(300)
+        }
+        throw AssertionError("could not tap; on screen: ${onScreen()}", last)
     }
 
     /** Fails with what is on screen (and, for [diagnose], what the engine does) only when [selector] never shows up. */
