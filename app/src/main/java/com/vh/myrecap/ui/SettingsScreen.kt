@@ -150,6 +150,13 @@ fun SettingsScreen(vm: AppViewModel) {
                 SwitchRow("Không nhắc lặp ban đêm (22:00–06:30)", s.quietNags) { v -> update { it.copy(quietNags = v) } }
                 Hint("Mục ❗ Quan trọng nhắc lại mỗi 10 phút, tối đa 6 lần. Bật mục này thì lần nhắc rơi vào ban đêm sẽ chờ đến 06:30.")
             }
+            Section("Phiên học theo mốc") {
+                Hint("Dòng checklist bắt đầu bằng số phút (“10 phút: …”) thành một mốc đếm giờ. Bấm “Bắt đầu học” trên thẻ hoặc trên thông báo nhắc giờ.")
+                SwitchRow("Hết giờ tự chuyển sang mốc kế", s.studyAuto) { v -> update { it.copy(studyAuto = v) } }
+                SwitchRow("Báo “tick tick” trước khi hết 1 phút", s.studyWarn) { v -> update { it.copy(studyWarn = v) } }
+                SwitchRow("Tín hiệu luôn nghe được (nâng âm lượng báo thức lên ít nhất 80% trong phiên)", s.studyLoud) { v -> update { it.copy(studyLoud = v) } }
+                Hint("Âm phát theo kênh báo thức nên vẫn kêu khi máy để im lặng hoặc rung, và kèm rung riêng cho từng loại. Âm lượng cũ được trả lại khi phiên kết thúc. Chế độ “Không làm phiền” tắt hoàn toàn thì Android vẫn chặn.")
+            }
             Section("1. Chuyển giọng nói → văn bản") {
                 ProviderChoice(s.sttProvider) { k -> update { it.copy(sttProvider = k) } }
                 Hint(

@@ -16,6 +16,9 @@ import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.StudyPlan
+import com.vh.myrecap.study.StudyEngine
+import com.vh.myrecap.study.StudyService
 import com.vh.myrecap.ui.MainActivity
 import com.vh.myrecap.core.ReminderPolicy
 import com.vh.myrecap.core.ReminderPolicy.Snooze
@@ -116,6 +119,8 @@ object Reminders {
         all.forEach { sync(context, it) }
         restoreFollowUps(context, all)
         LunarReminders.sync(context)
+        // A study session that was running: bring its alarm and notification back (or play what came due).
+        StudyEngine.act(context, StudyService.ACTION_TICK)
     }
 
     private fun alarmIntent(context: Context, itemId: String): PendingIntent = PendingIntent.getBroadcast(
@@ -171,10 +176,14 @@ object Reminders {
             builder.addAction(0, "Xong", done)
         }
         // Android shows three actions at most: Xong (tasks) plus two snoozes, or two snoozes for appointments.
-        val snoozes = if (item.type == ItemType.TASK) listOf(Snooze.HOUR_1, Snooze.TOMORROW) else listOf(Snooze.MINUTES_10, Snooze.HOUR_1)
+        // A checklist with timed lines ("10 phút: ...") swaps the last one for "Bắt đầu học".
+        val study = StudyPlan.canStart(item)
+        var snoozes = if (item.type == ItemType.TASK) listOf(Snooze.HOUR_1, Snooze.TOMORROW) else listOf(Snooze.MINUTES_10, Snooze.HOUR_1)
+        if (study) snoozes = snoozes.take(1)
         for (choice in snoozes) {
             builder.addAction(0, "Hoãn ${choice.label.replaceFirstChar { it.lowercase() }}", snoozeIntent(context, item.id, choice))
         }
+        if (study) builder.addAction(0, "Bắt đầu học", StudyService.startPending(context, item.id))
         try {
             NotificationManagerCompat.from(context).notify(notificationId(item.id), builder.build())
         } catch (_: SecurityException) {

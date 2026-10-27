@@ -76,6 +76,12 @@ data class AppSettings(
     val tagRules: List<TagRule> = emptyList(),
     /** Repeats of an important item wait for the morning instead of ringing overnight. */
     val quietNags: Boolean = true,
+    /** Study sessions: move to the next step by itself when time is up (off: wait, and remind). */
+    val studyAuto: Boolean = true,
+    /** Study sessions: a soft "tick tick" one minute before a step ends (steps of 10 minutes or more). */
+    val studyWarn: Boolean = true,
+    /** Study sessions: raise the alarm volume to at least 80% while a session runs, so the signals are always heard. */
+    val studyLoud: Boolean = true,
     /** Lunar date, state holidays, "Sắp nghỉ" banner and notice, mùng 1 / rằm. */
     val lunar: LunarPrefs = LunarPrefs(),
     /** A newer holiday schedule file downloaded from the site (blank: use the bundled one). */
@@ -169,6 +175,9 @@ class SettingsRepository(context: Context) {
             checklistTemplates = ChecklistTemplates.decode(prefs.getString("checklistTemplates", null)) ?: d.checklistTemplates,
             tagRules = TagRules.decode(prefs.getString("tagRules", null)) ?: d.tagRules,
             quietNags = prefs.getBoolean("quietNags", d.quietNags),
+            studyAuto = prefs.getBoolean("studyAuto", d.studyAuto),
+            studyWarn = prefs.getBoolean("studyWarn", d.studyWarn),
+            studyLoud = prefs.getBoolean("studyLoud", d.studyLoud),
             lunar = LunarPrefs(
                 show = prefs.getBoolean("lunarShow", d.lunar.show),
                 holidays = prefs.getBoolean("lunarHolidays", d.lunar.holidays),
@@ -219,6 +228,9 @@ class SettingsRepository(context: Context) {
             .putString("checklistTemplates", ChecklistTemplates.encode(s.checklistTemplates))
             .putString("tagRules", TagRules.encode(s.tagRules))
             .putBoolean("quietNags", s.quietNags)
+            .putBoolean("studyAuto", s.studyAuto)
+            .putBoolean("studyWarn", s.studyWarn)
+            .putBoolean("studyLoud", s.studyLoud)
             .putBoolean("lunarShow", s.lunar.show)
             .putBoolean("lunarHolidays", s.lunar.holidays)
             .putBoolean("lunarBanner", s.lunar.banner)
