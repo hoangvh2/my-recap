@@ -74,20 +74,20 @@ class StudySessionFlowTest {
             assertTrue("row", device.wait(Until.hasObject(By.textStartsWith("Học thử phiên")), 10_000))
             tap { device.findObject(By.descStartsWith("Checklist 0/2")) }
             expectShowing("start button", By.textStartsWith("Bắt đầu học"))
-            tap { device.findObject(By.textStartsWith("Bắt đầu học")) }
+            tap(centered = true) { device.findObject(By.textStartsWith("Bắt đầu học")) }
             expectShowing("running", By.textStartsWith("Đang học"), diagnose = true)
             assertNotNull(StudyEngine.active.value)
             assertEquals(itemId, StudyEngine.active.value?.itemId)
 
             // "Huỷ": the session keeps running.
-            tap { device.findObject(By.text("Kết thúc")) }
+            tap(centered = true) { device.findObject(By.text("Kết thúc")) }
             assertTrue("dialog", device.wait(Until.hasObject(By.text("Kết thúc phiên học?")), 5_000))
             tap { device.findObject(By.text("Huỷ")) }
             assertTrue(device.wait(Until.gone(By.text("Kết thúc phiên học?")), 5_000))
             assertNotNull(StudyEngine.active.value)
 
             // "Kết thúc": it stops.
-            tap { device.findObject(By.text("Kết thúc")) }
+            tap(centered = true) { device.findObject(By.text("Kết thúc")) }
             assertTrue(device.wait(Until.hasObject(By.text("Kết thúc phiên học?")), 5_000))
             tap { device.findObjects(By.text("Kết thúc")).lastOrNull() }
             assertTrue("stopped", waitFor(5_000) { StudyEngine.active.value == null })
@@ -107,10 +107,18 @@ class StudySessionFlowTest {
     }
 
     /** Finds the node again and taps it; the screen redraws while the session starts and stops, which makes a found node stale. */
-    private fun tap(find: () -> androidx.test.uiautomator.UiObject2?) {
+    private fun tap(centered: Boolean = false, find: () -> androidx.test.uiautomator.UiObject2?) {
         var last: Exception? = null
         repeat(6) {
             try {
+                // A button near the bottom edge sits under the navigation bar on the small emulator screen: bring it up first.
+                if (centered) repeat(3) {
+                    val y = find()?.visibleBounds?.centerY() ?: return@repeat
+                    if (y > device.displayHeight * 0.6) {
+                        device.swipe(device.displayWidth / 2, device.displayHeight * 65 / 100, device.displayWidth / 2, device.displayHeight * 35 / 100, 20)
+                        Thread.sleep(500)
+                    }
+                }
                 find()?.let { node -> node.click(); return }
             } catch (e: androidx.test.uiautomator.StaleObjectException) {
                 last = e
