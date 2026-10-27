@@ -134,7 +134,7 @@ class StudySessionFlowTest {
     }
 
     private fun onScreen(): String = device.findObjects(By.pkg(context.packageName))
-        .mapNotNull { it.text ?: it.contentDescription }
+        .mapNotNull { runCatching { it.text ?: it.contentDescription }.getOrNull() }
         .distinct()
         .joinToString(" | ")
 
