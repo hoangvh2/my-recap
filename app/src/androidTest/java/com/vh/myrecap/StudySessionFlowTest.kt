@@ -73,9 +73,9 @@ class StudySessionFlowTest {
         ActivityScenario.launch<MainActivity>(launch).use {
             assertTrue("row", device.wait(Until.hasObject(By.textStartsWith("Học thử phiên")), 10_000))
             device.findObject(By.descStartsWith("Checklist 0/2")).click()
-            assertTrue("start button; on screen: ${onScreen()}", showing(By.textStartsWith("Bắt đầu học")))
+            expectShowing("start button", By.textStartsWith("Bắt đầu học"))
             device.findObject(By.textStartsWith("Bắt đầu học")).click()
-            assertTrue("running; ${diagnose()}", showing(By.textStartsWith("Đang học")))
+            expectShowing("running", By.textStartsWith("Đang học"), diagnose = true)
             assertNotNull(StudyEngine.active.value)
             assertEquals(itemId, StudyEngine.active.value?.itemId)
 
@@ -91,7 +91,7 @@ class StudySessionFlowTest {
             assertTrue(device.wait(Until.hasObject(By.text("Kết thúc phiên học?")), 5_000))
             device.findObjects(By.text("Kết thúc")).last().click()
             assertTrue("stopped", waitFor(5_000) { StudyEngine.active.value == null })
-            assertTrue("start offered again; on screen: ${onScreen()}", showing(By.textStartsWith("Bắt đầu học")))
+            expectShowing("start offered again", By.textStartsWith("Bắt đầu học"))
             assertNull(StudyEngine.active.value)
         }
     }
@@ -104,6 +104,12 @@ class StudySessionFlowTest {
             if (device.wait(Until.hasObject(selector), 800)) return true
         }
         return false
+    }
+
+    /** Fails with what is on screen (and, for [diagnose], what the engine does) only when [selector] never shows up. */
+    private fun expectShowing(label: String, selector: androidx.test.uiautomator.BySelector, diagnose: Boolean = false) {
+        if (showing(selector)) return
+        throw AssertionError("$label; " + if (diagnose) diagnose() else "on screen: ${onScreen()}")
     }
 
     /** What the engine does when called directly, to tell "the service did not start" from "the engine did not start". */
