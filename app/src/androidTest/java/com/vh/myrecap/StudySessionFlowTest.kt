@@ -75,7 +75,7 @@ class StudySessionFlowTest {
             device.findObject(By.descStartsWith("Checklist 0/2")).click()
             assertTrue("start button; on screen: ${onScreen()}", showing(By.textStartsWith("Bắt đầu học")))
             device.findObject(By.textStartsWith("Bắt đầu học")).click()
-            assertTrue("running; on screen: ${onScreen()}", showing(By.textStartsWith("Đang học")))
+            assertTrue("running; ${diagnose()}", showing(By.textStartsWith("Đang học")))
             assertNotNull(StudyEngine.active.value)
             assertEquals(itemId, StudyEngine.active.value?.itemId)
 
@@ -104,6 +104,13 @@ class StudySessionFlowTest {
             if (device.wait(Until.hasObject(selector), 800)) return true
         }
         return false
+    }
+
+    /** What the engine does when called directly, to tell "the service did not start" from "the engine did not start". */
+    private fun diagnose(): String {
+        val before = StudyEngine.active.value
+        val direct = runCatching { StudyEngine.start(context, itemId) }
+        return "active before=${before != null}, direct start=${direct.getOrNull()} ${direct.exceptionOrNull()?.stackTraceToString()?.take(900).orEmpty()}, active after=${StudyEngine.active.value != null}; on screen: ${onScreen()}"
     }
 
     private fun onScreen(): String = device.findObjects(By.pkg(context.packageName))
