@@ -73,9 +73,9 @@ class StudySessionFlowTest {
         ActivityScenario.launch<MainActivity>(launch).use {
             assertTrue("row", device.wait(Until.hasObject(By.textStartsWith("Học thử phiên")), 10_000))
             device.findObject(By.descStartsWith("Checklist 0/2")).click()
-            assertTrue("start button", device.wait(Until.hasObject(By.textStartsWith("Bắt đầu học")), 5_000))
+            assertTrue("start button; on screen: ${onScreen()}", showing(By.textStartsWith("Bắt đầu học")))
             device.findObject(By.textStartsWith("Bắt đầu học")).click()
-            assertTrue("running", device.wait(Until.hasObject(By.textStartsWith("Đang học")), 10_000))
+            assertTrue("running; on screen: ${onScreen()}", showing(By.textStartsWith("Đang học")))
             assertNotNull(StudyEngine.active.value)
             assertEquals(itemId, StudyEngine.active.value?.itemId)
 
@@ -91,10 +91,25 @@ class StudySessionFlowTest {
             assertTrue(device.wait(Until.hasObject(By.text("Kết thúc phiên học?")), 5_000))
             device.findObjects(By.text("Kết thúc")).last().click()
             assertTrue("stopped", waitFor(5_000) { StudyEngine.active.value == null })
-            assertTrue("start offered again", device.wait(Until.hasObject(By.textStartsWith("Bắt đầu học")), 5_000))
+            assertTrue("start offered again; on screen: ${onScreen()}", showing(By.textStartsWith("Bắt đầu học")))
             assertNull(StudyEngine.active.value)
         }
     }
+
+    /** The emulator screen is small: look where it is, scrolling the list down a few times if it is not in view yet. */
+    private fun showing(selector: androidx.test.uiautomator.BySelector): Boolean {
+        if (device.wait(Until.hasObject(selector), 3_000)) return true
+        repeat(4) {
+            device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 3, 20)
+            if (device.wait(Until.hasObject(selector), 800)) return true
+        }
+        return false
+    }
+
+    private fun onScreen(): String = device.findObjects(By.pkg(context.packageName))
+        .mapNotNull { it.text ?: it.contentDescription }
+        .distinct()
+        .joinToString(" | ")
 
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {
         val end = SystemClock.uptimeMillis() + timeoutMs
