@@ -119,6 +119,15 @@ class MyRecapApp : Application() {
             },
         )
         nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_STUDY, "Phiên học", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Đếm ngược từng mốc học, hiển thị cả trên màn hình khoá. Âm báo do app tự phát"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            },
+        )
+        nm.createNotificationChannel(
             NotificationChannel(CHANNEL_CALLS, "Sau cuộc gọi", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Gợi ý ghi tóm tắt sau cuộc gọi để tạo việc, lịch hẹn"
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE
@@ -195,6 +204,7 @@ class MyRecapApp : Application() {
         const val CHANNEL_RECORDING = "recording"
         const val CHANNEL_RESULTS = "results"
         const val CHANNEL_REMINDERS = "reminders"
+        const val CHANNEL_STUDY = "study"
         const val CHANNEL_CALLS = "calls"
         const val CHANNEL_SHARED = "shared"
 

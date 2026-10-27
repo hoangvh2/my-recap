@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Study sessions (countdown per checklist line with sounds): Android 14+ needs a declared type for the timer service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -81,6 +83,20 @@
             android:name=".recorder.RecordingService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".study.StudyService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Countdown timer for study steps: keeps its alarm and notification running with the screen off" />
+        </service>
+
+        <!-- Backup alarm of a study session: brings the next step's sound on time even if the service was stopped. -->
+        <receiver
+            android:name=".study.StudyReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".reminder.ReminderReceiver"
