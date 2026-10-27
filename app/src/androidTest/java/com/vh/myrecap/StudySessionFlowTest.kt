@@ -129,8 +129,10 @@ class StudySessionFlowTest {
     /** What the engine does when called directly, to tell "the service did not start" from "the engine did not start". */
     private fun diagnose(): String {
         val before = StudyEngine.active.value
+        val services = device.executeShellCommand("dumpsys activity services ${context.packageName}").lines().filter { "StudyService" in it }.take(4).joinToString(" / ")
+        val log = device.executeShellCommand("logcat -d -t 400 AndroidRuntime:E ActivityManager:W MyRecap:E *:S").lines().takeLast(14).joinToString(" / ").take(1800)
         val direct = runCatching { StudyEngine.start(context, itemId) }
-        return "active before=${before != null}, direct start=${direct.getOrNull()} ${direct.exceptionOrNull()?.stackTraceToString()?.take(900).orEmpty()}, active after=${StudyEngine.active.value != null}; on screen: ${onScreen()}"
+        return "active before=${before != null}, services=[$services], log=[$log], direct start=${direct.getOrNull()} ${direct.exceptionOrNull()?.stackTraceToString()?.take(600).orEmpty()}, active after=${StudyEngine.active.value != null}; on screen: ${onScreen()}"
     }
 
     private fun onScreen(): String = device.findObjects(By.pkg(context.packageName))
