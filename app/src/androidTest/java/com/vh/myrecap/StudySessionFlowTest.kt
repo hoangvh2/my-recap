@@ -110,6 +110,9 @@ class StudySessionFlowTest {
     private fun tap(centered: Boolean = false, find: () -> androidx.test.uiautomator.UiObject2?) {
         var last: Exception? = null
         repeat(6) {
+            // The card opens and closes with an animation: a node found halfway sits at the wrong place by the time it is tapped.
+            device.waitForIdle()
+            Thread.sleep(800)
             try {
                 // A button near the bottom edge sits under the navigation bar on the small emulator screen: bring it up first.
                 if (centered) repeat(3) {
