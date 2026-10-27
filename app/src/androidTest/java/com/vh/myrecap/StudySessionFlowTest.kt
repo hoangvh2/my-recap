@@ -130,7 +130,7 @@ class StudySessionFlowTest {
     private fun diagnose(): String {
         val before = StudyEngine.active.value
         val services = device.executeShellCommand("dumpsys activity services ${context.packageName}").lines().filter { "StudyService" in it }.take(4).joinToString(" / ")
-        val log = device.executeShellCommand("logcat -d -t 400 AndroidRuntime:E ActivityManager:W MyRecap:E *:S").lines().takeLast(14).joinToString(" / ").take(1800)
+        val log = device.executeShellCommand("logcat -d -s Study:V AndroidRuntime:E MyRecap:E").lines().takeLast(14).joinToString(" / ").take(2400)
         val direct = runCatching { StudyEngine.start(context, itemId) }
         return "active before=${before != null}, services=[$services], log=[$log], direct start=${direct.getOrNull()} ${direct.exceptionOrNull()?.stackTraceToString()?.take(600).orEmpty()}, active after=${StudyEngine.active.value != null}; on screen: ${onScreen()}"
     }

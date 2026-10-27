@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.vh.myrecap.MyRecapApp
@@ -29,6 +30,7 @@ class StudyService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "onStartCommand ${intent?.action}")
         // Android requires the foreground notification within seconds of startForegroundService, whatever the action is.
         try {
             ServiceCompat.startForeground(
@@ -37,8 +39,9 @@ class StudyService : Service() {
                 StudyNotifications.build(this, StudyEngine.peek(this), System.currentTimeMillis()),
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0,
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Not allowed to run in the foreground right now: the engine and its alarm still carry the session.
+            Log.w(TAG, "startForeground refused", e)
         }
         dispatch(intent?.action ?: ACTION_TICK, intent?.getStringExtra(EXTRA_ITEM))
         return START_NOT_STICKY
@@ -47,8 +50,9 @@ class StudyService : Service() {
     private fun dispatch(action: String, itemId: String? = null) {
         main.removeCallbacks(tick)
         MyRecapApp.from(this).appScope.launch {
+            Log.i(TAG, "dispatch $action $itemId")
             when (action) {
-                ACTION_START -> if (itemId != null) StudyEngine.start(this@StudyService, itemId)
+                ACTION_START -> if (itemId != null) Log.i(TAG, "start -> ${StudyEngine.start(this@StudyService, itemId)}")
                 ACTION_STOP -> StudyEngine.stop(this@StudyService)
                 else -> StudyEngine.act(this@StudyService, action)
             }
@@ -79,9 +83,11 @@ class StudyService : Service() {
         const val ACTION_PAUSE = "com.vh.myrecap.STUDY_PAUSE"
         const val ACTION_RESUME = "com.vh.myrecap.STUDY_RESUME"
         private const val EXTRA_ITEM = "itemId"
+        private const val TAG = "Study"
 
         /** Starts a session; from the app, or from a notification button (both count as the person asking). */
         fun start(context: Context, itemId: String) {
+            Log.i(TAG, "start requested for $itemId")
             ContextCompat.startForegroundService(context, startIntent(context, itemId))
         }
 
