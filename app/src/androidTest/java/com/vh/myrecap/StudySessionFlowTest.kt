@@ -139,7 +139,7 @@ class StudySessionFlowTest {
         val before = StudyEngine.active.value
         val services = device.executeShellCommand("dumpsys activity services ${context.packageName}").lines().filter { "StudyService" in it }.take(4).joinToString(" / ")
         val all = device.executeShellCommand("logcat -d -v brief")
-        val log = all.lines().filter { "Study" in it || "FATAL" in it || "ForegroundService" in it || "FOREGROUND_SERVICE" in it }.takeLast(14).joinToString(" / ").take(2600) + " (log lines: ${all.lines().size})"
+        val log = all.lines().filter { "/Study(" in it || "FATAL" in it || "com.vh.myrecap" in it && "ForegroundService" in it }.takeLast(14).joinToString(" / ").takeLast(2600) + " (log lines: ${all.lines().size})"
         val direct = runCatching { StudyEngine.start(context, itemId) }
         return "active before=${before != null}, services=[$services], log=[$log], direct start=${direct.getOrNull()} ${direct.exceptionOrNull()?.stackTraceToString()?.take(600).orEmpty()}, active after=${StudyEngine.active.value != null}; on screen: ${onScreen()}"
     }
