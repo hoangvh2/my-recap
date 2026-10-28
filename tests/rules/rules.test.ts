@@ -342,7 +342,7 @@ describe("notifications", () => {
   it("an item can carry a colour tag, on a task or appointment only", async () => {
     await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/tg1"), item({ id: "tg1", tag: "red" })));
     await assertSucceeds(setDoc(doc(ownerCtx(), "users/uOwner/items/tg2"), item({ id: "tg2", type: "EVENT", tag: "purple" })));
-    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg3"), item({ id: "tg3", tag: "green" })));
+    await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg3"), item({ id: "tg3", tag: "magenta" })));
     await assertFails(setDoc(doc(ownerCtx(), "users/uOwner/items/tg4"), item({ id: "tg4", type: "NOTE", tag: "red" })));
   });
   it("a task or appointment can carry a checklist of at most 40 lines; nothing else can", async () => {

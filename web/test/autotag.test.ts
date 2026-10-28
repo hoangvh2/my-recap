@@ -73,7 +73,7 @@ describe("normalizeRules", () => {
     const out = normalizeRules([
       { field: "person", text: "  anh   Nam ", tag: "red" },
       { field: "color", text: "x", tag: "red" },
-      { field: "place", text: "x", tag: "green" },
+      { field: "place", text: "x", tag: "magenta" },
       { field: "place", text: "   ", tag: "red" },
       null,
       "x",
