@@ -142,7 +142,7 @@ for (const scheme of ["light", "dark"] as const) {
     const editor = page.getByRole("dialog", { name: "Sửa" });
     await editor.getByRole("button", { name: /Đổi thẻ/ }).click(); // it already has one (Gia đình)
     const menu = editor.getByRole("menu", { name: "Chọn thẻ" });
-    await expect(menu.getByRole("menuitemradio")).toHaveCount(6);
+    await expect(menu.getByRole("menuitemradio")).toHaveCount(7);
     await expect(menu.getByRole("menuitemradio", { name: /Không thẻ/ })).toBeVisible();
     await shot(page, "07-editor-tag-picker", scheme);
     await menu.getByRole("menuitemradio", { name: /Cần xác nhận/ }).click();
