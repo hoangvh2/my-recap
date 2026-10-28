@@ -65,11 +65,11 @@ for (const scheme of ["light", "dark"] as const) {
     await bar.getByRole("button", { name: "Có thẻ" }).click();
     await expect(page.locator(".row-item")).toHaveCount(6);
 
-    // ---- long press: popover with the five tags; picking applies and closes; the row does not open
+    // ---- long press: popover with the six tags; picking applies and closes; the row does not open
     await holdRow(page, row("Mua sữa"));
     const pop = page.getByRole("dialog", { name: "Chọn thẻ" });
     await expect(pop).toBeVisible();
-    await expect(pop.getByRole("button", { name: /^Thẻ / })).toHaveCount(5);
+    await expect(pop.getByRole("button", { name: /^Thẻ / })).toHaveCount(6);
     await expect(page.getByRole("dialog", { name: "Sửa" })).toHaveCount(0);
     await shot(page, "02-long-press-popover", scheme);
     await pop.getByRole("button", { name: "Thẻ Gia đình" }).click();
