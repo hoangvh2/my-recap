@@ -83,8 +83,10 @@ import com.vh.myrecap.core.NoteFilter
 import com.vh.myrecap.core.NoteKind
 import com.vh.myrecap.core.OwnerFilter
 import com.vh.myrecap.core.SharedItem
+import com.vh.myrecap.core.StudyLane
 import com.vh.myrecap.core.Triage
 import com.vh.myrecap.core.WeeklyRecap
+import com.vh.myrecap.core.isStudy
 import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
@@ -393,7 +395,10 @@ private fun dueKey(item: Item): Long = item.whenAt ?: Long.MAX_VALUE
 /** Tasks and appointments by when they are due, plus this month's spending and recent notes. */
 private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowExpenses: () -> Unit) {
     val today = LocalDate.now()
-    val open = saved.filter { it.status == ItemStatus.OPEN && (it.type == ItemType.TASK || it.type == ItemType.EVENT) }
+    val everything = saved.filter { it.status == ItemStatus.OPEN && (it.type == ItemType.TASK || it.type == ItemType.EVENT) }
+    // Study routines never compete with the day's work: they fold into one card after it.
+    val study = everything.filter { it.isStudy }.sortedBy(::dueKey)
+    val open = everything.filterNot { it.isStudy }
     val overdue = open.filter { isOverdue(it) }.sortedBy(::dueKey)
     val rest = open - overdue.toSet()
     val todayItems = rest.filter { it.whenAt != null && localDate(it.whenAt!!) == today }.sortedBy(::dueKey)
@@ -415,7 +420,8 @@ private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowEx
     todayTimeline(todayItems, vm)
     itemGroup("Sắp tới", upcoming.take(12), vm, trailing = if (upcoming.size > 12) "+${upcoming.size - 12}" else null)
     itemGroup("Chưa có hạn", undated, vm)
-    if (open.isEmpty()) {
+    studyLane(study, vm)
+    if (everything.isEmpty()) {
         item { Text("Không có việc hay lịch hẹn nào đang mở.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp)) }
     }
 
@@ -464,6 +470,37 @@ private fun LazyListScope.itemGroup(label: String, list: List<Item>, vm: AppView
     }
 }
 
+/** One folded card for the study routine, below the work. Opens to the usual rows (each keeps its "Bắt đầu học"). */
+private fun LazyListScope.studyLane(study: List<Item>, vm: AppViewModel) {
+    if (study.isEmpty()) return
+    val today = LocalDate.now()
+    val now = StudyLane.today(study, today, ZoneId.systemDefault())
+    val later = study.size - now.size
+    item(key = "study-lane") {
+        var open by rememberSaveable { mutableStateOf(false) }
+        val sum = StudyLane.summary(now)
+        val line = (if (now.isEmpty()) "Hôm nay không có khối học" else "Hôm nay ${sum.blocks} khối" + if (sum.minutes > 0) " · ${sum.minutes} phút" else "") +
+            if (later > 0) " · sắp tới $later" else ""
+        Column(Modifier.padding(top = 8.dp)) {
+            Surface(onClick = { open = !open }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Học ✎", style = MaterialTheme.typography.titleSmall)
+                        Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = if (open) "Thu gọn việc học" else "Mở việc học")
+                }
+            }
+            AnimatedVisibility(open) {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    study.take(30).forEach { d -> ItemRow(d, onOpen = { vm.openItem(d.id) }, onToggleDone = { vm.setDone(d.id, it) }, onDelete = { vm.deleteItem(d.id) }, onTag = { vm.setTag(d.id, it) }, onChecklist = { vm.checklist(d.id, it) }) }
+                    if (study.size > 30) Text("và ${study.size - 30} mục khác", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
 private fun LazyListScope.doneGroup(done: List<Item>, vm: AppViewModel, label: String = "Đã xong") {
     if (done.isEmpty()) return
     item(key = "done-toggle-$label") {
@@ -491,10 +528,10 @@ private fun LazyListScope.taskList(tasks: List<Item>, vm: AppViewModel) {
     }
     val overdue = open.filter { isOverdue(it) }.sortedBy(::dueKey)
     val rest = open - overdue.toSet()
-    itemGroup("Quá hạn", overdue, vm)
-    itemGroup("Hôm nay", rest.filter { it.whenAt != null && localDate(it.whenAt!!) == today }.sortedBy(::dueKey), vm)
-    itemGroup("Sắp tới", rest.filter { it.whenAt != null && localDate(it.whenAt!!).isAfter(today) }.sortedBy(::dueKey), vm)
-    itemGroup("Chưa có hạn", rest.filter { it.whenAt == null }.sortedByDescending { it.createdAt }, vm)
+    itemGroup("Quá hạn", StudyLane.studyLast(overdue), vm)
+    itemGroup("Hôm nay", StudyLane.studyLast(rest.filter { it.whenAt != null && localDate(it.whenAt!!) == today }.sortedBy(::dueKey)), vm)
+    itemGroup("Sắp tới", StudyLane.studyLast(rest.filter { it.whenAt != null && localDate(it.whenAt!!).isAfter(today) }.sortedBy(::dueKey)), vm)
+    itemGroup("Chưa có hạn", StudyLane.studyLast(rest.filter { it.whenAt == null }.sortedByDescending { it.createdAt }), vm)
     doneGroup(tasks.filter { it.status == ItemStatus.DONE }.sortedByDescending { it.doneAt ?: 0 }, vm)
 }
 
@@ -507,7 +544,7 @@ private fun LazyListScope.eventList(events: List<Item>, vm: AppViewModel, settin
     val upcoming = events.filter { it.status == ItemStatus.OPEN && (it.whenAt == null || !isOverdue(it, now)) }.sortedBy(::dueKey)
     val data = Holidays.newest(settings.holidayJson)
     for ((day, group) in upcoming.groupBy { it.whenAt?.let { w -> localDate(w) } }) {
-        itemGroup(if (day == null) "Chưa có ngày" else dayLabel(day) + LunarText.dayExtras(day, settings.lunar, data.overrides), group, vm)
+        itemGroup(if (day == null) "Chưa có ngày" else dayLabel(day) + LunarText.dayExtras(day, settings.lunar, data.overrides), StudyLane.studyLast(group), vm)
     }
     doneGroup(events.filter { it !in upcoming }.sortedByDescending { it.whenAt ?: 0 }, vm, label = "Đã qua")
 }

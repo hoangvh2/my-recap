@@ -10,8 +10,8 @@ const list = [
 const ids = (xs: Item[]) => xs.map((x) => x.id);
 
 describe("tag labels", () => {
-  it("has the five names and glyphs", () => {
-    expect(Object.values(TAG_INFO).map((t) => `${t.glyph} ${t.label}`)).toEqual(["! Gấp", "★ Nổi bật", "▲ Lưu ý", "? Cần xác nhận", "♥ Gia đình"]);
+  it("has the six names and glyphs", () => {
+    expect(Object.values(TAG_INFO).map((t) => `${t.glyph} ${t.label}`)).toEqual(["! Gấp", "★ Nổi bật", "▲ Lưu ý", "? Cần xác nhận", "♥ Gia đình", "✎ Học"]);
   });
 });
 

@@ -124,7 +124,7 @@ describe("ItemExtraction.parse: colour tag", () => {
     expect(items.map((i) => i.tag)).toEqual(["red", "purple"]);
   });
   it("drops an unknown colour, a non-string and an empty value", () => {
-    const items = parse(`[{"type":"task","title":"A","tag":"green"},{"type":"task","title":"B","tag":5},{"type":"task","title":"C","tag":null},{"type":"task","title":"D","tag":""}]`)!;
+    const items = parse(`[{"type":"task","title":"A","tag":"magenta"},{"type":"task","title":"B","tag":5},{"type":"task","title":"C","tag":null},{"type":"task","title":"D","tag":""}]`)!;
     expect(items).toHaveLength(4);
     for (const i of items) expect(Object.keys(i)).not.toContain("tag");
   });
@@ -133,9 +133,9 @@ describe("ItemExtraction.parse: colour tag", () => {
     expect(items).toHaveLength(2);
     for (const i of items) expect(Object.keys(i)).not.toContain("tag");
   });
-  it("tagFrom accepts exactly the five colours", () => {
-    for (const t of ["red", "yellow", "orange", "blue", "purple"]) expect(tagFrom(t)).toBe(t);
-    for (const t of ["green", "RED!", undefined, null, 1, {}, "none"]) expect(tagFrom(t)).toBeUndefined();
+  it("tagFrom accepts exactly the six colours", () => {
+    for (const t of ["red", "yellow", "orange", "blue", "purple", "green"]) expect(tagFrom(t)).toBe(t);
+    for (const t of ["magenta", "RED!", undefined, null, 1, {}, "none"]) expect(tagFrom(t)).toBeUndefined();
   });
 });
 

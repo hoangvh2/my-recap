@@ -7,12 +7,13 @@ export const TAG_INFO: Record<ItemTag, { label: string; glyph: string }> = {
   orange: { label: "Lưu ý", glyph: "▲" },
   blue: { label: "Cần xác nhận", glyph: "?" },
   purple: { label: "Gia đình", glyph: "♥" },
+  green: { label: "Học", glyph: "✎" },
 };
 export { ITEM_TAGS };
 
 export const tagLabel = (t: ItemTag): string => `Thẻ ${TAG_INFO[t].label}`;
 
-/** A tag that is one of the five known values and sits on something that can carry one. */
+/** A tag that is one of the known values and sits on something that can carry one. */
 export const tagOf = (i: Pick<Item, "type" | "tag">): ItemTag | undefined =>
   canTag(i.type) && i.tag !== undefined && ITEM_TAGS.includes(i.tag) ? i.tag : undefined;
 

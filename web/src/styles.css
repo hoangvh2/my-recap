@@ -24,6 +24,7 @@
   --tag-orange: #cc4a0a; --on-tag-orange: #ffffff;
   --tag-blue: #1c5fd0; --on-tag-blue: #ffffff;
   --tag-purple: #7a3fc2; --on-tag-purple: #ffffff;
+  --tag-green: #17724a; --on-tag-green: #ffffff;
   /* What other people shared with me: indigo, always with a name and a lock next to it (never colour alone). */
   --other: #4338ca;
   --other-bg: #eef0fd;
@@ -55,6 +56,7 @@
     --tag-orange: #fb923c; --on-tag-orange: #2b1100;
     --tag-blue: #6aa6ff; --on-tag-blue: #07162f;
     --tag-purple: #c39bff; --on-tag-purple: #1f0b3a;
+    --tag-green: #5fd49c; --on-tag-green: #04200f;
     --other: #a5b4fc;
     --other-bg: #1e2140;
   }
@@ -81,6 +83,7 @@
   --tag-orange: #fb923c; --on-tag-orange: #2b1100;
   --tag-blue: #6aa6ff; --on-tag-blue: #07162f;
   --tag-purple: #c39bff; --on-tag-purple: #1f0b3a;
+    --tag-green: #5fd49c; --on-tag-green: #04200f;
   --other: #a5b4fc;
   --other-bg: #1e2140;
 }
@@ -514,6 +517,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 36px; display: 
 .tag-orange { --tg: var(--tag-orange); --on-tg: var(--on-tag-orange); }
 .tag-blue { --tg: var(--tag-blue); --on-tg: var(--on-tag-blue); }
 .tag-purple { --tg: var(--tag-purple); --on-tg: var(--on-tag-purple); }
+.tag-green { --tg: var(--tag-green); --on-tg: var(--on-tag-green); }
 .tg { display: inline-grid; place-items: center; border-radius: 50%; background: var(--tg); color: var(--on-tg); font-style: normal; font-weight: 800; line-height: 1; flex: none; font-variant-emoji: text; }
 .no-tag { flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 4 3; }
 

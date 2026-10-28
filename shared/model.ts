@@ -8,8 +8,8 @@ export type ItemStatus = "DRAFT" | "OPEN" | "DONE";
 export type Recurrence = "DAILY" | "WEEKDAYS" | "WEEKLY" | "MONTHLY" | "LUNAR_MONTHLY" | "LUNAR_YEARLY";
 
 /** A visual-only mark that draws the eye to a task or appointment; unlike `important` it never changes reminders. */
-export type ItemTag = "red" | "yellow" | "orange" | "blue" | "purple";
-export const ITEM_TAGS: readonly ItemTag[] = ["red", "yellow", "orange", "blue", "purple"];
+export type ItemTag = "red" | "yellow" | "orange" | "blue" | "purple" | "green";
+export const ITEM_TAGS: readonly ItemTag[] = ["red", "yellow", "orange", "blue", "purple", "green"];
 /** Only tasks and appointments can carry a tag. */
 export const canTag = (type: ItemType): boolean => type === "TASK" || type === "EVENT";
 

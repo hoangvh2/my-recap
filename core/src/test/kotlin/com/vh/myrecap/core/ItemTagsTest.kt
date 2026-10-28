@@ -101,4 +101,32 @@ class ItemTagsTest {
         assertEquals(at(2, 0) + interval, ReminderPolicy.nextNagAt(important, 0, at(2, 0), quiet = false, zone = zone))
         assertTrue(ReminderPolicy.nextNagAt(important, 0, at(14, 0), quiet = true, zone = zone)!! > at(14, 0))
     }
+
+    @Test
+    fun studyTagIsTheStudyLaneAndGoesLast() {
+        val work = item(tag = "red").copy(id = "w1")
+        val study = item(tag = "green").copy(id = "s1")
+        val plain = item().copy(id = "w2")
+        assertEquals(ItemTag.GREEN, study.itemTag)
+        assertTrue(study.isStudy)
+        assertFalse(work.isStudy)
+        assertEquals(listOf("w1", "w2", "s1"), StudyLane.studyLast(listOf(study, work, plain)).map { it.id })
+    }
+
+    @Test
+    fun studyLaneCountsTodayAndMissedBlocksOnly() {
+        val zone = java.time.ZoneId.of("UTC")
+        val day = java.time.LocalDate.of(2026, 11, 2)
+        fun at(d: java.time.LocalDate) = d.atTime(7, 30).atZone(zone).toInstant().toEpochMilli()
+        val a = item(tag = "green").copy(id = "a", whenAt = at(day))
+        val missed = item(tag = "green").copy(id = "m", whenAt = at(day.minusDays(1)))
+        val later = item(tag = "green").copy(id = "l", whenAt = at(day.plusDays(1)))
+        assertEquals(listOf("a", "m"), StudyLane.today(listOf(a, missed, later), day, zone).map { it.id })
+    }
+
+    @Test
+    fun studyLaneAddsUpTheMinutesStillPlanned() {
+        val i = item(tag = "green").copy(checklist = listOf(ChecklistEntry("1", "10 phút: Anki", false), ChecklistEntry("2", "25 phút: Voca", false), ChecklistEntry("3", "5 phút: xong rồi", true)))
+        assertEquals(StudyLane.Summary(1, 35), StudyLane.summary(listOf(i)))
+    }
 }

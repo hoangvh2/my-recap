@@ -56,7 +56,7 @@ service cloud.firestore {
         && optString(d, 'licenseId', 64)
         && (!('important' in d) || d.important == null || d.important is bool)
         && (!('tag' in d) || d.tag == null
-            || (d.tag in ['red', 'yellow', 'orange', 'blue', 'purple'] && d.type in ['TASK', 'EVENT']))
+            || (d.tag in ['red', 'yellow', 'orange', 'blue', 'purple', 'green'] && d.type in ['TASK', 'EVENT']))
         && (!('checklist' in d) || d.checklist == null
             || (d.checklist is list && d.checklist.size() <= 40 && d.type in ['TASK', 'EVENT']))
         && (!('kind' in d) || d.kind == null

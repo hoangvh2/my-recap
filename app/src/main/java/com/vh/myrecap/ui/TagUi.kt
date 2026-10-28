@@ -52,6 +52,7 @@ internal fun tagPaint(tag: ItemTag): TagPaint {
             ItemTag.ORANGE -> Color(0xFFFF9340)
             ItemTag.BLUE -> Color(0xFF5B9BFF)
             ItemTag.PURPLE -> Color(0xFFB388FF)
+            ItemTag.GREEN -> Color(0xFF4CD08A)
         }
         TagPaint(fill, Color(0xFF12060A))
     } else {
@@ -61,6 +62,7 @@ internal fun tagPaint(tag: ItemTag): TagPaint {
             ItemTag.ORANGE -> TagPaint(Color(0xFFE8710A), Color(0xFF2B2100))
             ItemTag.BLUE -> TagPaint(Color(0xFF1D62D6), Color.White)
             ItemTag.PURPLE -> TagPaint(Color(0xFF7B3FC4), Color.White)
+            ItemTag.GREEN -> TagPaint(Color(0xFF1B7F4B), Color.White)
         }
     }
 }
@@ -105,7 +107,7 @@ fun TagDot(tag: ItemTag, selected: Boolean, onClick: () -> Unit, modifier: Modif
     ) { Text(tag.glyph, color = paint.ink, fontWeight = FontWeight.Bold, fontSize = 15.sp) }
 }
 
-/** The quick-pick menu shown on a long press: the five tags in a row and a way to remove it. */
+/** The quick-pick menu shown on a long press: the tags in a row and a way to remove it. */
 @Composable
 fun TagQuickMenu(expanded: Boolean, current: ItemTag?, onDismiss: () -> Unit, onPick: (ItemTag?) -> Unit) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
