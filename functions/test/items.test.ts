@@ -134,7 +134,7 @@ describe("ItemExtraction.parse: colour tag", () => {
     for (const i of items) expect(Object.keys(i)).not.toContain("tag");
   });
   it("tagFrom accepts exactly the five colours", () => {
-    for (const t of ["red", "yellow", "orange", "blue", "purple"]) expect(tagFrom(t)).toBe(t);
+    for (const t of ["red", "yellow", "orange", "blue", "purple", "green"]) expect(tagFrom(t)).toBe(t);
     for (const t of ["green", "RED!", undefined, null, 1, {}, "none"]) expect(tagFrom(t)).toBeUndefined();
   });
 });

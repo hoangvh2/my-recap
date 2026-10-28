@@ -13,7 +13,8 @@ enum class ItemTag(val key: String, val label: String, val glyph: String) {
     YELLOW("yellow", "Nổi bật", "★"),
     ORANGE("orange", "Lưu ý", "▲"),
     BLUE("blue", "Cần xác nhận", "?"),
-    PURPLE("purple", "Gia đình", "♥");
+    PURPLE("purple", "Gia đình", "♥"),
+    GREEN("green", "Học", "✎");
 
     companion object {
         fun fromKey(key: String?): ItemTag? = entries.firstOrNull { it.key == key }
@@ -22,6 +23,24 @@ enum class ItemTag(val key: String, val label: String, val glyph: String) {
 
 /** The tag of an item, or null for none (or a key this version does not know). */
 val Item.itemTag: ItemTag? get() = ItemTag.fromKey(tag)
+
+/** Study routines (the "Học" tag) sit apart from the day's work: the screens list them last and fold them into one card. */
+val Item.isStudy: Boolean get() = itemTag == ItemTag.GREEN
+
+object StudyLane {
+    /** [items] with the study ones moved after the others; the order inside each part is kept. */
+    fun studyLast(items: List<Item>): List<Item> = items.filterNot { it.isStudy } + items.filter { it.isStudy }
+
+    /** The blocks due by the end of [today] (missed ones included) or without a date; later ones are just counted. */
+    fun today(items: List<Item>, today: java.time.LocalDate, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): List<Item> =
+        items.filter { it.whenAt == null || !java.time.Instant.ofEpochMilli(it.whenAt!!).atZone(zone).toLocalDate().isAfter(today) }
+
+    /** What the folded card says: how many blocks and the minutes still planned in their checklists. */
+    data class Summary(val blocks: Int, val minutes: Int)
+
+    fun summary(items: List<Item>): Summary =
+        Summary(items.size, items.sumOf { StudyPlan.totalMinutes(StudyPlan.phases(it)) })
+}
 
 /** Tags only make sense on tasks and appointments. */
 fun ItemType.canHaveTag(): Boolean = this == ItemType.TASK || this == ItemType.EVENT

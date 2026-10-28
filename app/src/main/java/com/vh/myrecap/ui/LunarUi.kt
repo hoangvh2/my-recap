@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.vh.myrecap.core.DayKind
 import com.vh.myrecap.core.HolidayOverride
 import com.vh.myrecap.core.Holidays
+import com.vh.myrecap.core.StudyLane
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
 import com.vh.myrecap.core.ItemType
@@ -147,7 +148,7 @@ fun MonthCalendar(items: List<Item>, vm: AppViewModel, s: AppSettings) {
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        val list = byDay[selected].orEmpty().sortedBy { it.whenAt }
+        val list = StudyLane.studyLast(byDay[selected].orEmpty().sortedBy { it.whenAt })
         if (list.isEmpty()) {
             Text("Không có việc hay lịch hẹn ngày này.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
         } else {
