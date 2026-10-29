@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.vh.myrecap.recorder.RecorderState
+import com.vh.myrecap.study.StudyService
 import com.vh.myrecap.ui.theme.MyRecapTheme
 import kotlinx.coroutines.launch
 
@@ -89,7 +90,14 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         intent?.getStringExtra(EXTRA_SESSION_ID)?.let { vm.openSession(it) }
-        intent?.getStringExtra(EXTRA_ITEM_ID)?.let { vm.openItem(it) }
+        intent?.getStringExtra(EXTRA_ITEM_ID)?.let { id ->
+            vm.openItem(id)
+            // Tapping the reminder of a study block is "start it": no hunting for the button.
+            if (intent.getBooleanExtra(EXTRA_START_STUDY, false)) {
+                intent.removeExtra(EXTRA_START_STUDY)
+                StudyService.start(this, id)
+            }
+        }
         intent?.getStringExtra(EXTRA_SHARE_ID)?.let { vm.openShared(it) }
         if (intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE) receiveShare(intent)
         if (intent?.action == ACTION_CONTACTS) vm.openContacts()
@@ -118,6 +126,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_SESSION_ID = "sessionId"
         const val EXTRA_ITEM_ID = "itemId"
+        /** With [EXTRA_ITEM_ID]: also start the study session of that item. */
+        const val EXTRA_START_STUDY = "startStudy"
         /** A sharing push: open what was shared. */
         const val EXTRA_SHARE_ID = "shareId"
         /** A "linked / unlinked" push: open the contacts. */

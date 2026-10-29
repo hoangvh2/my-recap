@@ -666,6 +666,7 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             if (edit.type == ItemType.NOTE) {
                 NoteKindFields(edit) { edit = it }
             }
+            if (stored != null && original.status == ItemStatus.OPEN) StudyRow(original)
             if (edit.type.canChecklist()) {
                 ChecklistEditor(
                     entries = edit.checklist,

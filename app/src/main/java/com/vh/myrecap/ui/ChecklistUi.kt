@@ -243,7 +243,7 @@ fun ChecklistEditor(
  * the ticks already made stay.
  */
 @Composable
-private fun StudyRow(item: Item) {
+internal fun StudyRow(item: Item) {
     val context = LocalContext.current
     val session by StudyEngine.active.collectAsState()
     val running = session?.takeIf { it.itemId == item.id && !it.finished }
