@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,7 @@ import com.vh.myrecap.core.Triage
 import com.vh.myrecap.core.WeeklyRecap
 import com.vh.myrecap.core.isStudy
 import com.vh.myrecap.data.Session
+import com.vh.myrecap.study.StudyEngine
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
 import com.vh.myrecap.settings.AppSettings
@@ -415,6 +417,7 @@ private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowEx
         }
         return
     }
+    studyNow(study)
     triageCard(Triage.overdueTasks(overdue, System.currentTimeMillis(), ZoneId.systemDefault()), vm)
     itemGroup("Quá hạn", overdue, vm)
     todayTimeline(todayItems, vm)
@@ -467,6 +470,39 @@ private fun LazyListScope.itemGroup(label: String, list: List<Item>, vm: AppView
     item(key = "label-$label") { SectionLabel(label, trailing = trailing) }
     items(list, key = { "$label-${it.id}" }) { item ->
         ItemRow(item, onOpen = { vm.openItem(item.id) }, onToggleDone = { vm.setDone(item.id, it) }, onDelete = { vm.deleteItem(item.id) }, onTag = { vm.setTag(item.id, it) }, onChecklist = { vm.checklist(item.id, it) }, onNoteFlag = { vm.setNoteFlag(item.id, it) })
+    }
+}
+
+/**
+ * The study block that is due (or running) gets its own card at the top, with the start button right there: the
+ * folded lane below holds the routine, this holds what to do now. Nothing shows while no block is near.
+ */
+private fun LazyListScope.studyNow(study: List<Item>) {
+    if (study.isEmpty()) return
+    item(key = "study-now") {
+        val session by StudyEngine.active.collectAsState()
+        val running = session?.takeIf { !it.finished }?.let { s -> study.firstOrNull { it.id == s.itemId } }
+        val due = StudyLane.focus(study, System.currentTimeMillis())?.takeIf { it.dueNow }?.item
+        val shown = running ?: due
+        if (shown != null) {
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                Column(Modifier.padding(top = 12.dp, bottom = 4.dp)) {
+                    Text(
+                        (if (running != null) "Đang học" else "Đến giờ học") + shown.whenAt?.let { " · ${clock(it)}" }.orEmpty(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Text(
+                        shown.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    StudyRow(shown)
+                }
+            }
+        }
     }
 }
 

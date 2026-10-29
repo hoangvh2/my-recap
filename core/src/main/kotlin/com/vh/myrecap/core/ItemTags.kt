@@ -35,6 +35,30 @@ object StudyLane {
     fun today(items: List<Item>, today: java.time.LocalDate, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): List<Item> =
         items.filter { it.whenAt == null || !java.time.Instant.ofEpochMilli(it.whenAt!!).atZone(zone).toLocalDate().isAfter(today) }
 
+    /** The block to offer right now: [dueNow] while the time is near, otherwise just the next one today. */
+    data class Focus(val item: Item, val dueNow: Boolean)
+
+    const val EARLY_MS = 10 * 60_000L
+    const val LATE_MS = 15 * 60_000L
+
+    /**
+     * The study block that is due: one that starts within ten minutes, or started and has not run out its planned
+     * minutes (plus a quarter hour); the nearest start wins. With none due, the next block that has a time and
+     * something to start. Null when nothing can be started.
+     */
+    fun focus(items: List<Item>, now: Long): Focus? {
+        val startable = items.filter { it.whenAt != null && StudyPlan.canStart(it) }
+        val due = startable
+            .filter {
+                val start = it.whenAt!!
+                val length = StudyPlan.totalMinutes(StudyPlan.phases(it)) * 60_000L
+                now >= start - EARLY_MS && now <= start + length + LATE_MS
+            }
+            .minByOrNull { kotlin.math.abs(it.whenAt!! - now) }
+        if (due != null) return Focus(due, true)
+        return startable.filter { it.whenAt!! > now }.minByOrNull { it.whenAt!! }?.let { Focus(it, false) }
+    }
+
     /** What the folded card says: how many blocks and the minutes still planned in their checklists. */
     data class Summary(val blocks: Int, val minutes: Int)
 

@@ -141,11 +141,13 @@ object Reminders {
 
     @SuppressLint("MissingPermission") // SecurityException handled below.
     internal fun notify(context: Context, item: Item) {
+        val study = StudyPlan.canStart(item)
         val open = PendingIntent.getActivity(
             context,
             item.id.hashCode(),
             Intent(context, MainActivity::class.java)
                 .putExtra(MainActivity.EXTRA_ITEM_ID, item.id)
+                .putExtra(MainActivity.EXTRA_START_STUDY, study)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
@@ -166,7 +168,7 @@ object Reminders {
             .setPriority(if (item.important) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(open)
             .setAutoCancel(true)
-        if (item.type == ItemType.TASK) {
+        if (item.type == ItemType.TASK && !study) {
             val done = PendingIntent.getBroadcast(
                 context,
                 item.id.hashCode() + 1,
@@ -175,15 +177,17 @@ object Reminders {
             )
             builder.addAction(0, "Xong", done)
         }
-        // Android shows three actions at most: Xong (tasks) plus two snoozes, or two snoozes for appointments.
-        // A checklist with timed lines ("10 phút: ...") swaps the last one for "Bắt đầu học".
-        val study = StudyPlan.canStart(item)
-        var snoozes = if (item.type == ItemType.TASK) listOf(Snooze.HOUR_1, Snooze.TOMORROW) else listOf(Snooze.MINUTES_10, Snooze.HOUR_1)
-        if (study) snoozes = snoozes.take(1)
+        // Android shows three actions at most. A checklist with timed lines ("10 phút: ...") is a study block: the
+        // notification itself and the first button start it, then 10 minutes / 1 hour later. Otherwise: Xong (tasks) plus two snoozes.
+        if (study) builder.addAction(0, "Bắt đầu học", StudyService.startPending(context, item.id))
+        val snoozes = when {
+            study -> listOf(Snooze.MINUTES_10, Snooze.HOUR_1)
+            item.type == ItemType.TASK -> listOf(Snooze.HOUR_1, Snooze.TOMORROW)
+            else -> listOf(Snooze.MINUTES_10, Snooze.HOUR_1)
+        }
         for (choice in snoozes) {
             builder.addAction(0, "Hoãn ${choice.label.replaceFirstChar { it.lowercase() }}", snoozeIntent(context, item.id, choice))
         }
-        if (study) builder.addAction(0, "Bắt đầu học", StudyService.startPending(context, item.id))
         try {
             NotificationManagerCompat.from(context).notify(notificationId(item.id), builder.build())
         } catch (_: SecurityException) {

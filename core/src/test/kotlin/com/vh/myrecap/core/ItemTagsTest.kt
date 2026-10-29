@@ -129,4 +129,30 @@ class ItemTagsTest {
         val i = item(tag = "green").copy(checklist = listOf(ChecklistEntry("1", "10 phút: Anki", false), ChecklistEntry("2", "25 phút: Voca", false), ChecklistEntry("3", "5 phút: xong rồi", true)))
         assertEquals(StudyLane.Summary(1, 35), StudyLane.summary(listOf(i)))
     }
+
+    private fun block(id: String, at: Long, minutes: Int = 25) =
+        item(tag = "green").copy(id = id, whenAt = at, checklist = listOf(ChecklistEntry("c$id", "$minutes phút: học")))
+
+    @Test
+    fun focusIsDueFromTenMinutesBeforeUntilAQuarterHourAfterTheBlockEnds() {
+        val min = 60_000L
+        val start = 1_000_000 * min
+        val b = block("b", start)
+        assertEquals(StudyLane.Focus(b, false), StudyLane.focus(listOf(b), start - 11 * min))
+        assertEquals(StudyLane.Focus(b, true), StudyLane.focus(listOf(b), start - 10 * min))
+        assertEquals(StudyLane.Focus(b, true), StudyLane.focus(listOf(b), start + 40 * min))
+        assertNull(StudyLane.focus(listOf(b), start + 41 * min))
+    }
+
+    @Test
+    fun focusPicksTheNearestStartAndSkipsBlocksThatCannotStart() {
+        val min = 60_000L
+        val now = 1_000_000 * min
+        val soon = block("soon", now + 5 * min)
+        val later = block("later", now + 120 * min)
+        val untimed = item(tag = "green").copy(id = "u", whenAt = now, checklist = listOf(ChecklistEntry("x", "đọc sách")))
+        assertEquals("soon", StudyLane.focus(listOf(later, untimed, soon), now)!!.item.id)
+        assertEquals("later", StudyLane.focus(listOf(later, untimed), now)!!.item.id)
+        assertNull(StudyLane.focus(listOf(untimed), now))
+    }
 }
