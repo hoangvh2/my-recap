@@ -11,11 +11,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.R
-import com.vh.myrecap.core.Checklist
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.ItemStatus
-import com.vh.myrecap.core.ItemText
 import com.vh.myrecap.core.ItemType
+import com.vh.myrecap.core.ReminderText
+import com.vh.myrecap.core.ReminderTexts
 import com.vh.myrecap.core.StudyPlan
 import com.vh.myrecap.study.StudyEngine
 import com.vh.myrecap.study.StudyService
@@ -139,6 +139,15 @@ object Reminders {
 
     fun notificationId(itemId: String) = 0x5000_0000 xor itemId.hashCode()
 
+    /** One line per checklist entry (InboxStyle), the long description last; plain paragraphs when there is no list. */
+    internal fun style(text: ReminderText): NotificationCompat.Style =
+        if (text.entries.isEmpty()) NotificationCompat.BigTextStyle().bigText(text.asParagraph())
+        else NotificationCompat.InboxStyle().also { box ->
+            box.addLine(text.header)
+            text.entries.forEach(box::addLine)
+            text.summary?.let(box::setSummaryText)
+        }
+
     @SuppressLint("MissingPermission") // SecurityException handled below.
     internal fun notify(context: Context, item: Item) {
         val study = StudyPlan.canStart(item)
@@ -151,19 +160,12 @@ object Reminders {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val text = listOfNotNull(
-            ItemText.whenText(item, ZoneId.systemDefault()),
-            item.recurrence?.label,
-            item.place,
-            item.details.ifBlank { null },
-            Checklist.remainingLabel(item, show = 4).ifEmpty { null },
-        )
-            .joinToString(" · ")
+        val text = ReminderTexts.of(item, System.currentTimeMillis(), ZoneId.systemDefault())
         val builder = NotificationCompat.Builder(context, MyRecapApp.CHANNEL_REMINDERS)
             .setSmallIcon(R.drawable.ic_stat_mic)
             .setContentTitle((if (item.important) "❗ " else "") + if (item.type == ItemType.EVENT) "Sắp tới: ${item.title}" else item.title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentText(text.collapsed)
+            .setStyle(style(text))
             .setCategory(if (item.type == ItemType.EVENT) NotificationCompat.CATEGORY_EVENT else NotificationCompat.CATEGORY_REMINDER)
             .setPriority(if (item.important) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(open)
