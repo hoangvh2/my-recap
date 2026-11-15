@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Item } from "../src/lib/model";
-import { agenda, expensesOfMonth, fold, matches, monthKey, overview, shiftMonth } from "../src/lib/views";
+import { splitAhead, agenda, expensesOfMonth, fold, matches, monthKey, overview, shiftMonth } from "../src/lib/views";
 
 const now = new Date(2026, 9, 10, 14, 0).getTime();
 let n = 0;
@@ -26,6 +26,35 @@ describe("overview", () => {
     expect(o.today.map((i) => i.title)).toEqual(["today-allday", "event-earlier", "event"]);
     expect(o.upcoming.map((i) => i.title)).toEqual(["tomorrow"]);
     expect(o.someday.map((i) => i.title)).toEqual(["someday"]);
+  });
+});
+
+describe("splitAhead (dashboard Sắp tới)", () => {
+  const ahead = (...items: Item[]) => splitAhead(items, now);
+  it("keeps what is at most 3 calendar days away in soon, one-off and repeating alike", () => {
+    const d1 = it_({ title: "d1", whenAt: at(11) });
+    const d3late = it_({ title: "d3-late", whenAt: new Date(2026, 9, 13, 23, 30).getTime() });
+    const d3rep = it_({ title: "d3-rep", whenAt: at(13), recurrence: "WEEKLY" });
+    const a = ahead(d1, d3late, d3rep);
+    expect(a.soon.map((i) => i.title)).toEqual(["d1", "d3-late", "d3-rep"]);
+    expect(a.later).toEqual([]);
+    expect(a.recurring).toEqual([]);
+  });
+  it("folds further one-off items into later and repeating ones into recurring, each item once", () => {
+    const d4 = it_({ title: "d4", whenAt: at(14, 0) });
+    const d4rep = it_({ title: "d4-rep", whenAt: at(14, 8), recurrence: "WEEKLY" });
+    const monthly = it_({ title: "monthly", whenAt: at(30), recurrence: "MONTHLY" });
+    const far = it_({ title: "far", whenAt: at(28) });
+    const a = ahead(d4, d4rep, monthly, far);
+    expect(a.soon).toEqual([]);
+    expect(a.later.map((i) => i.title)).toEqual(["d4", "far"]);
+    expect(a.recurring.map((i) => i.title)).toEqual(["d4-rep", "monthly"]);
+    expect(a.soon.length + a.later.length + a.recurring.length).toBe(4);
+  });
+  it("measures calendar days, so late tonight and early on day 4 differ", () => {
+    const lateNow = new Date(2026, 9, 10, 23, 50).getTime();
+    const x = it_({ whenAt: new Date(2026, 9, 14, 0, 5).getTime() });
+    expect(splitAhead([x], lateNow).later).toEqual([x]);
   });
 });
 

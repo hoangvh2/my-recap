@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectNoProblems, idTokenFor, OWNER, seed, signIn, swipeRow, tab, textCapture, watchBrowser } from "./helpers";
+import { answerConfirm, expectNoProblems, idTokenFor, OWNER, seed, signIn, swipeRow, tab, textCapture, watchBrowser } from "./helpers";
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `e2e/.artifacts/${name}.png` });
 
@@ -137,5 +137,55 @@ test("Light/Dark/Auto theme from Settings, remembered on this device; the VHub s
   expect(await bg()).toBe("rgb(11, 13, 16)");
   await page.emulateMedia({ colorScheme: "light" });
   expect(await bg()).toBe("rgb(246, 247, 249)");
+  expectNoProblems(problems);
+});
+
+test("Today: Sắp tới holds only the next 3 days; repeating and far-off items fold into Định kỳ and Sau này, counted once", async ({ page, request }) => {
+  const problems = watchBrowser(page);
+  const who = await idTokenFor(request, OWNER);
+  const d = new Date();
+  const day = (n: number, h = 9) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, h).getTime();
+  const now = Date.now();
+  const item = (id: string, title: string, whenAt: number, extra: Record<string, string> = {}) =>
+    seed(request, who, "items", id, { type: "EVENT", status: "OPEN", title, details: "", allDay: false, whenAt, createdAt: now, ...extra });
+  await item("a", "Gửi báo giá", day(1));
+  await item("b", "Họp IFTP", day(2), { recurrence: "WEEKLY", place: "Văn phòng" }); // repeating but due in 2 days → Sắp tới
+  await item("c", "Họp tuần với đội", day(5), { recurrence: "WEEKLY" });
+  await item("e", "Đóng tiền nhà", day(20), { recurrence: "MONTHLY" });
+  await item("f", "Khám sức khoẻ", day(12));
+  await page.clock.setFixedTime(day(0, 8));
+  await signIn(page, OWNER);
+
+  const soon = page.locator(".block", { has: page.getByRole("heading", { name: /Sắp tới/ }) });
+  await expect(soon.locator(".row-item .title")).toHaveText(["Gửi báo giá", "Họp IFTP"]);
+  const rec = page.getByTestId("fold-recurring");
+  const later = page.getByTestId("fold-later");
+  await expect(rec.locator("summary")).toContainText("Định kỳ");
+  await expect(rec.locator("summary .count")).toHaveText("2");
+  await expect(rec.locator("summary .fold-sub")).toContainText("tiếp theo: Họp tuần với đội");
+  await expect(later.locator("summary .count")).toHaveText("1");
+  // Every item is on the page exactly once.
+  for (const t of ["Gửi báo giá", "Họp IFTP", "Họp tuần với đội", "Đóng tiền nhà", "Khám sức khoẻ"]) await expect(page.locator(".row-item .title", { hasText: t })).toHaveCount(1);
+  await expect(rec.locator(".row-item").first()).toBeHidden();
+
+  await rec.locator("summary").click();
+  await later.locator("summary").click();
+  await shot(page, "60-today-folds-light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await shot(page, "61-today-folds-dark");
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // Delete from inside the fold asks first: "Không" keeps it, "Xoá" removes it and the count follows.
+  const row = rec.locator(".row-item", { hasText: "Đóng tiền nhà" });
+  await swipeRow(page, row, "left");
+  await answerConfirm(page, "Không");
+  await expect(rec.locator("summary .count")).toHaveText("2");
+  await swipeRow(page, row, "left");
+  await answerConfirm(page, "Xoá");
+  await expect(rec.locator("summary .count")).toHaveText("1");
+  await expect(page.locator(".row-item .title", { hasText: "Đóng tiền nhà" })).toHaveCount(0);
+  // Finishing a one-off in "Sau này" takes it off the dashboard; the last item removes the whole fold.
+  await swipeRow(page, later.locator(".row-item", { hasText: "Khám sức khoẻ" }), "right");
+  await expect(later).toHaveCount(0);
   expectNoProblems(problems);
 });
