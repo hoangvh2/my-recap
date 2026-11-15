@@ -98,7 +98,7 @@ class KeepTabAfterEditTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             assertTrue("home", device.wait(Until.hasObject(By.textStartsWith("Tổng quan")), 8_000))
             chip(chipLabel).click()
-            assertFalse("$other hidden under $chip", device.wait(Until.hasObject(By.textContains(other)), 1_500))
+            assertFalse("$other hidden under $chipLabel", device.wait(Until.hasObject(By.textContains(other)), 1_500))
             checkNotNull(find(By.textContains(first))) { "first row" }.click()
             assertTrue("editor", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000) || find(By.text("Lưu thay đổi")) != null)
             val field = checkNotNull(find(By.text(first))) { "title field" }
