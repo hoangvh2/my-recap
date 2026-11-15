@@ -78,13 +78,26 @@ class KeepTabAfterEditTest {
         return device.findObject(selector)
     }
 
+    /** The filter chip [label]: other texts can start the same ("Chi tiêu tháng 11" in the overview), so take the one on the chip row. */
+    private fun chip(label: String): UiObject2 {
+        val row = checkNotNull(find(By.textStartsWith("Tổng quan"))) { "chip row" }
+        val y = row.visibleBounds.centerY()
+        val w = device.displayWidth
+        repeat(6) { attempt ->
+            device.findObjects(By.textStartsWith(label)).firstOrNull { kotlin.math.abs(it.visibleBounds.centerY() - y) < 40 }?.let { return it }
+            if (attempt < 3) device.swipe(w * 3 / 4, y, w / 4, y, 20) else device.swipe(w / 4, y, w * 3 / 4, y, 20)
+            Thread.sleep(300)
+        }
+        throw AssertionError("chip $label not found")
+    }
+
     private fun shows(text: String) = find(By.textContains(text)) != null
 
-    /** Opens [first] from the [chip] list, renames it and saves; then [second] must be on screen, [other] must not. */
-    private fun editKeepsList(chip: String, first: String, second: String, other: String) {
+    /** Opens [first] from the [chipLabel] list, renames it and saves; then [second] must be on screen, [other] must not. */
+    private fun editKeepsList(chipLabel: String, first: String, second: String, other: String) {
         ActivityScenario.launch(MainActivity::class.java).use {
             assertTrue("home", device.wait(Until.hasObject(By.textStartsWith("Tổng quan")), 8_000))
-            checkNotNull(find(By.textStartsWith(chip))) { "chip $chip" }.click()
+            chip(chipLabel).click()
             assertFalse("$other hidden under $chip", device.wait(Until.hasObject(By.textContains(other)), 1_500))
             checkNotNull(find(By.textContains(first))) { "first row" }.click()
             assertTrue("editor", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000) || find(By.text("Lưu thay đổi")) != null)
