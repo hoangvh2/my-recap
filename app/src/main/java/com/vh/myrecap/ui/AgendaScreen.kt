@@ -112,10 +112,13 @@ fun AgendaTab(vm: AppViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val recorder by vm.recorder.collectAsStateWithLifecycle()
     val resumeTick by vm.resumeTick.collectAsStateWithLifecycle()
-    var filterIndex by rememberSaveable { mutableStateOf(0) }
-    var noteKindKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var notePending by rememberSaveable { mutableStateOf(false) }
-    var monthView by rememberSaveable { mutableStateOf(false) }
+    // Held by the ViewModel, not rememberSaveable: opening an editor leaves this screen's composition, and
+    // saveable state would be dropped with it, bouncing the person back to the overview after every save.
+    val view = vm.agendaView
+    var filterIndex by view::filterIndex
+    var noteKindKey by view::noteKindKey
+    var notePending by view::notePending
+    var monthView by view::monthView
     var micDenied by remember { mutableStateOf(false) }
     val scroll = TopAppBarDefaults.pinnedScrollBehavior()
     val undo = rememberItemUndo(vm)
@@ -131,7 +134,7 @@ fun AgendaTab(vm: AppViewModel) {
     }
 
     val received by vm.received.collectAsStateWithLifecycle()
-    var ownerFilter by rememberSaveable { mutableStateOf(OwnerFilter.ALL) }
+    var ownerFilter by view::ownerFilter
     val filter = FILTERS[filterIndex]
     val drafts = items.filter { it.status == ItemStatus.DRAFT }
     val mine = items.filter { it.status != ItemStatus.DRAFT }
@@ -175,6 +178,7 @@ fun AgendaTab(vm: AppViewModel) {
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize(),
+            state = view.list,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -637,7 +641,7 @@ private fun LazyListScope.noteList(notes: List<Item>, vm: AppViewModel, filtered
 /** Month total, spending by category and the month's expenses by day. */
 @Composable
 private fun ExpenseView(expenses: List<Item>, vm: AppViewModel) {
-    var month by remember { mutableStateOf(YearMonth.now()) }
+    var month by vm.agendaView::expenseMonth
     val inMonth = expenses.filter { it.whenAt != null && YearMonth.from(localDate(it.whenAt!!)) == month }
         .sortedByDescending { it.whenAt }
     val total = inMonth.sumOf { it.amount ?: 0 }
