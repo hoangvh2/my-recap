@@ -187,6 +187,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _resumeTick = MutableStateFlow(0)
     val resumeTick: StateFlow<Int> = _resumeTick
 
+    /** Which secretary list is open (tab, month, filters, scroll); survives opening an editor and coming back. */
+    val agendaView = AgendaViewState()
+
     /** Back stack; the home screen is always at the bottom. */
     private val stack = mutableStateListOf<Screen>(Screen.Home)
 
