@@ -41,6 +41,34 @@ export function overview(items: Item[], now: number, received: (i: Item) => bool
   return out;
 }
 
+/** "Sắp tới" on the dashboard only holds what is at most this many calendar days away. */
+export const UPCOMING_DAYS = 3;
+
+export interface Ahead {
+  /** Due within {@link UPCOMING_DAYS} days (one-off and repeating alike), soonest first. */
+  soon: Item[];
+  /** One-off, further away: folded under "Sau này" so it is not lost from the dashboard. */
+  later: Item[];
+  /** Repeating and further away: folded under "Định kỳ". Anything repeating that is already due shows in `soon`, never twice. */
+  recurring: Item[];
+}
+
+/**
+ * Splits what `overview` calls upcoming for the dashboard. A repeating item has one open record whose `whenAt`
+ * is its next occurrence, so that is what decides the group. Every item lands in exactly one group.
+ */
+export function splitAhead(upcoming: Item[], now: number): Ahead {
+  const d = new Date(startOfDay(now));
+  d.setDate(d.getDate() + UPCOMING_DAYS + 1);
+  const limit = d.getTime();
+  const out: Ahead = { soon: [], later: [], recurring: [] };
+  for (const i of upcoming) {
+    if (i.whenAt === undefined || i.whenAt < limit) out.soon.push(i);
+    else (i.recurrence ? out.recurring : out.later).push(i);
+  }
+  return out;
+}
+
 export interface Agenda {
   /** Tasks whose time has passed and are not done: they stay on top until done. */
   overdue: Item[];

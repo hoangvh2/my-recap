@@ -86,6 +86,7 @@ import com.vh.myrecap.core.OwnerFilter
 import com.vh.myrecap.core.SharedItem
 import com.vh.myrecap.core.StudyLane
 import com.vh.myrecap.core.Triage
+import com.vh.myrecap.core.UpcomingSplit
 import com.vh.myrecap.core.WeeklyRecap
 import com.vh.myrecap.core.isStudy
 import com.vh.myrecap.data.Session
@@ -421,7 +422,11 @@ private fun LazyListScope.overview(saved: List<Item>, vm: AppViewModel, onShowEx
     triageCard(Triage.overdueTasks(overdue, System.currentTimeMillis(), ZoneId.systemDefault()), vm)
     itemGroup("Quá hạn", overdue, vm)
     todayTimeline(todayItems, vm)
-    itemGroup("Sắp tới", upcoming.take(12), vm, trailing = if (upcoming.size > 12) "+${upcoming.size - 12}" else null)
+    // "Sắp tới" is only the next few days; repeating work and far-off one-offs fold away so they stay in view without crowding it.
+    val ahead = UpcomingSplit.of(upcoming, today)
+    itemGroup("Sắp tới", ahead.soon.take(12), vm, trailing = if (ahead.soon.size > 12) "+${ahead.soon.size - 12}" else null)
+    foldedGroup("recurring", "Định kỳ", "tiếp theo", ahead.recurring, vm)
+    foldedGroup("later", "Sau này", "gần nhất", ahead.later, vm)
     itemGroup("Chưa có hạn", undated, vm)
     studyLane(study, vm)
     if (everything.isEmpty()) {
@@ -500,6 +505,36 @@ private fun LazyListScope.studyNow(study: List<Item>) {
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
                     StudyRow(shown)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A folded card like the study one: count and the nearest item on the closed line, the full rows (frequency, time,
+ * place) when opened. The rows swipe and ask before deleting exactly like everywhere else.
+ */
+private fun LazyListScope.foldedGroup(id: String, title: String, nearLabel: String, list: List<Item>, vm: AppViewModel) {
+    if (list.isEmpty()) return
+    item(key = "fold-$id") {
+        var open by rememberSaveable { mutableStateOf(false) }
+        val first = list.first()
+        val line = "$nearLabel: ${first.title}" + first.whenAt?.let { ", ${dayLabel(localDate(it))}" }.orEmpty()
+        Column(Modifier.padding(top = 8.dp)) {
+            Surface(onClick = { open = !open }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("$title · ${list.size}", style = MaterialTheme.typography.titleSmall)
+                        Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = if (open) "Thu gọn $title" else "Mở $title")
+                }
+            }
+            AnimatedVisibility(open) {
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    list.take(30).forEach { d -> ItemRow(d, onOpen = { vm.openItem(d.id) }, onToggleDone = { vm.setDone(d.id, it) }, onDelete = { vm.deleteItem(d.id) }, onTag = { vm.setTag(d.id, it) }, onChecklist = { vm.checklist(d.id, it) }) }
+                    if (list.size > 30) Text("và ${list.size - 30} mục khác", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

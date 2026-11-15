@@ -160,6 +160,13 @@ h1, h2, h3, p { margin: 0; }
 .block { margin-bottom: 18px; }
 .block h3 { font-size: 13px; letter-spacing: 0.4px; text-transform: uppercase; color: var(--muted); margin: 0 4px 8px; display: flex; gap: 8px; align-items: center; }
 .block h3.warn { color: var(--warn); }
+.fold { margin-bottom: 18px; }
+.fold > summary { list-style: none; cursor: pointer; min-height: 48px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-weight: 600; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "▾"; margin-left: auto; color: var(--muted); }
+.fold[open] > summary::after { content: "▴"; }
+.fold[open] > summary { margin-bottom: 8px; }
+.fold-sub { flex-basis: 100%; order: 5; font-size: 13px; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
 .list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; }
 .row-item { display: flex; align-items: center; gap: 12px; padding: 4px 14px 4px 10px; min-height: 56px; border-bottom: 1px solid var(--line); }
 .row-item:last-child { border-bottom: 0; }

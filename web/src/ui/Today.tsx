@@ -3,11 +3,11 @@ import { useMemo } from "preact/hooks";
 import { diffDays } from "../../../shared/dates";
 import { dueNudges, upcomingNudges } from "../../../shared/renewals";
 import { items as itemsStore, setDone } from "../data";
-import { clock, todayLabel } from "../lib/format";
+import { clock, dayLabel, todayLabel } from "../lib/format";
 import type { Item } from "../lib/model";
 import { go, to } from "../lib/router";
 import { useStore } from "../lib/store";
-import { overview, timeline } from "../lib/views";
+import { overview, splitAhead, timeline } from "../lib/views";
 import { withReceived } from "../lib/sharing";
 import { received as receivedStore } from "../share";
 import { NoticeBanner, OwnerFilterBar, useOwnerFilter } from "./Sharing";
@@ -46,6 +46,7 @@ export function Today() {
   const base = useMemo(() => withReceived(all.filter((i) => i.status !== "DRAFT"), rec, who), [all, rec, who]);
   const tf = useTagFilter(base);
   const o = useMemo(() => overview(tf.shown, now, (i) => recIds.has(i.id)), [tf.shown, now, recIds]);
+  const ahead = useMemo(() => splitAhead(o.upcoming, now), [o.upcoming, now]);
   const tl = useMemo(() => timeline(o.today, now), [o.today, now]);
 
   const openItem = (i: Item) => openEditor(i);
@@ -129,10 +130,30 @@ export function Today() {
         </Section>
       )}
 
-      {o.upcoming.length > 0 && (
+      {ahead.soon.length > 0 && (
         <Section title="Sắp tới" action={<Link to={to.work} class="more">Xem tất cả</Link>}>
-          <ul class="list">{o.upcoming.slice(0, 5).map((i) => <ItemRow key={i.id} item={i} onOpen={openItem} onToggle={toggle} />)}</ul>
+          <ul class="list">{ahead.soon.slice(0, 5).map((i) => <ItemRow key={i.id} item={i} onOpen={openItem} onToggle={toggle} />)}</ul>
         </Section>
+      )}
+      {ahead.recurring.length > 0 && (
+        <details class="fold" data-testid="fold-recurring">
+          <summary>
+            <span class="fold-title">Định kỳ</span>
+            <span class="count">{ahead.recurring.length}</span>
+            <span class="fold-sub">tiếp theo: {ahead.recurring[0].title}, {dayLabel(ahead.recurring[0].whenAt!, now)}</span>
+          </summary>
+          <ul class="list">{ahead.recurring.map((i) => <ItemRow key={i.id} item={i} onOpen={openItem} onToggle={toggle} />)}</ul>
+        </details>
+      )}
+      {ahead.later.length > 0 && (
+        <details class="fold" data-testid="fold-later">
+          <summary>
+            <span class="fold-title">Sau này</span>
+            <span class="count">{ahead.later.length}</span>
+            <span class="fold-sub">gần nhất: {ahead.later[0].title}, {dayLabel(ahead.later[0].whenAt!, now)}</span>
+          </summary>
+          <ul class="list">{ahead.later.map((i) => <ItemRow key={i.id} item={i} onOpen={openItem} onToggle={toggle} />)}</ul>
+        </details>
       )}
       {actions.dialogs}
     </>
