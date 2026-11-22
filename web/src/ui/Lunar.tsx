@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { addDays, type ISODate } from "../../../shared/dates";
+import { type ISODate } from "../../../shared/dates";
 import { companyBanner, companyOn, companySpan } from "../../../shared/company";
 import { bannerFor, bannerKey, holidayOn, type HolidayOverride } from "../../../shared/holidays";
 import { lunarMonth, lunarToSolar, solarToLunar } from "../../../shared/lunar";
-import { LEAD_CHOICES, holidayData, lunarPrefs, refreshHolidayData, setLunarPrefs } from "../lib/lunarCfg";
-import { dm, holidayLine, longDate, lunarAt, lunarChip, lunarFull, monthlyMark } from "../lib/lunarText";
+import { LEAD_CHOICES, MONTHLY_LEAD_CHOICES, clockText, parseClock, holidayData, lunarPrefs, refreshHolidayData, setLunarPrefs } from "../lib/lunarCfg";
+import { dm, holidayLine, longDate, lunarAt, lunarChip, lunarFull, monthlyMark, monthlyNotice, monthlyTitle } from "../lib/lunarText";
 import { dayLabel, toDateInput } from "../lib/format";
 import type { Item } from "../lib/model";
 import { useStore } from "../lib/store";
@@ -30,8 +30,8 @@ export function HolidayBanner({ now }: { now: number }) {
   const today = toDateInput(now);
   const ahead = prefs.banner && prefs.holidays ? bannerFor(today, prefs.lead, prefs.dismissed, overrides) : null;
   const company = prefs.banner ? companyBanner(today, prefs.lead, prefs.dismissed, prefs.company) : null;
-  const tomorrow = prefs.monthly ? monthlyMark(solarToLunar(addDays(today, 1))) : null;
-  if (!ahead && !company && !tomorrow) return null;
+  const monthly = prefs.monthly ? monthlyNotice(now, prefs.monthlyLead, prefs.monthlyMinutes) : null;
+  if (!ahead && !company && !monthly) return null;
   const hide = () => ahead && hideKey(bannerKey(ahead.holiday));
   const hideKey = (key: string) => {
     setLunarPrefs({ dismissed: [...prefs.dismissed, key] });
@@ -66,11 +66,11 @@ export function HolidayBanner({ now }: { now: number }) {
           <button class="btn text" onClick={() => hideKey(company.key)}>Ẩn</button>
         </div>
       )}
-      {tomorrow && (
+      {monthly && (
         <div class="notice holiday" role="status">
           <Icon name="clock" size={18} />
           <span class="grow">
-            <strong>Mai là {tomorrow === "Rằm" ? "Rằm" : "Mùng 1"} {lunarFull(solarToLunar(addDays(today, 1))!).replace(/^(Rằm|Mùng 1) /, "")}</strong>
+            <strong>{monthlyTitle(monthly.lead, monthly.mark, lunarFull(solarToLunar(monthly.target)!).replace(/^(Rằm|Mùng 1) /, ""))}</strong>
             <br />
             Chuẩn bị đồ cúng.
           </span>
@@ -290,7 +290,26 @@ export function LunarSettings() {
           {LEAD_CHOICES.map((n) => <option key={n} value={n}>{n} ngày (Tết luôn ít nhất 14 ngày)</option>)}
         </select>
       </label>
-      {toggle("monthly", "Mùng 1 và Rằm hằng tháng", "Đánh dấu trên lịch và nhắc ở Hôm nay từ hôm trước để chuẩn bị đồ cúng.")}
+      {toggle("monthly", "Mùng 1 và Rằm hằng tháng", "Đánh dấu trên lịch và nhắc ở Hôm nay để chuẩn bị đồ cúng. Thông báo đẩy (đúng giờ) chỉ có trên Android.")}
+      {prefs.monthly && (
+        <div class="row-between">
+          <label>Nhắc trước
+            <select value={prefs.monthlyLead} onChange={(e) => setLunarPrefs({ monthlyLead: Number((e.target as HTMLSelectElement).value) })}>
+              {MONTHLY_LEAD_CHOICES.map((n) => <option key={n} value={n}>{n === 0 ? "Đúng ngày" : `${n} ngày`}</option>)}
+            </select>
+          </label>
+          <label>Giờ nhắc
+            <input
+              type="time"
+              value={clockText(prefs.monthlyMinutes)}
+              onChange={(e) => {
+                const m = parseClock((e.target as HTMLInputElement).value);
+                if (m !== null) setLunarPrefs({ monthlyMinutes: m });
+              }}
+            />
+          </label>
+        </div>
+      )}
       <div class="row-between">
         <small class="hint">Lịch nghỉ cập nhật ngày {updated ? updated.split("-").reverse().join("/") : "?"}. Ngày nghỉ bù và hoán đổi do nhà nước công bố từng năm.</small>
         <button type="button" class="btn ghost small" disabled={busy} onClick={() => void check()}>{busy ? "Đang kiểm tra…" : "Kiểm tra bản mới"}</button>

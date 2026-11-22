@@ -81,6 +81,10 @@ data class LunarPrefs(
     val lead: Int = 5,
     /** Mùng 1 and Rằm marked, with a notice the evening before. Off until chosen. */
     val monthly: Boolean = false,
+    /** How many days before mùng 1 / rằm the notice comes (0 = the day itself, 1 = the day before). */
+    val monthlyLead: Int = 1,
+    /** Minute of the day the notice comes, 0..1439 (default 18:00). */
+    val monthlyMinutes: Int = DEFAULT_MONTHLY_MINUTES,
     /** Banners hidden by the person, as [Holiday.key]. */
     val dismissed: Set<String> = emptySet(),
     /** Days off the company gives, typed in by the person. */
@@ -88,5 +92,16 @@ data class LunarPrefs(
 ) {
     companion object {
         val LEAD_CHOICES = listOf(3, 5, 7, 14)
+        val MONTHLY_LEAD_CHOICES = listOf(0, 1, 2, 3, 5, 7)
+        const val DEFAULT_MONTHLY_MINUTES = 18 * 60
+
+        fun clockText(minutes: Int) = "%02d:%02d".format(minutes / 60, minutes % 60)
     }
+}
+
+/** Title of the notice for a mùng 1 / rằm that is [lead] days away, e.g. "Mai là Rằm tháng 3 Âm". */
+fun monthlyNoticeTitle(lead: Int, mark: String, name: String): String = when (lead) {
+    0 -> "Hôm nay là $mark $name"
+    1 -> "Mai là $mark $name"
+    else -> "$lead ngày nữa là $mark $name"
 }

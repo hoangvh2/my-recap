@@ -9,6 +9,8 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.width
@@ -780,6 +782,7 @@ private fun TagRulesSection(s: AppSettings, update: ((AppSettings) -> AppSetting
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LunarSection(vm: AppViewModel, s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
     val l = s.lunar
@@ -795,7 +798,28 @@ private fun LunarSection(vm: AppViewModel, s: AppSettings, update: ((AppSettings
     ChoiceRow(LunarPrefs.LEAD_CHOICES, l.lead, { "$it ngày" }) { n -> update { it.copy(lunar = it.lunar.copy(lead = n)) } }
     Hint("Tết luôn báo trước ít nhất 14 ngày.")
     SwitchRow("Mùng 1 và Rằm hằng tháng", l.monthly) { v -> update { it.copy(lunar = it.lunar.copy(monthly = v)) } }
-    Hint("Đánh dấu trên lịch và nhắc từ 18:00 hôm trước để chuẩn bị đồ cúng.")
+    Hint("Đánh dấu trên lịch và nhắc để chuẩn bị đồ cúng.")
+    if (l.monthly) {
+        var pickClock by remember { mutableStateOf(false) }
+        Text("Nhắc trước", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ChoiceRow(LunarPrefs.MONTHLY_LEAD_CHOICES, l.monthlyLead, { if (it == 0) "Đúng ngày" else "$it ngày" }) { n -> update { it.copy(lunar = it.lunar.copy(monthlyLead = n)) } }
+        OutlinedButton(onClick = { pickClock = true }) { Text("Giờ nhắc: ${LunarPrefs.clockText(l.monthlyMinutes)}") }
+        if (pickClock) {
+            val state = rememberTimePickerState(initialHour = l.monthlyMinutes / 60, initialMinute = l.monthlyMinutes % 60, is24Hour = true)
+            AlertDialog(
+                onDismissRequest = { pickClock = false },
+                title = { Text("Giờ nhắc mùng 1 và Rằm") },
+                text = { TimePicker(state = state) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pickClock = false
+                        update { it.copy(lunar = it.lunar.copy(monthlyMinutes = state.hour * 60 + state.minute)) }
+                    }) { Text("Chọn") }
+                },
+                dismissButton = { TextButton(onClick = { pickClock = false }) { Text("Huỷ") } },
+            )
+        }
+    }
     if (l.dismissed.isNotEmpty()) {
         TextButton(onClick = { update { it.copy(lunar = it.lunar.copy(dismissed = emptySet())) } }) { Text("Hiện lại thông báo đã ẩn (${l.dismissed.size})") }
     }

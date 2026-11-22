@@ -13,7 +13,6 @@ data class LunarNotice(val key: String, val at: LocalDateTime, val title: String
  */
 object LunarNotices {
     const val HOLIDAY_HOUR = 8
-    const val MONTHLY_HOUR = 18
     const val HORIZON_DAYS = 400
     const val MAX = 40
 
@@ -49,16 +48,18 @@ object LunarNotices {
         }
 
         if (prefs.monthly) {
-            var d = today
-            while (d <= today.plusDays(HORIZON_DAYS.toLong())) {
-                val l = Lunar.toLunar(d.plusDays(1))
+            val lead = prefs.monthlyLead.coerceIn(0, 31).toLong()
+            val minutes = prefs.monthlyMinutes.coerceIn(0, 24 * 60 - 1)
+            var target = today
+            while (target <= today.plusDays(HORIZON_DAYS.toLong())) {
+                val l = Lunar.toLunar(target)
                 val mark = LunarText.monthlyMark(l)
-                val at = d.atTime(MONTHLY_HOUR, 0)
+                val at = target.minusDays(lead).atTime(minutes / 60, minutes % 60)
                 if (mark != null && l != null && at > now) {
                     val name = LunarText.full(l).removePrefix("$mark ")
-                    out += LunarNotice("monthly:${d.plusDays(1)}", at, "Mai là $mark $name", "Chuẩn bị đồ cúng.")
+                    out += LunarNotice("monthly:$target", at, monthlyNoticeTitle(lead.toInt(), mark, name), "Chuẩn bị đồ cúng.")
                 }
-                d = d.plusDays(1)
+                target = target.plusDays(1)
             }
         }
         return out.sortedBy { it.at }.take(MAX)
