@@ -1,6 +1,6 @@
 import { holidayDays, holidayOn, lunarOfMain, type Holiday, type HolidayOverride } from "../../../shared/holidays";
 import { solarToLunar, type LunarDate } from "../../../shared/lunar";
-import type { ISODate } from "../../../shared/dates";
+import { addDays, type ISODate } from "../../../shared/dates";
 import { toDateInput } from "./format";
 
 const WEEKDAY = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
@@ -21,6 +21,29 @@ export function lunarFull(l: LunarDate): string {
 
 /** Mùng 1 or Rằm of a lunar date, for the monthly reminder. */
 export const monthlyMark = (l: LunarDate | null): "Mùng 1" | "Rằm" | null => (l?.day === 1 ? "Mùng 1" : l?.day === 15 ? "Rằm" : null);
+
+/** The reminder title for a mùng 1 / rằm that is [lead] days away. */
+export function monthlyTitle(lead: number, mark: string, name: string): string {
+  return lead === 0 ? `Hôm nay là ${mark} ${name}` : lead === 1 ? `Mai là ${mark} ${name}` : `${lead} ngày nữa là ${mark} ${name}`;
+}
+
+/**
+ * The mùng 1 / rằm reminder to show at [nowMs], or null. It starts [lead] days before at [minutes] of the day
+ * and stays until the day itself ends.
+ */
+export function monthlyNotice(nowMs: number, lead: number, minutes: number): { mark: "Mùng 1" | "Rằm"; target: ISODate; lead: number } | null {
+  const today = isoOf(nowMs);
+  const d = new Date(nowMs);
+  const nowMin = d.getHours() * 60 + d.getMinutes();
+  for (let k = 0; k <= lead; k++) {
+    const target = addDays(today, k);
+    const mark = monthlyMark(solarToLunar(target));
+    if (!mark) continue;
+    // k === lead: the notice day itself, which only starts at the chosen time.
+    if (k < lead || nowMin >= minutes) return { mark, target, lead: k };
+  }
+  return null;
+}
 
 /** "Thứ Sáu 16/4/2027". */
 export function longDate(iso: ISODate): string {

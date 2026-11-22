@@ -184,6 +184,8 @@ class SettingsRepository(context: Context) {
                 banner = prefs.getBoolean("lunarBanner", d.lunar.banner),
                 lead = prefs.getInt("lunarLead", d.lunar.lead).takeIf { it in LunarPrefs.LEAD_CHOICES } ?: d.lunar.lead,
                 monthly = prefs.getBoolean("lunarMonthly", d.lunar.monthly),
+                monthlyLead = prefs.getInt("lunarMonthlyLead", d.lunar.monthlyLead).takeIf { it in LunarPrefs.MONTHLY_LEAD_CHOICES } ?: d.lunar.monthlyLead,
+                monthlyMinutes = prefs.getInt("lunarMonthlyMinutes", d.lunar.monthlyMinutes).takeIf { it in 0 until 24 * 60 } ?: d.lunar.monthlyMinutes,
                 dismissed = (prefs.getString("lunarDismissed", "") ?: "").split(',').filter { it.isNotBlank() }.toSet(),
             ),
             holidayJson = prefs.getString("holidayJson", null) ?: d.holidayJson,
@@ -236,6 +238,8 @@ class SettingsRepository(context: Context) {
             .putBoolean("lunarBanner", s.lunar.banner)
             .putInt("lunarLead", s.lunar.lead)
             .putBoolean("lunarMonthly", s.lunar.monthly)
+            .putInt("lunarMonthlyLead", s.lunar.monthlyLead)
+            .putInt("lunarMonthlyMinutes", s.lunar.monthlyMinutes)
             .putString("lunarDismissed", s.lunar.dismissed.joinToString(","))
             .putString("holidayJson", s.holidayJson)
             .putString("autoBackupUri", s.autoBackupUri)

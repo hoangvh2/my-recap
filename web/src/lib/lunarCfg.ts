@@ -14,12 +14,38 @@ export interface LunarPrefs {
   lead: number;
   /** Mùng 1 and Rằm marked, with a reminder the day before to prepare offerings. Off until chosen. */
   monthly: boolean;
+  /** Days before mùng 1 / rằm the reminder shows (0 = the day itself, 1 = the day before). */
+  monthlyLead: number;
+  /** Minute of the day the reminder starts showing, 0..1439 (default 18:00). */
+  monthlyMinutes: number;
   /** Banners the person hid, as "id:year". */
   dismissed: string[];
 }
 
 export const LEAD_CHOICES = [3, 5, 7, 14] as const;
-export const DEFAULT_LUNAR_PREFS: LunarPrefs = { show: true, holidays: true, banner: true, lead: 5, monthly: false, dismissed: [] };
+export const MONTHLY_LEAD_CHOICES = [0, 1, 2, 3, 5, 7] as const;
+export const DEFAULT_MONTHLY_MINUTES = 18 * 60;
+export const DEFAULT_LUNAR_PREFS: LunarPrefs = {
+  show: true,
+  holidays: true,
+  banner: true,
+  lead: 5,
+  monthly: false,
+  monthlyLead: 1,
+  monthlyMinutes: DEFAULT_MONTHLY_MINUTES,
+  dismissed: [],
+};
+
+/** "18:00" for a minute of the day, the value an <input type="time"> uses. */
+export const clockText = (minutes: number): string => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+/** The minute of the day for "18:00", or null if it is not a time. */
+export function parseClock(text: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(text);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return h < 24 && min < 60 ? h * 60 + min : null;
+}
 
 const KEY = "vhub.lunar";
 const DATA_KEY = "vhub.holidays";
@@ -33,6 +59,9 @@ export function readLunarPrefs(raw: unknown): LunarPrefs {
     banner: typeof r.banner === "boolean" ? r.banner : d.banner,
     lead: (LEAD_CHOICES as readonly number[]).includes(r.lead as number) ? (r.lead as number) : d.lead,
     monthly: typeof r.monthly === "boolean" ? r.monthly : d.monthly,
+    monthlyLead: (MONTHLY_LEAD_CHOICES as readonly number[]).includes(r.monthlyLead as number) ? (r.monthlyLead as number) : d.monthlyLead,
+    monthlyMinutes:
+      Number.isInteger(r.monthlyMinutes) && (r.monthlyMinutes as number) >= 0 && (r.monthlyMinutes as number) < 24 * 60 ? (r.monthlyMinutes as number) : d.monthlyMinutes,
     dismissed: Array.isArray(r.dismissed) ? r.dismissed.filter((x): x is string => typeof x === "string").slice(-40) : [],
   };
 }
