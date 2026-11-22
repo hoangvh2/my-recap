@@ -86,6 +86,32 @@ class LunarNoticesTest {
     }
 
     @Test
+    fun monthlyNoticeFollowsChosenLeadAndTime() {
+        val now = at("2027-04-01T10:00")
+        val three = LunarNotices.plan(now, LunarPrefs(monthly = true, holidays = false, monthlyLead = 3, monthlyMinutes = 7 * 60 + 30), overrides)
+        val ram = three.first { it.key == "monthly:2027-04-21" }
+        assertEquals(at("2027-04-18T07:30"), ram.at)
+        assertEquals("3 ngày nữa là Rằm tháng 3 Âm", ram.title)
+        val same = LunarNotices.plan(now, LunarPrefs(monthly = true, holidays = false, monthlyLead = 0, monthlyMinutes = 6 * 60), overrides)
+        assertEquals(at("2027-04-21T06:00"), same.first { it.key == "monthly:2027-04-21" }.at)
+        assertEquals("Hôm nay là Rằm tháng 3 Âm", same.first { it.key == "monthly:2027-04-21" }.title)
+    }
+
+    @Test
+    fun monthlyNoticeAlreadyPastIsSkipped() {
+        // Rằm 21/4, notice day 20/4 18:00: at 19:00 that evening it is gone, the next Mùng 1 is still planned.
+        val plan = LunarNotices.plan(at("2027-04-20T19:00"), LunarPrefs(monthly = true, holidays = false), overrides)
+        assertTrue(plan.none { it.key == "monthly:2027-04-21" })
+        assertTrue(plan.any { it.key.startsWith("monthly:2027-05") })
+    }
+
+    @Test
+    fun defaultsKeepTheOldEveningBeforeBehaviour() {
+        assertEquals(1, LunarPrefs().monthlyLead)
+        assertEquals("18:00", LunarPrefs.clockText(LunarPrefs().monthlyMinutes))
+    }
+
+    @Test
     fun planIsSortedAndCapped() {
         val plan = LunarNotices.plan(at("2027-01-01T00:00"), LunarPrefs(monthly = true), overrides)
         assertTrue(plan.size <= LunarNotices.MAX)
