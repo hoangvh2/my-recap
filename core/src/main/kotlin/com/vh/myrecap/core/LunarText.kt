@@ -66,6 +66,7 @@ object LunarText {
         val l = Lunar.toLunar(d)
         if (prefs.show && l != null) parts += chip(l)
         if (prefs.holidays) Holidays.on(d, overrides)?.takeIf { it.second != DayKind.WEEKEND }?.let { parts += it.first.name }
+        CompanyHolidays.on(d, prefs.company)?.let { parts += it.name }
         if (prefs.monthly) monthlyMark(l)?.let { m -> if (parts.none { it.contains(m) }) parts += m }
         return if (parts.isEmpty()) "" else " · " + parts.joinToString(" · ")
     }
@@ -82,6 +83,8 @@ data class LunarPrefs(
     val monthly: Boolean = false,
     /** Banners hidden by the person, as [Holiday.key]. */
     val dismissed: Set<String> = emptySet(),
+    /** Days off the company gives, typed in by the person. */
+    val company: List<CompanyHoliday> = emptyList(),
 ) {
     companion object {
         val LEAD_CHOICES = listOf(3, 5, 7, 14)

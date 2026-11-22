@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vh.myrecap.core.DayKind
+import com.vh.myrecap.core.CompanyHolidays
 import com.vh.myrecap.core.HolidayOverride
 import com.vh.myrecap.core.Holidays
 import com.vh.myrecap.core.StudyLane
@@ -68,9 +69,10 @@ fun HolidayBanners(vm: AppViewModel, s: AppSettings) {
     val data = remember(s.holidayJson) { Holidays.newest(s.holidayJson) }
     val lunar = s.lunar
     val ahead = if (lunar.banner && lunar.holidays) Holidays.banner(today, lunar.lead, lunar.dismissed, data.overrides) else null
+    val company = if (lunar.banner) CompanyHolidays.banner(today, lunar.lead, lunar.dismissed, lunar.company) else null
     val tomorrow = if (lunar.monthly) Lunar.toLunar(today.plusDays(1)) else null
     val mark = LunarText.monthlyMark(tomorrow)
-    if (ahead == null && mark == null) return
+    if (ahead == null && company == null && mark == null) return
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (ahead != null) {
             val h = ahead.holiday
@@ -85,6 +87,20 @@ fun HolidayBanners(vm: AppViewModel, s: AppSettings) {
                         Text(LunarText.holidayBasis(h), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton(onClick = { vm.updateSettings { it.copy(lunar = it.lunar.copy(dismissed = it.lunar.dismissed + h.key)) } }) { Text("Ẩn") }
+                }
+            }
+        }
+        if (company != null) {
+            val b = company.brk
+            Surface(color = HOLIDAY_FILL, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Rounded.Event, null, Modifier.size(20.dp), tint = HOLIDAY_EDGE)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text((if (company.daysUntil < 0) "Đang nghỉ" else "Sắp nghỉ") + " · ${b.name}", style = MaterialTheme.typography.titleSmall)
+                        Text(CompanyHolidays.line(b, company.daysUntil), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(onClick = { vm.updateSettings { it.copy(lunar = it.lunar.copy(dismissed = it.lunar.dismissed + b.key)) } }) { Text("Ẩn") }
                 }
             }
         }
@@ -165,6 +181,7 @@ fun MonthCalendar(items: List<Item>, vm: AppViewModel, s: AppSettings) {
 private fun DayCell(date: LocalDate, today: LocalDate, selected: LocalDate, count: Int, prefs: LunarPrefs, overrides: List<HolidayOverride>, modifier: Modifier, onClick: () -> Unit) {
     val l = if (prefs.show || prefs.monthly) Lunar.toLunar(date) else null
     val holiday = if (prefs.holidays) Holidays.on(date, overrides) else null
+    val company = CompanyHolidays.on(date, prefs.company)
     val mark = if (prefs.monthly) LunarText.monthlyMark(l) else if (l?.day == 1) "Mùng 1" else null
     val sub = when {
         l == null -> ""
@@ -177,6 +194,7 @@ private fun DayCell(date: LocalDate, today: LocalDate, selected: LocalDate, coun
     val label = when {
         legal -> "Lễ"
         holiday?.second == DayKind.EXTRA -> "Nghỉ"
+        company != null -> "Cty"
         else -> null
     }
     val c = MaterialTheme.colorScheme
@@ -189,12 +207,13 @@ private fun DayCell(date: LocalDate, today: LocalDate, selected: LocalDate, coun
         LunarText.longDate(date),
         l?.let { LunarText.full(it) },
         holiday?.let { "nghỉ lễ ${it.first.name}" },
+        company?.let { "công ty nghỉ ${it.name}" },
         if (count > 0) "$count mục" else null,
     ).joinToString(", ")
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
-        color = if (holiday != null) HOLIDAY_FILL else c.surfaceContainerLow,
+        color = if (holiday != null || company != null) HOLIDAY_FILL else c.surfaceContainerLow,
         border = border,
         modifier = modifier.height(56.dp).semantics { contentDescription = description },
     ) {

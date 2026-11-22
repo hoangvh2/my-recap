@@ -1,5 +1,6 @@
 import bundled from "../../../shared/holidays-vn.json";
 import { parseOverrides, type HolidayOverride } from "../../../shared/holidays";
+import { parseCompany, type CompanyHoliday } from "../../../shared/company";
 import { createStore } from "./store";
 
 /** What the lunar calendar and holiday features show. A per-device choice, kept in this browser like the theme. */
@@ -14,12 +15,14 @@ export interface LunarPrefs {
   lead: number;
   /** Mùng 1 and Rằm marked, with a reminder the day before to prepare offerings. Off until chosen. */
   monthly: boolean;
-  /** Banners the person hid, as "id:year". */
+  /** Banners the person hid, as "id:year" (or "company:id:year"). */
   dismissed: string[];
+  /** Days off the company gives, typed in by the person. */
+  company: CompanyHoliday[];
 }
 
 export const LEAD_CHOICES = [3, 5, 7, 14] as const;
-export const DEFAULT_LUNAR_PREFS: LunarPrefs = { show: true, holidays: true, banner: true, lead: 5, monthly: false, dismissed: [] };
+export const DEFAULT_LUNAR_PREFS: LunarPrefs = { show: true, holidays: true, banner: true, lead: 5, monthly: false, dismissed: [], company: [] };
 
 const KEY = "vhub.lunar";
 const DATA_KEY = "vhub.holidays";
@@ -34,6 +37,7 @@ export function readLunarPrefs(raw: unknown): LunarPrefs {
     lead: (LEAD_CHOICES as readonly number[]).includes(r.lead as number) ? (r.lead as number) : d.lead,
     monthly: typeof r.monthly === "boolean" ? r.monthly : d.monthly,
     dismissed: Array.isArray(r.dismissed) ? r.dismissed.filter((x): x is string => typeof x === "string").slice(-40) : [],
+    company: parseCompany(r.company),
   };
 }
 
