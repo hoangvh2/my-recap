@@ -2,6 +2,7 @@ package com.vh.myrecap.settings
 
 import android.content.Context
 import com.vh.myrecap.core.InterviewerSpeech
+import com.vh.myrecap.core.CompanyHolidays
 import com.vh.myrecap.core.LunarPrefs
 import com.vh.myrecap.core.OutputLanguage
 import com.vh.myrecap.core.ProviderConfig
@@ -187,6 +188,7 @@ class SettingsRepository(context: Context) {
                 monthlyLead = prefs.getInt("lunarMonthlyLead", d.lunar.monthlyLead).takeIf { it in LunarPrefs.MONTHLY_LEAD_CHOICES } ?: d.lunar.monthlyLead,
                 monthlyMinutes = prefs.getInt("lunarMonthlyMinutes", d.lunar.monthlyMinutes).takeIf { it in 0 until 24 * 60 } ?: d.lunar.monthlyMinutes,
                 dismissed = (prefs.getString("lunarDismissed", "") ?: "").split(',').filter { it.isNotBlank() }.toSet(),
+                company = CompanyHolidays.parse(prefs.getString("companyHolidays", null)),
             ),
             holidayJson = prefs.getString("holidayJson", null) ?: d.holidayJson,
             autoBackupUri = prefs.getString("autoBackupUri", null) ?: d.autoBackupUri,
@@ -241,6 +243,7 @@ class SettingsRepository(context: Context) {
             .putInt("lunarMonthlyLead", s.lunar.monthlyLead)
             .putInt("lunarMonthlyMinutes", s.lunar.monthlyMinutes)
             .putString("lunarDismissed", s.lunar.dismissed.joinToString(","))
+            .putString("companyHolidays", CompanyHolidays.toJson(s.lunar.company))
             .putString("holidayJson", s.holidayJson)
             .putString("autoBackupUri", s.autoBackupUri)
             .putString("autoBackupError", s.autoBackupError)

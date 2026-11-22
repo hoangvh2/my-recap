@@ -1,5 +1,6 @@
 import bundled from "../../../shared/holidays-vn.json";
 import { parseOverrides, type HolidayOverride } from "../../../shared/holidays";
+import { parseCompany, type CompanyHoliday } from "../../../shared/company";
 import { createStore } from "./store";
 
 /** What the lunar calendar and holiday features show. A per-device choice, kept in this browser like the theme. */
@@ -18,8 +19,10 @@ export interface LunarPrefs {
   monthlyLead: number;
   /** Minute of the day the reminder starts showing, 0..1439 (default 18:00). */
   monthlyMinutes: number;
-  /** Banners the person hid, as "id:year". */
+  /** Banners the person hid, as "id:year" (or "company:id:year"). */
   dismissed: string[];
+  /** Days off the company gives, typed in by the person. */
+  company: CompanyHoliday[];
 }
 
 export const LEAD_CHOICES = [3, 5, 7, 14] as const;
@@ -34,6 +37,7 @@ export const DEFAULT_LUNAR_PREFS: LunarPrefs = {
   monthlyLead: 1,
   monthlyMinutes: DEFAULT_MONTHLY_MINUTES,
   dismissed: [],
+  company: [],
 };
 
 /** "18:00" for a minute of the day, the value an <input type="time"> uses. */
@@ -63,6 +67,7 @@ export function readLunarPrefs(raw: unknown): LunarPrefs {
     monthlyMinutes:
       Number.isInteger(r.monthlyMinutes) && (r.monthlyMinutes as number) >= 0 && (r.monthlyMinutes as number) < 24 * 60 ? (r.monthlyMinutes as number) : d.monthlyMinutes,
     dismissed: Array.isArray(r.dismissed) ? r.dismissed.filter((x): x is string => typeof x === "string").slice(-40) : [],
+    company: parseCompany(r.company),
   };
 }
 

@@ -46,6 +46,7 @@ describe("lunar settings", () => {
   });
   it("drops bad values", () => {
     expect(readLunarPrefs({ show: "yes", lead: 4, monthly: true, dismissed: ["a", 3] })).toEqual({ ...DEFAULT_LUNAR_PREFS, monthly: true, dismissed: ["a"] });
+    expect(DEFAULT_LUNAR_PREFS.company).toEqual([]);
   });
 });
 

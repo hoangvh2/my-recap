@@ -141,6 +141,9 @@ fun SettingsScreen(vm: AppViewModel) {
             Section("Lịch Âm & ngày lễ") {
                 LunarSection(vm, s, update)
             }
+            Section("Ngày nghỉ của công ty") {
+                CompanyHolidaysSection(s, update)
+            }
             Section("Mẫu checklist") {
                 Hint("Danh sách cần nhớ (ra khỏi nhà mang gì, giao hàng, chuẩn bị họp). Một chạm ở ô gõ nhanh là tạo việc kèm checklist.")
                 FilledTonalButton(onClick = vm::openChecklistTemplates, modifier = Modifier.fillMaxWidth()) { Text("Quản lý mẫu checklist (${s.checklistTemplates.size})") }
@@ -422,7 +425,7 @@ private fun SecretField(label: String, value: String, onChange: (String) -> Unit
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

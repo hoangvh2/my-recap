@@ -85,3 +85,44 @@ test("deleting a lunar repeat asks first: Không keeps it, Xoá removes it", asy
   await expect(row(page, "Giỗ ông nội")).toHaveCount(0);
   expectNoProblems(problems);
 });
+
+test("company holidays: add one, see it on the calendar and Today, delete asks first (Không keeps it, Xoá removes it)", async ({ page }) => {
+  const problems = watchBrowser(page);
+  await page.clock.setFixedTime(local(2026, 7, 17, 9)); // three days before the company summer break
+  await signIn(page, OWNER);
+  await page.getByRole("link", { name: "Cài đặt" }).click();
+  const list = page.getByRole("list", { name: "Ngày nghỉ của công ty" });
+  await expect(list).toContainText("Chưa nhập ngày nghỉ nào");
+
+  await page.getByRole("button", { name: "Thêm ngày nghỉ công ty" }).click();
+  const sheet = page.getByRole("dialog", { name: "Kỳ nghỉ công ty mới" });
+  await sheet.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(sheet.getByRole("alert")).toHaveText("Nhập tên kỳ nghỉ.");
+  await sheet.getByLabel("Tên kỳ nghỉ").fill("Nghỉ hè công ty");
+  await sheet.getByLabel("Từ ngày").fill("2026-07-20");
+  await sheet.getByLabel(/^Đến ngày/).fill("2026-07-22");
+  await sheet.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(list).toContainText("Nghỉ hè công ty");
+  await expect(list).toContainText("20/7 đến 22/7 · lặp hằng năm");
+
+  // It shows on Today as a banner.
+  await page.evaluate(() => { location.hash = "#/"; });
+  await expect(page.locator(".notice.holiday")).toContainText("Sắp nghỉ · Nghỉ hè công ty");
+  await expect(page.locator(".notice.holiday")).toContainText("Còn 3 ngày. Nghỉ 20/7 đến 22/7");
+
+  // ...and on the month calendar.
+  await openCalendar(page);
+  await page.getByRole("radio", { name: "Tháng", exact: true }).click();
+  await expect(page.getByRole("gridcell", { name: /21\/7\/2026.*công ty nghỉ Nghỉ hè công ty/ })).toBeVisible();
+
+  // Delete asks first.
+  await page.evaluate(() => { location.hash = "#/cai-dat"; });
+  await list.getByRole("button", { name: "Xoá kỳ nghỉ Nghỉ hè công ty" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("Nghỉ hè công ty · 20/7 đến 22/7 · hằng năm");
+  await answerConfirm(page, "Không");
+  await expect(list).toContainText("Nghỉ hè công ty");
+  await list.getByRole("button", { name: "Xoá kỳ nghỉ Nghỉ hè công ty" }).click();
+  await answerConfirm(page, "Xoá");
+  await expect(list).toContainText("Chưa nhập ngày nghỉ nào");
+  expectNoProblems(problems);
+});

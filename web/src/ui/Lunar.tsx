@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { type ISODate } from "../../../shared/dates";
+import { companyBanner, companyOn, companySpan } from "../../../shared/company";
 import { bannerFor, bannerKey, holidayOn, type HolidayOverride } from "../../../shared/holidays";
 import { lunarMonth, lunarToSolar, solarToLunar } from "../../../shared/lunar";
 import { LEAD_CHOICES, MONTHLY_LEAD_CHOICES, clockText, parseClock, holidayData, lunarPrefs, refreshHolidayData, setLunarPrefs } from "../lib/lunarCfg";
@@ -28,11 +29,11 @@ export function HolidayBanner({ now }: { now: number }) {
   const { prefs, overrides } = useLunarCfg();
   const today = toDateInput(now);
   const ahead = prefs.banner && prefs.holidays ? bannerFor(today, prefs.lead, prefs.dismissed, overrides) : null;
+  const company = prefs.banner ? companyBanner(today, prefs.lead, prefs.dismissed, prefs.company) : null;
   const monthly = prefs.monthly ? monthlyNotice(now, prefs.monthlyLead, prefs.monthlyMinutes) : null;
-  if (!ahead && !monthly) return null;
-  const hide = () => {
-    if (!ahead) return;
-    const key = bannerKey(ahead.holiday);
+  if (!ahead && !company && !monthly) return null;
+  const hide = () => ahead && hideKey(bannerKey(ahead.holiday));
+  const hideKey = (key: string) => {
     setLunarPrefs({ dismissed: [...prefs.dismissed, key] });
     showToast("Đã ẩn thông báo kỳ nghỉ này", { label: "Hoàn tác", run: () => setLunarPrefs({ dismissed: lunarPrefs.get().dismissed.filter((k) => k !== key) }) });
   };
@@ -51,6 +52,18 @@ export function HolidayBanner({ now }: { now: number }) {
             </small>
           </span>
           <button class="btn text" onClick={hide}>Ẩn</button>
+        </div>
+      )}
+      {company && (
+        <div class="notice holiday" role="status">
+          <Icon name="calendar" size={18} />
+          <span class="grow">
+            <strong>{company.daysUntil! < 0 ? "Đang nghỉ" : "Sắp nghỉ"} · {company.name}</strong>
+            <br />
+            {company.daysUntil! < 0 ? `Nghỉ đến hết ${companySpan({ from: company.to, to: company.to })}.` : company.daysUntil === 0 ? "Nghỉ từ hôm nay." : company.daysUntil === 1 ? "Nghỉ từ ngày mai." : `Còn ${company.daysUntil} ngày.`} Nghỉ {companySpan(company)}.
+            <small class="status">Ngày nghỉ của công ty</small>
+          </span>
+          <button class="btn text" onClick={() => hideKey(company.key)}>Ẩn</button>
         </div>
       )}
       {monthly && (
@@ -79,6 +92,8 @@ export function dayExtras(t: number, prefs = lunarPrefs.get(), overrides: readon
     const h = holidayOn(iso, overrides);
     if (h && h.kind !== "weekend") parts.push(h.holiday.name);
   }
+  const co = companyOn(iso, prefs.company);
+  if (co) parts.push(co.name);
   if (prefs.monthly) {
     const m = monthlyMark(lunarAt(t));
     if (m && !parts.some((p) => p.includes(m))) parts.push(m);
@@ -139,13 +154,14 @@ export function MonthCalendar({ items, onOpen, onToggle }: { items: Item[]; onOp
           const h = prefs.holidays ? holidayOn(iso, overrides) : null;
           const mark = prefs.monthly ? monthlyMark(l) : l?.day === 1 ? "Mùng 1" : null;
           const sub = !l ? "" : l.day === 1 ? `1/${l.month}${l.leap ? "n" : ""}` : mark === "Rằm" ? "Rằm" : prefs.show ? String(l.day) : "";
+          const co = companyOn(iso, prefs.company);
           const n = byDay.get(iso)?.length ?? 0;
-          const cls = ["cal-day", iso === todayIso ? "today" : "", iso === sel ? "sel" : "", h?.kind === "legal" ? "holiday" : h ? "off" : "", mark ? "lunar-mark" : ""].filter(Boolean).join(" ");
+          const cls = ["cal-day", iso === todayIso ? "today" : "", iso === sel ? "sel" : "", h?.kind === "legal" ? "holiday" : h || co ? "off" : "", co ? "company" : "", mark ? "lunar-mark" : ""].filter(Boolean).join(" ");
           return (
-            <button key={iso} type="button" class={cls} role="gridcell" aria-selected={iso === sel} aria-label={dayAria(iso, l ? lunarFull(l) : "", h?.holiday.name, n)} onClick={() => setSel(iso)}>
+            <button key={iso} type="button" class={cls} role="gridcell" aria-selected={iso === sel} aria-label={dayAria(iso, l ? lunarFull(l) : "", h?.holiday.name, n, co?.name)} onClick={() => setSel(iso)}>
               <span class="num">{Number(iso.slice(8, 10))}</span>
               {sub && <small>{sub}</small>}
-              {h?.kind === "legal" ? <em>Lễ</em> : h?.kind === "extra" ? <em>Nghỉ</em> : null}
+              {h?.kind === "legal" ? <em>Lễ</em> : h?.kind === "extra" ? <em>Nghỉ</em> : co ? <em>Cty</em> : null}
               {n > 0 && <i class="dotc" aria-hidden="true">{n}</i>}
             </button>
           );
@@ -163,8 +179,8 @@ export function MonthCalendar({ items, onOpen, onToggle }: { items: Item[]; onOp
   );
 }
 
-function dayAria(iso: ISODate, lunar: string, holiday: string | undefined, n: number): string {
-  return [longDate(iso), lunar, holiday ? `nghỉ lễ ${holiday}` : "", n ? `${n} mục` : ""].filter(Boolean).join(", ");
+function dayAria(iso: ISODate, lunar: string, holiday: string | undefined, n: number, company?: string): string {
+  return [longDate(iso), lunar, holiday ? `nghỉ lễ ${holiday}` : "", company ? `công ty nghỉ ${company}` : "", n ? `${n} mục` : ""].filter(Boolean).join(", ");
 }
 
 /** "Âm: 24/2 đến 25/3": the lunar days the solar month spans. */

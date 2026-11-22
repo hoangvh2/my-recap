@@ -1,3 +1,4 @@
+import { CompanyHolidaysCard } from "./CompanyHolidays";
 import { LunarSettings } from "./Lunar";
 import { useEffect, useState } from "preact/hooks";
 import { addDays, formatDate } from "../../../shared/dates";
@@ -199,6 +200,10 @@ export function Settings({ email }: { email: string }) {
 
       <Section title="Lịch Âm & ngày lễ">
         <LunarSettings />
+      </Section>
+
+      <Section title="Ngày nghỉ của công ty">
+        <CompanyHolidaysCard />
       </Section>
 
       <Section title="Mẫu checklist">

@@ -34,6 +34,19 @@ object LunarNotices {
             }
         }
 
+        if (prefs.banner) {
+            val horizon = today.plusDays(HORIZON_DAYS.toLong())
+            for (year in today.year..today.year + 1) {
+                for (b in CompanyHolidays.ofYear(prefs.company, year)) {
+                    if (b.from > horizon || b.to < today || b.key in prefs.dismissed) continue
+                    val day = b.from.minusDays(prefs.lead.toLong())
+                    val at = day.atTime(HOLIDAY_HOUR, 0)
+                    if (at <= now) continue
+                    out += LunarNotice(b.key, at, "Sắp nghỉ · ${b.name}", CompanyHolidays.line(b, prefs.lead))
+                }
+            }
+        }
+
         if (prefs.monthly) {
             val lead = prefs.monthlyLead.coerceIn(0, 31).toLong()
             val minutes = prefs.monthlyMinutes.coerceIn(0, 24 * 60 - 1)
