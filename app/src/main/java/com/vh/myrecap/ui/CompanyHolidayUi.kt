@@ -13,6 +13,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,6 +105,7 @@ fun CompanyHolidaysSection(s: AppSettings, update: ((AppSettings) -> AppSettings
 private fun Long.toDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 private fun LocalDate.toMs(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompanyHolidayDialog(entry: CompanyHoliday?, onSave: (CompanyHoliday) -> Unit, onDelete: (CompanyHoliday) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(entry?.name ?: "") }
