@@ -779,6 +779,7 @@ private fun TagRulesSection(s: AppSettings, update: ((AppSettings) -> AppSetting
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LunarSection(vm: AppViewModel, s: AppSettings, update: ((AppSettings) -> AppSettings) -> Unit) {
     val l = s.lunar
