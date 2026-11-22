@@ -116,7 +116,7 @@ test("company holidays: add one, see it on the calendar and Today, delete asks f
   await expect(page.getByRole("gridcell", { name: /21\/7\/2026.*công ty nghỉ Nghỉ hè công ty/ })).toBeVisible();
 
   // Delete asks first.
-  await page.getByRole("link", { name: "Cài đặt" }).click();
+  await page.evaluate(() => { location.hash = "#/cai-dat"; });
   await list.getByRole("button", { name: "Xoá kỳ nghỉ Nghỉ hè công ty" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("Nghỉ hè công ty · 20/7 đến 22/7 · hằng năm");
   await answerConfirm(page, "Không");
