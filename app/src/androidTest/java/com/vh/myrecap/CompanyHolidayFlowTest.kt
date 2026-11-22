@@ -49,7 +49,8 @@ class CompanyHolidayFlowTest {
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)).use {
             assertTrue("agenda", device.wait(Until.hasObject(By.desc("Cài đặt")), 10_000))
             device.findObject(By.desc("Cài đặt")).click()
-            assertTrue("company section", device.wait(Until.hasObject(By.desc("Xoá kỳ nghỉ Nghỉ hè công ty")), 10_000) || scrollTo("Xoá kỳ nghỉ Nghỉ hè công ty"))
+            assertTrue("company section", scrollTo("Xoá kỳ nghỉ Nghỉ hè công ty"))
+            Thread.sleep(700) // let the scroll settle before tapping
             shot("70-company-settings")
 
             // "Huỷ": it stays.
@@ -70,8 +71,9 @@ class CompanyHolidayFlowTest {
 
     private fun scrollTo(desc: String): Boolean {
         repeat(25) {
-            if (device.hasObject(By.desc(desc))) return true
-            device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
+            if (device.wait(Until.hasObject(By.desc(desc)), 600)) return true
+            // Slow drag (many steps) so the list does not fling past the target.
+            device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 2, 80)
         }
         return device.hasObject(By.desc(desc))
     }
