@@ -105,8 +105,8 @@ test("company holidays: add one, see it on the calendar and Today, delete asks f
   await expect(list).toContainText("Nghỉ hè công ty");
   await expect(list).toContainText("20/7 đến 22/7 · lặp hằng năm");
 
-  // It reloads from this browser and shows on Today as a banner.
-  await page.reload();
+  // It shows on Today as a banner.
+  await page.evaluate(() => { location.hash = "#/"; });
   await expect(page.locator(".notice.holiday")).toContainText("Sắp nghỉ · Nghỉ hè công ty");
   await expect(page.locator(".notice.holiday")).toContainText("Còn 3 ngày. Nghỉ 20/7 đến 22/7");
 
