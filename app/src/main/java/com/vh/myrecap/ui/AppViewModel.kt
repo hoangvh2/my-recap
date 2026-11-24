@@ -215,6 +215,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         push(if (session.isMemo) Screen.Review(id) else Screen.Detail(id))
     }
 
+    /** A script open on the teleprompter, drawn over whatever screen is below (so an unsaved note keeps its edits). */
+    data class TeleprompterRequest(val title: String, val script: String)
+
+    var teleprompter by mutableStateOf<TeleprompterRequest?>(null)
+        private set
+
+    fun openTeleprompter(title: String, script: String) {
+        if (script.isNotBlank()) teleprompter = TeleprompterRequest(title.trim(), script)
+    }
+
+    fun closeTeleprompter() {
+        teleprompter = null
+    }
+
     fun openSettings() = push(Screen.Settings)
     fun openTemplates() = push(Screen.Templates)
     fun openChecklistTemplates() = push(Screen.ChecklistTemplates)

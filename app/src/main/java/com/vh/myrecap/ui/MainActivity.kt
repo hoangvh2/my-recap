@@ -164,34 +164,38 @@ private fun AppRoot(vm: AppViewModel) {
     }
     val nav = vm.nav
     if (nav.depth > 1) BackHandler { vm.back() }
-    AnimatedContent(
-        targetState = nav,
-        contentKey = { it.screen },
-        transitionSpec = {
-            // Deeper screens slide in from the right; going back slides the other way.
-            val forward = targetState.depth >= initialState.depth
-            val dir = if (forward) 1 else -1
-            (slideInHorizontally(tween(260)) { it / 6 * dir } + fadeIn(tween(220))) togetherWith
-                (slideOutHorizontally(tween(260)) { -it / 10 * dir } + fadeOut(tween(160)))
-        },
-        label = "screens",
-    ) { entry ->
-        when (val target = entry.screen) {
-            Screen.Home -> HomeScreen(vm)
-            is Screen.Detail -> SessionScreen(vm, target.id)
-            is Screen.Clip -> ClipScreen(vm, target.id, target.index)
-            is Screen.Summary -> SummaryScreen(vm, target.id, target.jobId)
-            is Screen.Review -> ReviewScreen(vm, target.id)
-            is Screen.ItemEdit -> ItemEditScreen(vm, target.id, target.type)
-            Screen.Settings -> SettingsScreen(vm)
-            Screen.Templates -> TemplatesScreen(vm)
-            Screen.ChecklistTemplates -> ChecklistTemplatesScreen(vm)
-            Screen.Search -> SearchScreen(vm)
-            Screen.Spending -> SpendingScreen(vm)
-            Screen.Weekly -> WeeklyRecapScreen(vm)
-            Screen.Contacts -> ContactsScreen(vm)
-            is Screen.ContactDetail -> ContactDetailScreen(vm, target.uid)
-            is Screen.Shared -> SharedDetailScreen(vm, target.id)
+    val tele = vm.teleprompter
+    Box(Modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = nav,
+            contentKey = { it.screen },
+            transitionSpec = {
+                // Deeper screens slide in from the right; going back slides the other way.
+                val forward = targetState.depth >= initialState.depth
+                val dir = if (forward) 1 else -1
+                (slideInHorizontally(tween(260)) { it / 6 * dir } + fadeIn(tween(220))) togetherWith
+                    (slideOutHorizontally(tween(260)) { -it / 10 * dir } + fadeOut(tween(160)))
+            },
+            label = "screens",
+        ) { entry ->
+            when (val target = entry.screen) {
+                Screen.Home -> HomeScreen(vm)
+                is Screen.Detail -> SessionScreen(vm, target.id)
+                is Screen.Clip -> ClipScreen(vm, target.id, target.index)
+                is Screen.Summary -> SummaryScreen(vm, target.id, target.jobId)
+                is Screen.Review -> ReviewScreen(vm, target.id)
+                is Screen.ItemEdit -> ItemEditScreen(vm, target.id, target.type)
+                Screen.Settings -> SettingsScreen(vm)
+                Screen.Templates -> TemplatesScreen(vm)
+                Screen.ChecklistTemplates -> ChecklistTemplatesScreen(vm)
+                Screen.Search -> SearchScreen(vm)
+                Screen.Spending -> SpendingScreen(vm)
+                Screen.Weekly -> WeeklyRecapScreen(vm)
+                Screen.Contacts -> ContactsScreen(vm)
+                is Screen.ContactDetail -> ContactDetailScreen(vm, target.uid)
+                is Screen.Shared -> SharedDetailScreen(vm, target.id)
+            }
         }
+        if (tele != null) TeleprompterScreen(vm, tele)
     }
 }
