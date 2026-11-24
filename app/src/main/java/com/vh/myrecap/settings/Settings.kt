@@ -77,6 +77,8 @@ data class AppSettings(
     val checklistTemplates: List<ChecklistTemplate> = ChecklistTemplates.DEFAULTS,
     /** "Person / place / word → tag" rules applied to new tasks and appointments. */
     val tagRules: List<TagRule> = emptyList(),
+    /** The web app may make this phone ring ("Tìm điện thoại"). */
+    val findPhone: Boolean = true,
     /** How the teleprompter reads a script: speed, text size, mirror, countdown. */
     val teleprompter: TeleprompterPrefs = TeleprompterPrefs(),
     /** Repeats of an important item wait for the morning instead of ringing overnight. */
@@ -179,6 +181,7 @@ class SettingsRepository(context: Context) {
             quickTemplates = QuickTemplates.decode(prefs.getString("quickTemplates", null)) ?: d.quickTemplates,
             checklistTemplates = ChecklistTemplates.decode(prefs.getString("checklistTemplates", null)) ?: d.checklistTemplates,
             tagRules = TagRules.decode(prefs.getString("tagRules", null)) ?: d.tagRules,
+            findPhone = prefs.getBoolean("findPhone", d.findPhone),
             teleprompter = Teleprompter.decode(prefs.getString("teleprompter", null)) ?: d.teleprompter,
             quietNags = prefs.getBoolean("quietNags", d.quietNags),
             studyAuto = prefs.getBoolean("studyAuto", d.studyAuto),
@@ -236,6 +239,7 @@ class SettingsRepository(context: Context) {
             .putString("quickTemplates", QuickTemplates.encode(s.quickTemplates))
             .putString("checklistTemplates", ChecklistTemplates.encode(s.checklistTemplates))
             .putString("tagRules", TagRules.encode(s.tagRules))
+            .putBoolean("findPhone", s.findPhone)
             .putString("teleprompter", Teleprompter.encode(s.teleprompter))
             .putBoolean("quietNags", s.quietNags)
             .putBoolean("studyAuto", s.studyAuto)

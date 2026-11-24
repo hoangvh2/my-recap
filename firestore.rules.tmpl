@@ -235,11 +235,13 @@ service cloud.firestore {
       allow get: if owner(uid);
       allow create, update: if owner(uid)
         && id.matches('^[A-Za-z0-9_-]{1,64}$')
-        && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt', 'name', 'find'])
         && request.resource.data.token is string
         && request.resource.data.token.size() > 20 && request.resource.data.token.size() <= 4096
         && request.resource.data.platform in ['web', 'android', 'ios']
-        && request.resource.data.updatedAt is int;
+        && request.resource.data.updatedAt is int
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 60))
+        && (!('find' in request.resource.data) || request.resource.data.find is bool);
       allow delete: if owner(uid);
     }
 

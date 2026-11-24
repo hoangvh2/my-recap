@@ -21,6 +21,7 @@ import { saveFile } from "./download";
 import { useCtx, useGraph, useUid } from "./hooks";
 import { Icon } from "./icons";
 import { NotifySettingsCard } from "./Notify";
+import { FindPhoneCard } from "./FindPhone";
 import { MembersCard, SharePushCard } from "./Sharing";
 import { useContacts } from "./hooks";
 import { showToast } from "./toast";
@@ -223,6 +224,10 @@ export function Settings({ email }: { email: string }) {
 
       <Section title="Thông báo trên điện thoại">
         <div class="card-block"><NotifySettingsCard /></div>
+      </Section>
+
+      <Section title="Tìm điện thoại">
+        <FindPhoneCard />
       </Section>
 
       <Section title="Nhắc gia hạn">

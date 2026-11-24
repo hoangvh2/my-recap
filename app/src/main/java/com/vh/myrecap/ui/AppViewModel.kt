@@ -229,6 +229,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         teleprompter = null
     }
 
+    /** A setting kept in the account's device list changed (the "find my phone" switch). */
+    fun deviceSettingChanged() = app.cloud.refreshDevice()
+
     fun openSettings() = push(Screen.Settings)
     fun openTemplates() = push(Screen.Templates)
     fun openChecklistTemplates() = push(Screen.ChecklistTemplates)

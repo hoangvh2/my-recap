@@ -476,6 +476,14 @@ describe("sharing", () => {
     await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/web3"), { token: "short", platform: "web", updatedAt: 1 }));
     await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/web4"), { token, platform: "web", updatedAt: 1, extra: 1 }));
     await assertFails(setDoc(doc(ownerCtx(), "users/uMember/devices/web5"), { token, platform: "web", updatedAt: 1 }));
+    // A phone also says what to call it and whether it may be rung from the web.
+    await assertSucceeds(setDoc(doc(memberCtx(), "users/uMember/devices/ph1"), { token, platform: "android", updatedAt: 1, name: "Tecno Spark", find: true }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/ph2"), { token, platform: "android", updatedAt: 1, name: "x".repeat(61), find: true }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/ph3"), { token, platform: "android", updatedAt: 1, name: 5 }));
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/devices/ph4"), { token, platform: "android", updatedAt: 1, find: "yes" }));
+    // The ring log is the server's own: no client can read or write it.
+    await assertFails(setDoc(doc(memberCtx(), "users/uMember/findphone/ph1"), { at: 1 }));
+    await assertFails(getDoc(doc(memberCtx(), "users/uMember/findphone/ph1")));
     await assertSucceeds(deleteDoc(doc(memberCtx(), "users/uMember/devices/web1")));
   });
 });

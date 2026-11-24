@@ -92,6 +92,22 @@ export async function manageMembers(req: MembersRequest): Promise<MembersState> 
   }
 }
 
+export interface PhoneInfo { id: string; name: string; updatedAt: number }
+type FindRequest = { action: "list" } | { action: "ring" | "stop"; id: string };
+const findCall = httpsCallable<FindRequest, { devices?: PhoneInfo[]; sent?: true }>(functions, "findphone", { timeout: 30_000 });
+
+/** "Tìm điện thoại": my Android phones that allow it, or make one ring / stop ringing. Only my own phones. */
+export async function findPhone(req: FindRequest): Promise<{ devices?: PhoneInfo[]; sent?: true }> {
+  try {
+    return (await findCall(req)).data;
+  } catch (e) {
+    const msg = (e as { message?: string } | null)?.message ?? "";
+    // This function's own refusals (not found, too fast) come with a readable message; plain codes do not.
+    if (msg && !/^[a-z-]+$/.test(msg)) throw new ApiError(msg, false);
+    throw toApiError(e);
+  }
+}
+
 export function toApiError(e: unknown): ApiError {
   const code = (e as { code?: string } | null)?.code ?? "";
   const msg = (e as { message?: string } | null)?.message ?? "";

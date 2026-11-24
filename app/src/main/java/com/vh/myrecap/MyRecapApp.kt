@@ -148,6 +148,15 @@ class MyRecapApp : Application() {
             },
         )
         nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_FIND, "Tìm điện thoại", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Hiện khi điện thoại đang đổ chuông do bạn yêu cầu từ bản web, có nút Dừng chuông. Âm phát theo kênh báo thức"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            },
+        )
+        nm.createNotificationChannel(
             NotificationChannel(CHANNEL_PINNED, "Checklist đã ghim", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Checklist bạn ghim để tick ngay trên thanh thông báo. Không phát âm"
                 setSound(null, null)
@@ -225,6 +234,7 @@ class MyRecapApp : Application() {
         const val CHANNEL_CALLS = "calls"
         const val CHANNEL_SHARED = "shared"
         const val CHANNEL_PINNED = "pinned"
+        const val CHANNEL_FIND = "find"
 
         fun from(context: Context): MyRecapApp = context.applicationContext as MyRecapApp
     }

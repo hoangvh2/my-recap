@@ -2,6 +2,7 @@ package com.vh.myrecap.cloud
 
 import android.app.Activity
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -20,6 +21,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.vh.myrecap.BuildConfig
+import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.core.Item
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -143,7 +145,7 @@ class Cloud(
     /** A new push token (the system rotates them): remember it for the signed-in account. */
     fun onNewToken(token: String) {
         val uid = uid ?: return
-        scope.launch { runCatching { sharing?.saveDevice(uid, deviceId(token), token) } }
+        scope.launch { runCatching { saveThisDevice(uid, token) } }
     }
 
     private suspend fun registerPush(uid: String) {
@@ -151,10 +153,22 @@ class Cloud(
             val messaging = FirebaseMessaging.getInstance()
             messaging.isAutoInitEnabled = true
             val token = messaging.token.await()
-            sharing?.saveDevice(uid, deviceId(token), token)
+            saveThisDevice(uid, token)
         } catch (e: Exception) {
             Log.w(TAG, "Push registration failed", e)
         }
+    }
+
+    private suspend fun saveThisDevice(uid: String, token: String) {
+        val maker = Build.MANUFACTURER.orEmpty().trim().replaceFirstChar { it.uppercase() }
+        val name = listOf(maker, Build.MODEL.orEmpty().trim()).filter { it.isNotEmpty() }.distinct().joinToString(" ").take(60).ifEmpty { "Điện thoại Android" }
+        sharing?.saveDevice(uid, deviceId(token), token, name, MyRecapApp.from(context).settings.current.findPhone)
+    }
+
+    /** The phone's name or its "Cho phép tìm máy từ web" switch changed: tell the account's device list. */
+    fun refreshDevice() {
+        val uid = uid ?: return
+        scope.launch { registerPush(uid) }
     }
 
     /** The account is not on the allowlist: the server refuses everything, so sign out and say why. */
