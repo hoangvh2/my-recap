@@ -9,6 +9,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.vh.myrecap.MyRecapApp
 import com.vh.myrecap.R
+import com.vh.myrecap.find.FindPhoneService
 import com.vh.myrecap.ui.MainActivity
 
 /**
@@ -23,6 +24,11 @@ class PushService : FirebaseMessagingService() {
     @SuppressLint("MissingPermission") // SecurityException handled below.
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
+        // Commands from my own web app ("Tìm điện thoại") carry no title: they are not notifications about sharing.
+        when (data["kind"]) {
+            "find-ring" -> return FindPhoneService.ring(this)
+            "find-stop" -> return FindPhoneService.stop(this)
+        }
         val title = data["title"]?.takeIf { it.isNotBlank() } ?: return
         val body = data["body"].orEmpty()
         val shareId = data["shareId"]?.takeIf { data["kind"] != "deleted" }

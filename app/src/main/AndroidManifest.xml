@@ -93,9 +93,24 @@
                 android:value="Countdown timer for study steps: keeps its alarm and notification running with the screen off" />
         </service>
 
+        <!-- "Tìm điện thoại": rings for up to 30 seconds after a command from the person's own web app. -->
+        <service
+            android:name=".find.FindPhoneService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Find my phone: rings loudly for up to 30 seconds when the owner asks from the web app, with a button to stop" />
+        </service>
+
         <!-- Backup alarm of a study session: brings the next step's sound on time even if the service was stopped. -->
         <receiver
             android:name=".study.StudyReceiver"
+            android:exported="false" />
+
+        <!-- Buttons of a pinned checklist (tick, all, unpin, undo). -->
+        <receiver
+            android:name=".pin.PinReceiver"
             android:exported="false" />
 
         <receiver

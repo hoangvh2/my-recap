@@ -151,6 +151,13 @@ fun SettingsScreen(vm: AppViewModel) {
             Section("Thẻ màu tự gắn") {
                 TagRulesSection(s) { transform -> update(transform) }
             }
+            Section("Tìm điện thoại") {
+                SwitchRow("Cho phép tìm máy từ web (đổ chuông)", s.findPhone) { v ->
+                    update { it.copy(findPhone = v) }
+                    vm.deviceSettingChanged()
+                }
+                Hint("Trên bản web: Cài đặt → Tìm điện thoại → Đổ chuông. Máy kêu tối đa 30 giây bằng kênh báo thức ở âm lượng tối đa, kể cả khi đang im lặng, và có nút Dừng chuông. Cần đã đăng nhập đồng bộ và có mạng. Chế độ “Không làm phiền” tắt hoàn toàn thì Android vẫn chặn.")
+            }
             Section("Nhắc lặp mục Quan trọng") {
                 SwitchRow("Không nhắc lặp ban đêm (22:00–06:30)", s.quietNags) { v -> update { it.copy(quietNags = v) } }
                 Hint("Mục ❗ Quan trọng nhắc lại mỗi 10 phút, tối đa 6 lần. Bật mục này thì lần nhắc rơi vào ban đêm sẽ chờ đến 06:30.")

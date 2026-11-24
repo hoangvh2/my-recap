@@ -27,12 +27,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.vh.myrecap.data.RecState
 import com.vh.myrecap.data.Segment
 import com.vh.myrecap.data.SessionStore
 import com.vh.myrecap.data.StorageJanitor
+import com.vh.myrecap.pin.PinnedChecklists
 import com.vh.myrecap.reminder.HolidayUpdater
 import com.vh.myrecap.reminder.LunarReminders
 import com.vh.myrecap.reminder.Reminders
@@ -88,6 +90,12 @@ class MyRecapApp : Application() {
         appScope.launch {
             items.items.drop(1).debounce(500).collect { CaptureWidget.refresh(this@MyRecapApp) }
         }
+        // Pinned checklists follow the data (ticked in the app, changed on the web, finished or deleted).
+        appScope.launch {
+            items.ready.first { it }
+            PinnedChecklists.refresh(this@MyRecapApp)
+            items.items.drop(1).debounce(300).collect { PinnedChecklists.refresh(this@MyRecapApp) }
+        }
         appScope.launch {
             settings.settings.map { it.quickTemplates }.distinctUntilChanged().collect {
                 QuickAddWidget.refresh(this@MyRecapApp)
@@ -136,6 +144,24 @@ class MyRecapApp : Application() {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_SHARED, "Chia sẻ", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Khi người đã liên kết chia sẻ, sửa hoặc xoá một mục với bạn"
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_FIND, "Tìm điện thoại", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Hiện khi điện thoại đang đổ chuông do bạn yêu cầu từ bản web, có nút Dừng chuông. Âm phát theo kênh báo thức"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_PINNED, "Checklist đã ghim", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Checklist bạn ghim để tick ngay trên thanh thông báo. Không phát âm"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
                 lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             },
         )
@@ -207,6 +233,8 @@ class MyRecapApp : Application() {
         const val CHANNEL_STUDY = "study"
         const val CHANNEL_CALLS = "calls"
         const val CHANNEL_SHARED = "shared"
+        const val CHANNEL_PINNED = "pinned"
+        const val CHANNEL_FIND = "find"
 
         fun from(context: Context): MyRecapApp = context.applicationContext as MyRecapApp
     }

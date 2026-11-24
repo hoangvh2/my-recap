@@ -9,6 +9,7 @@ import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-fu
 import { isAllowedToken, parseAllowedEmails } from "./auth";
 import { CaptureError, parseCaptureInput, runCapture, type CaptureDeps } from "./capture";
 import { allowedOrigins, DEFAULT_GEMINI_MODEL, GEMINI_BASE_URL, REGION } from "./config";
+import { FcmFindSender, FindPhoneError, FirestoreFindStore, handleFindPhone, parseFindRequest } from "./findphone";
 import { FeedHandler, FeedRequestError, FirestoreFeedStore, manageFeed, parseFeedRequest } from "./feed";
 import { GeminiClient } from "./gemini";
 import { FirestoreMembersStore, isMemberToken, manageMembers, MembersError, parseMembersRequest } from "./members";
@@ -296,6 +297,32 @@ export const members = onCall(
     } catch (e) {
       if (e instanceof MembersError) throw new HttpsError(e.code, e.message);
       logger.error("members crashed", { uid: shortHash(uid), error: e instanceof Error ? e.name : "unknown" });
+      throw new HttpsError("internal", "Chưa làm được, thử lại sau");
+    }
+  },
+);
+
+/** "Tìm điện thoại": list my Android phones, make one ring, or stop it. Only my own phones are reachable. */
+export const findphone = onCall(
+  {
+    region: REGION,
+    enforceAppCheck: false,
+    cors: inEmulator ? true : allowedOrigins(project, process.env.EXTRA_ORIGINS),
+    maxInstances: 2,
+    concurrency: 8,
+    timeoutSeconds: 30,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const uid = await requireAllowed(request, "findphone");
+    try {
+      const req = parseFindRequest(request.data);
+      const result = await handleFindPhone(new FirestoreFindStore(getFirestore()), new FcmFindSender(inEmulator ? null : getMessaging()), uid, req, Date.now());
+      logger.info("findphone", { uid: shortHash(uid), action: req.action });
+      return result;
+    } catch (e) {
+      if (e instanceof FindPhoneError) throw new HttpsError(e.code, e.message);
+      logger.error("findphone crashed", { uid: shortHash(uid), error: e instanceof Error ? e.name : "unknown" });
       throw new HttpsError("internal", "Chưa làm được, thử lại sau");
     }
   },

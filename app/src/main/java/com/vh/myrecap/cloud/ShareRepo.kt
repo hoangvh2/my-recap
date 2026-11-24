@@ -143,9 +143,10 @@ class ShareRepo(private val db: FirebaseFirestore, private val functions: Fireba
         db.collection("users").document(me ?: return@write).collection("notices").document(id).delete().await()
     }
 
-    suspend fun saveDevice(uid: String, id: String, token: String) {
+    /** [name]: what the web app calls this phone; [find]: whether the web app may make it ring. */
+    suspend fun saveDevice(uid: String, id: String, token: String, name: String, find: Boolean) {
         db.collection("users").document(uid).collection("devices").document(id)
-            .set(mapOf("token" to token, "platform" to "android", "updatedAt" to System.currentTimeMillis())).await()
+            .set(mapOf("token" to token, "platform" to "android", "updatedAt" to System.currentTimeMillis(), "name" to name, "find" to find)).await()
     }
 
     suspend fun forgetDevice(uid: String, id: String) {

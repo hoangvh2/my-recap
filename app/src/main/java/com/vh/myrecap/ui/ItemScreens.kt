@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
@@ -687,6 +689,15 @@ fun ItemEditScreen(vm: AppViewModel, id: String?, newType: ItemType) {
             )
             if (edit.type == ItemType.NOTE) {
                 NoteAiButton(edit, busy = vm.noteAiBusy, onClick = { vm.suggestForNote(current) })
+                OutlinedButton(
+                    onClick = { vm.openTeleprompter(current.title, current.details) },
+                    enabled = current.details.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Đọc bằng Teleprompter")
+                }
             }
 
             if ((edit.type == ItemType.EVENT || edit.type == ItemType.TASK) && edit.whenAt != null) {
