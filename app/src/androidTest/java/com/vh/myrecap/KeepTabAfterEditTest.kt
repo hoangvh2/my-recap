@@ -90,7 +90,9 @@ class KeepTabAfterEditTest {
             device.waitForIdle()
             Thread.sleep(600)
         }
-        throw AssertionError("chip $label not found")
+        // Say what the screen shows, so a failure in CI can be read from the log.
+        val seen = device.findObjects(By.text(java.util.regex.Pattern.compile(".+"))).joinToString(" | ") { "${it.text}@${it.visibleBounds.centerX()},${it.visibleBounds.centerY()}" }
+        throw AssertionError("chip $label not found; row y=$y; on screen: ${seen.take(1500)}")
     }
 
     /** Taps the chip until [gone] has left the screen: a tap that lands while the row still glides selects nothing, so it is repeated (the check itself is as strict as before). */
