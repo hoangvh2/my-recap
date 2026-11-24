@@ -86,9 +86,19 @@ class KeepTabAfterEditTest {
         repeat(6) { attempt ->
             device.findObjects(By.textStartsWith(label)).firstOrNull { kotlin.math.abs(it.visibleBounds.centerY() - y) < 40 }?.let { return it }
             if (attempt < 3) device.swipe(w * 3 / 4, y, w / 4, y, 20) else device.swipe(w / 4, y, w * 3 / 4, y, 20)
-            Thread.sleep(300)
+            // The row keeps gliding after the swipe; a tap on the spot where the chip was a moment ago misses it.
+            device.waitForIdle()
+            Thread.sleep(600)
         }
         throw AssertionError("chip $label not found")
+    }
+
+    /** Taps the chip until [gone] has left the screen: a tap that lands while the row still glides selects nothing, so it is repeated (the check itself is as strict as before). */
+    private fun selectChip(label: String, gone: String) {
+        repeat(3) {
+            chip(label).click()
+            if (device.wait(Until.gone(By.textContains(gone)), 3_000)) return
+        }
     }
 
     private fun shows(text: String) = find(By.textContains(text)) != null
@@ -97,8 +107,8 @@ class KeepTabAfterEditTest {
     private fun editKeepsList(chipLabel: String, first: String, second: String, other: String) {
         ActivityScenario.launch(MainActivity::class.java).use {
             assertTrue("home", device.wait(Until.hasObject(By.textStartsWith("Tổng quan")), 8_000))
-            chip(chipLabel).click()
-            assertFalse("$other hidden under $chipLabel", device.wait(Until.hasObject(By.textContains(other)), 1_500))
+            selectChip(chipLabel, gone = other)
+            assertFalse("$other hidden under $chipLabel", device.hasObject(By.textContains(other)))
             checkNotNull(find(By.textContains(first))) { "first row" }.click()
             assertTrue("editor", device.wait(Until.hasObject(By.text("Lưu thay đổi")), 5_000) || find(By.text("Lưu thay đổi")) != null)
             val field = checkNotNull(find(By.text(first))) { "title field" }
