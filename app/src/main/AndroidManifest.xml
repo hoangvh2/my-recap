@@ -98,6 +98,11 @@
             android:name=".study.StudyReceiver"
             android:exported="false" />
 
+        <!-- Buttons of a pinned checklist (tick, all, unpin, undo). -->
+        <receiver
+            android:name=".pin.PinReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".reminder.ReminderReceiver"
             android:exported="false">

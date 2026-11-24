@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -58,6 +59,8 @@ import com.vh.myrecap.core.ChecklistTemplate
 import com.vh.myrecap.core.Item
 import com.vh.myrecap.core.StudyPlan
 import com.vh.myrecap.MyRecapApp
+import com.vh.myrecap.core.ItemStatus
+import com.vh.myrecap.pin.PinnedChecklists
 import com.vh.myrecap.study.StudyEngine
 import com.vh.myrecap.study.StudyService
 import kotlinx.coroutines.launch
@@ -111,6 +114,17 @@ fun ChecklistPanel(item: Item, onOp: (ChecklistOp) -> Unit, modifier: Modifier =
                 }
             }
             if (p.ticked.isNotEmpty()) TextButton(onClick = { onOp(ChecklistOp.Reset) }) { Text("Đặt lại") }
+        }
+        if (item.status == ItemStatus.OPEN) {
+            val pinned = item.id in PinnedChecklists.ids.collectAsState().value
+            TextButton(
+                onClick = { onOp(ChecklistOp.TogglePin) },
+                modifier = Modifier.padding(horizontal = 4.dp).heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.Rounded.PushPin, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (pinned) "Bỏ ghim khỏi thanh thông báo" else "Ghim lên thanh thông báo")
+            }
         }
     }
 }

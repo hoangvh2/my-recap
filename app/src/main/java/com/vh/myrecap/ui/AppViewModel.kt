@@ -53,6 +53,7 @@ import com.vh.myrecap.data.Session
 import com.vh.myrecap.data.StorageStats
 import com.vh.myrecap.data.TaskStatus
 import com.vh.myrecap.recorder.RecorderState
+import com.vh.myrecap.pin.PinnedChecklists
 import com.vh.myrecap.reminder.HolidayUpdater
 import com.vh.myrecap.reminder.Reminders
 import com.vh.myrecap.recorder.RecordingService
@@ -76,6 +77,8 @@ sealed interface ChecklistOp {
     data class Toggle(val entryId: String) : ChecklistOp
     data object All : ChecklistOp
     data object Reset : ChecklistOp
+    /** Pin the checklist to the notification shade, or unpin it. */
+    data object TogglePin : ChecklistOp
 }
 
 /** The item as it was before a checklist change, with the words for the Undo bar. */
@@ -606,6 +609,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             is ChecklistOp.Toggle -> Checklist.toggle(before, op.entryId)
             ChecklistOp.All -> Checklist.tickAll(before)
             ChecklistOp.Reset -> Checklist.reset(before)
+            ChecklistOp.TogglePin -> {
+                if (PinnedChecklists.isPinned(app, id)) {
+                    PinnedChecklists.unpin(app, id)
+                    toast("Đã bỏ ghim")
+                } else {
+                    toast(PinnedChecklists.message(PinnedChecklists.pin(app, before)))
+                }
+                return@io
+            }
         }
         if (next == before) return@io
         val complete = Checklist.progress(next).complete

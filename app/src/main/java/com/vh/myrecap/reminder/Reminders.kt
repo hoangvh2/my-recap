@@ -17,6 +17,7 @@ import com.vh.myrecap.core.ItemType
 import com.vh.myrecap.core.ReminderText
 import com.vh.myrecap.core.ReminderTexts
 import com.vh.myrecap.core.StudyPlan
+import com.vh.myrecap.pin.PinnedChecklists
 import com.vh.myrecap.study.StudyEngine
 import com.vh.myrecap.study.StudyService
 import com.vh.myrecap.ui.MainActivity
@@ -267,7 +268,10 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED, AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,
-            -> Reminders.syncAll(context)
+            -> {
+                Reminders.syncAll(context)
+                PinnedChecklists.refresh(context) // notifications are gone after a restart or an update
+            }
         }
     }
 }
